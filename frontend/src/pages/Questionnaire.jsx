@@ -220,7 +220,7 @@ const inputStyle = {
 
 const selectStyle = { ...inputStyle, appearance: 'none', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' fill=\'%2394A3B8\' viewBox=\'0 0 16 16\'%3E%3Cpath d=\'M4.646 5.646a.5.5 0 0 1 .708 0L8 8.293l2.646-2.647a.5.5 0 0 1 .708.708l-3 3a.5.5 0 0 1-.708 0l-3-3a.5.5 0 0 1 0-.708z\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', paddingRight: '36px' };
 
-const InputField = ({ label, description, name, type = 'text', value, onChange, placeholder, info, prefix, suffix, required }) => (
+const InputField = ({ label, description, name, type = 'text', value, onChange, placeholder, info, prefix, suffix, required, min, max }) => (
     <div style={{ flex: 1, marginBottom: '20px' }}>
         <label style={labelStyle}>
             {label}
@@ -234,6 +234,7 @@ const InputField = ({ label, description, name, type = 'text', value, onChange, 
                 type={type === 'currency' || type === 'percentage' ? 'number' : type}
                 name={name} value={value !== undefined && value !== null ? value : ''} onChange={onChange} placeholder={placeholder}
                 required={required}
+                min={min} max={max}
                 style={{ ...inputStyle, ...(prefix ? { paddingLeft: '30px' } : {}), ...(suffix ? { paddingRight: '36px' } : {}) }}
                 onFocus={(e) => e.target.style.borderColor = '#1E293B'}
                 onBlur={(e) => e.target.style.borderColor = '#E2E8F0'}
@@ -279,7 +280,7 @@ const Step1 = ({ formData: f, onChange }) => (
         </Row>
         <SelectField label="Employment Type" name="employment_type" value={f.employment_type} onChange={onChange} options={['Salaried', 'Self-Employed', 'Business', 'Retired', 'Student']} required />
         <Row>
-            <InputField label="Risk Comfort" name="risk_comfort" type="number" value={f.risk_comfort} onChange={onChange} placeholder="1-10" info="Rate your comfort with financial risk, 1 = very low, 10 = very high" required />
+            <SelectField label="Risk Comfort" name="risk_comfort" value={f.risk_comfort} onChange={onChange} options={['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']} required info="Rate your comfort with financial risk, 1 = very low, 10 = very high" />
             <SelectField label="Investment Experience" name="investment_experience" value={f.investment_experience} onChange={onChange} options={['None', '< 1 year', '1-3 years', '3-5 years', '5+ years']} required />
         </Row>
     </>
