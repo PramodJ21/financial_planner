@@ -76,11 +76,10 @@ function Questionnaire() {
     );
 
     return (
-        <div style={{ display: 'flex', height: '100vh', backgroundColor: C.bg, fontFamily: "'Inter', sans-serif" }}>
+        <div className="questionnaire-layout" style={{ backgroundColor: C.bg, fontFamily: "'Inter', sans-serif" }}>
 
             {/* ─── SIDEBAR ─── */}
-            <div style={{
-                width: '240px', minWidth: '240px',
+            <div className="questionnaire-sidebar" style={{
                 backgroundColor: C.sidebarBg,
                 borderRight: `1px solid ${C.border}`,
                 display: 'flex', flexDirection: 'column',
@@ -163,7 +162,7 @@ function Questionnaire() {
                 </div>
 
                 {/* Scrollable Form Area */}
-                <div style={{ flex: 1, overflowY: 'auto', padding: '40px 48px', display: 'flex', justifyContent: 'center' }}>
+                <div className="questionnaire-main-scroll" style={{ flex: 1, overflowY: 'auto', display: 'flex', justifyContent: 'center' }}>
                     <div style={{ width: '100%', maxWidth: '640px' }}>
                         <h1 style={{ fontSize: '22px', fontWeight: 700, color: C.navy, marginBottom: '4px' }}>{STEPS[currentStep - 1].name}</h1>
                         <p style={{ fontSize: '14px', color: C.sublabel, marginBottom: '32px' }}>{STEPS[currentStep - 1].short}</p>
@@ -180,7 +179,7 @@ function Questionnaire() {
                             {currentStep === 9 && <Step9 formData={formData} onChange={handleInputChange} />}
                             {currentStep === 10 && <Step10 formData={formData} onChange={handleInputChange} />}
 
-                            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '40px', gap: '12px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '40px', gap: '12px', padding: '0 24px' }}>
                                 {currentStep > 1 && (
                                     <button type="button" onClick={() => setCurrentStep(s => s - 1)} style={{
                                         padding: '12px 28px', borderRadius: '24px', fontSize: '14px', fontWeight: 600,
@@ -221,18 +220,19 @@ const inputStyle = {
 
 const selectStyle = { ...inputStyle, appearance: 'none', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' fill=\'%2394A3B8\' viewBox=\'0 0 16 16\'%3E%3Cpath d=\'M4.646 5.646a.5.5 0 0 1 .708 0L8 8.293l2.646-2.647a.5.5 0 0 1 .708.708l-3 3a.5.5 0 0 1-.708 0l-3-3a.5.5 0 0 1 0-.708z\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', paddingRight: '36px' };
 
-const InputField = ({ label, name, type = 'text', value, onChange, placeholder, info, prefix, suffix, required }) => (
+const InputField = ({ label, description, name, type = 'text', value, onChange, placeholder, info, prefix, suffix, required }) => (
     <div style={{ flex: 1, marginBottom: '20px' }}>
         <label style={labelStyle}>
             {label}
             {required && <span style={{ color: '#EF4444', marginLeft: '2px' }}>*</span>}
             {info && <span title={info} style={{ cursor: 'help' }}><Info size={13} color="#94A3B8" /></span>}
         </label>
+        {description && <div style={{ fontSize: '11px', color: '#64748B', marginBottom: '8px', lineHeight: '1.4' }}>{description}</div>}
         <div style={{ position: 'relative' }}>
             {prefix && <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8', fontSize: '14px', pointerEvents: 'none' }}>{prefix}</span>}
             <input
                 type={type === 'currency' || type === 'percentage' ? 'number' : type}
-                name={name} value={value || ''} onChange={onChange} placeholder={placeholder}
+                name={name} value={value !== undefined && value !== null ? value : ''} onChange={onChange} placeholder={placeholder}
                 required={required}
                 style={{ ...inputStyle, ...(prefix ? { paddingLeft: '30px' } : {}), ...(suffix ? { paddingRight: '36px' } : {}) }}
                 onFocus={(e) => e.target.style.borderColor = '#1E293B'}
@@ -250,7 +250,7 @@ const SelectField = ({ label, name, value, onChange, options, info, required }) 
             {required && <span style={{ color: '#EF4444', marginLeft: '2px' }}>*</span>}
             {info && <span title={info} style={{ cursor: 'help' }}><Info size={13} color="#94A3B8" /></span>}
         </label>
-        <select name={name} value={value || ''} onChange={onChange} required={required} style={selectStyle}
+        <select name={name} value={value !== undefined && value !== null ? value : ''} onChange={onChange} required={required} style={selectStyle}
             onFocus={(e) => e.target.style.borderColor = '#1E293B'}
             onBlur={(e) => e.target.style.borderColor = '#E2E8F0'}
         >
@@ -260,7 +260,7 @@ const SelectField = ({ label, name, value, onChange, options, info, required }) 
     </div>
 );
 
-const Row = ({ children }) => <div style={{ display: 'flex', gap: '20px' }}>{children}</div>;
+const Row = ({ children }) => <div className="form-row">{children}</div>;
 
 /* ═══════════════════════════════════════════════
    STEP FORMS
@@ -271,7 +271,7 @@ const Step1 = ({ formData: f, onChange }) => (
         <InputField label="Full Name" name="full_name" value={f.full_name} onChange={onChange} placeholder="Enter your full name" required />
         <Row>
             <InputField label="Date of Birth" name="date_of_birth" type="date" value={f.date_of_birth?.split('T')[0]} onChange={onChange} required />
-            <InputField label="City" name="city" value={f.city} onChange={onChange} placeholder="e.g. Mumbai" required />
+            <SelectField label="City" name="city" value={f.city} onChange={onChange} options={['Mumbai', 'Delhi', 'Bengaluru', 'Hyderabad', 'Chennai', 'Kolkata', 'Pune', 'Ahmedabad', 'Other']} required />
         </Row>
         <Row>
             <SelectField label="Marital Status" name="marital_status" value={f.marital_status} onChange={onChange} options={['Single', 'Married', 'Divorced', 'Widowed']} required />
@@ -302,21 +302,37 @@ const Step2 = ({ formData: f, onChange }) => (
 
 const Step3 = ({ formData: f, onChange }) => (
     <>
+        <p style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', color: '#94A3B8', letterSpacing: '0.5px', marginBottom: '16px' }}>Part A: Monthly Expenses</p>
         <Row>
-            <InputField label="Household & Lifestyle" name="expense_household" type="currency" prefix="₹" value={f.expense_household} onChange={onChange} />
-            <InputField label="Rent / Home EMI" name="expense_rent" type="currency" prefix="₹" value={f.expense_rent} onChange={onChange} />
+            <InputField label="Household & Lifestyle" description="Groceries, maid, maintenance, clothing, personal care." name="expense_household" type="currency" prefix="₹" value={f.expense_household} onChange={onChange} />
+            <InputField label="Rent / Home EMI" description="House rent or EMI for your primary residence." name="expense_rent" type="currency" prefix="₹" value={f.expense_rent} onChange={onChange} />
         </Row>
         <Row>
-            <InputField label="Utilities" name="expense_utilities" type="currency" prefix="₹" value={f.expense_utilities} onChange={onChange} />
-            <InputField label="Transport" name="expense_transport" type="currency" prefix="₹" value={f.expense_transport} onChange={onChange} />
+            <InputField label="Utilities" description="Electricity, water, gas, internet, mobile bills." name="expense_utilities" type="currency" prefix="₹" value={f.expense_utilities} onChange={onChange} />
+            <InputField label="Transport" description="Fuel, public transit, cab fares, vehicle maintenance." name="expense_transport" type="currency" prefix="₹" value={f.expense_transport} onChange={onChange} />
         </Row>
         <Row>
-            <InputField label="Food & Dining" name="expense_food" type="currency" prefix="₹" value={f.expense_food} onChange={onChange} />
-            <InputField label="Subscriptions" name="expense_subscriptions" type="currency" prefix="₹" value={f.expense_subscriptions} onChange={onChange} />
+            <InputField label="Food & Dining" description="Eating out, ordering in, coffee shop visits." name="expense_food" type="currency" prefix="₹" value={f.expense_food} onChange={onChange} />
+            <InputField label="Subscriptions" description="Netflix, Gym, Amazon Prime, software." name="expense_subscriptions" type="currency" prefix="₹" value={f.expense_subscriptions} onChange={onChange} />
         </Row>
         <Row>
-            <InputField label="Insurance Premiums" name="expense_insurance" type="currency" prefix="₹" value={f.expense_insurance} onChange={onChange} />
-            <InputField label="Discretionary" name="expense_discretionary" type="currency" prefix="₹" value={f.expense_discretionary} onChange={onChange} info="Shopping, entertainment, hobbies" />
+            <InputField label="Discretionary" description="Shopping, hobbies, movies, recreational activities." name="expense_discretionary" type="currency" prefix="₹" value={f.expense_discretionary} onChange={onChange} />
+        </Row>
+
+        <p style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', color: '#94A3B8', letterSpacing: '0.5px', marginBottom: '16px', marginTop: '32px' }}>Part B: Annual Expenses</p>
+        <div style={{ padding: '12px 16px', backgroundColor: '#F0F9FF', borderRadius: '8px', border: '1px solid #BAE6FD', marginBottom: '20px', fontSize: '12px', color: '#0369A1', lineHeight: 1.6 }}>
+            <strong>Why do we ask for these?</strong> Yearly obligations take a hidden cut from your monthly income. We prorate these to reveal your <i>true</i> monthly surplus and pad your emergency fund.
+        </div>
+        <Row>
+            <InputField label="Insurance Premiums" description="Yearly payments for Health, Term, Vehicle, or Home insurance." name="expense_annual_insurance" type="currency" prefix="₹" value={f.expense_annual_insurance} onChange={onChange} />
+            <InputField label="Education / School Fees" description="Yearly school, college, or tuition fees for children or self." name="expense_annual_education" type="currency" prefix="₹" value={f.expense_annual_education} onChange={onChange} />
+        </Row>
+        <Row>
+            <InputField label="Property Tax & Maintenance" description="Yearly property taxes, major home repairs, or society charges." name="expense_annual_property" type="currency" prefix="₹" value={f.expense_annual_property} onChange={onChange} />
+            <InputField label="Travel & Vacations" description="Estimated yearly budget for family trips and holidays." name="expense_annual_travel" type="currency" prefix="₹" value={f.expense_annual_travel} onChange={onChange} />
+        </Row>
+        <Row>
+            <InputField label="Other Annual Obligations" description="Festive expenses, large gifts, or any other yearly recurring costs." name="expense_annual_other" type="currency" prefix="₹" value={f.expense_annual_other} onChange={onChange} />
         </Row>
     </>
 );
@@ -329,7 +345,6 @@ const Step4 = ({ formData: f, onChange }) => (
             <InputField label="FD Average Rate" name="fd_rate" type="percentage" suffix="%" value={f.fd_rate} onChange={onChange} info="Weighted average interest rate across your FDs" />
         </Row>
         <InputField label="Emergency Fund Set Aside" name="emergency_fund" type="currency" prefix="₹" value={f.emergency_fund} onChange={onChange} info="Liquid cash kept aside for unexpected expenses (medical, job loss). Ideally 3-6 months of expenses." />
-        <InputField label="Monthly Surplus / Deficit" name="monthly_surplus" type="currency" prefix="₹" value={f.monthly_surplus} onChange={onChange} info="Money left after all spending and EMIs. Positive = surplus, negative = deficit." />
     </>
 );
 
@@ -340,18 +355,16 @@ const Step5 = ({ formData: f, onChange }) => (
             <InputField label="Equity Mutual Funds" name="inv_equity_mf" type="currency" prefix="₹" value={f.inv_equity_mf} onChange={onChange} info="Current NAV value of all equity-oriented mutual fund holdings" />
         </Row>
         <Row>
-            <InputField label="Monthly SIP Amount" name="inv_monthly_sip" type="currency" prefix="₹" value={f.inv_monthly_sip} onChange={onChange} info="SIP = Systematic Investment Plan. Enter the total monthly amount auto-debited for all your SIPs." />
             <InputField label="EPF / PPF / NPS" name="inv_epf_ppf_nps" type="currency" prefix="₹" value={f.inv_epf_ppf_nps} onChange={onChange} info="EPF = Employee Provident Fund (employer deduction). PPF = Public Provident Fund. NPS = National Pension System." />
-        </Row>
-        <Row>
             <InputField label="Debt Funds & Bonds" name="inv_debt_funds" type="currency" prefix="₹" value={f.inv_debt_funds} onChange={onChange} info="Funds that invest in fixed-income instruments like govt bonds, corporate bonds. Lower risk than equity." />
-            <InputField label="Gold / Commodities" name="inv_gold_commodities" type="currency" prefix="₹" value={f.inv_gold_commodities} onChange={onChange} info="Physical gold, Sovereign Gold Bonds, Gold ETFs, or commodity investments" />
         </Row>
         <Row>
+            <InputField label="Gold / Commodities" name="inv_gold_commodities" type="currency" prefix="₹" value={f.inv_gold_commodities} onChange={onChange} info="Physical gold, Sovereign Gold Bonds, Gold ETFs, or commodity investments" />
             <InputField label="Real Estate Value" name="inv_real_estate" type="currency" prefix="₹" value={f.inv_real_estate} onChange={onChange} info="Current market value of all property owned (excluding primary residence loan)" />
+        </Row>
+        <Row>
             <InputField label="Crypto / Alternatives" name="inv_crypto_alt" type="currency" prefix="₹" value={f.inv_crypto_alt} onChange={onChange} info="Cryptocurrency, REITs, InvITs, angel investments, P2P lending, etc." />
         </Row>
-        <InputField label="Number of Mutual Funds" name="inv_num_mutual_funds" type="number" value={f.inv_num_mutual_funds} onChange={onChange} placeholder="Count" info="Total distinct mutual fund schemes you hold. Too many (>10) may over-diversify." />
     </>
 );
 
@@ -533,9 +546,50 @@ const Step10 = ({ formData: f, onChange }) => {
         { label: 'I prefer investing in brands I personally use', name: 'beh_familiar_brands' },
         { label: 'I compare my financial progress with peers', name: 'beh_compare_peers' }
     ];
+    const scaleLabels = ['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree'];
     return <>
-        {questions.map((q, i) => (
-            <SelectField key={i} label={q.label} name={q.name} value={f[q.name]} onChange={onChange} options={['1', '2', '3', '4', '5']} info="1 = Strongly Disagree, 5 = Strongly Agree" required />
-        ))}
+        <div style={{ padding: '12px 16px', backgroundColor: '#F8FAFC', borderRadius: '8px', border: '1px solid #E8ECF1', marginBottom: '24px', fontSize: '12px', color: '#475569', lineHeight: 1.7 }}>
+            <span style={{ fontWeight: 600, color: '#1E293B' }}>How to answer:</span> Rate each statement on a scale of 1 to 5 based on how strongly you agree with it.
+            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginTop: '8px' }}>
+                {scaleLabels.map((lbl, i) => (
+                    <span key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontWeight: 700, color: '#1E293B' }}>{i + 1}</span>
+                        <span style={{ color: '#64748B' }}>= {lbl}</span>
+                    </span>
+                ))}
+            </div>
+        </div>
+        {questions.map((q, i) => {
+            const current = f[q.name] ? String(f[q.name]) : '';
+            return (
+                <div key={i} style={{ marginBottom: '24px' }}>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#1E293B', marginBottom: '10px' }}>
+                        {q.label} <span style={{ color: '#EF4444' }}>*</span>
+                    </label>
+                    <div style={{ display: 'flex', gap: '0', borderRadius: '8px', overflow: 'hidden', border: '1px solid #E2E8F0' }}>
+                        {scaleLabels.map((lbl, j) => {
+                            const val = String(j + 1);
+                            const selected = current === val;
+                            return (
+                                <button key={val} type="button"
+                                    onClick={() => onChange({ target: { name: q.name, value: val } })}
+                                    style={{
+                                        flex: 1, padding: '10px 4px', border: 'none', cursor: 'pointer',
+                                        backgroundColor: selected ? '#1E293B' : '#fff',
+                                        color: selected ? '#fff' : '#475569',
+                                        fontSize: '11px', fontWeight: 600, textAlign: 'center',
+                                        borderRight: j < 4 ? '1px solid #E2E8F0' : 'none',
+                                        transition: 'all 0.15s ease'
+                                    }}
+                                >
+                                    <div style={{ fontSize: '14px', fontWeight: 700, marginBottom: '2px' }}>{val}</div>
+                                    <div style={{ fontSize: '9px', fontWeight: 500, opacity: 0.85 }}>{lbl}</div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        })}
     </>;
 };

@@ -1,0 +1,19 @@
+Fix for mobile view
+Dropdown for City 
+Dependents not accepting 0
+Mention if the expenses are monthly or yearly
+Remove monthly surplus
+Emergency Fund not accepting 0
+Action plan report unable to download
+Unable to change the progress of the action plan
+Round term insurance to nearest 50L
+Make moneysign system more robust and indepth
+Change ideal equity allocation strategy to take into account age and moneysign (less age -> less debt, dont consider real estate in ideal allocation)
+Remove Montly Investments column from asset holdings sections of investments page
+Remove SIP section from Investments section of questionnare
+
+Goal Based Investing
+For each goal consider all the possible constraints that comes with it.
+Take into account his current monthly surplus and then suggest.
+Only suggest investing in equity, debt, commodity
+Show chart for each goal, description

@@ -68,12 +68,12 @@ function Liabilities() {
             </div>
 
             {/* ── Top: Chart + Table + Credit Score ── */}
-            <div style={{ display: 'flex', gap: '16px' }}>
+            <div className="stat-row">
                 {/* Chart + Table card */}
                 <div className="card" style={{ flex: 1, padding: '24px' }}>
-                    <div style={{ display: 'flex', gap: '40px', alignItems: 'flex-start' }}>
+                    <div className="chart-table-row">
                         {/* Pie Chart */}
-                        <div style={{ width: '200px', flexShrink: 0 }}>
+                        <div className="chart-sidebar">
                             {pieData.length > 0 ? (
                                 <>
                                     <div style={{ height: '160px' }}>
@@ -108,7 +108,7 @@ function Liabilities() {
                         </div>
 
                         {/* Liabilities Table */}
-                        <div style={{ flex: 1, overflowX: 'auto' }}>
+                        <div className="table-scroll-wrapper" style={{ flex: 1 }}>
                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                 <thead>
                                     <tr style={{ borderBottom: '1px solid #E8ECF1' }}>
@@ -161,7 +161,7 @@ function Liabilities() {
                 {/* Good Liability */}
                 <div style={{ marginBottom: '24px' }}>
                     <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#1E293B', textTransform: 'uppercase', marginBottom: '12px' }}>Good Liability</h3>
-                    <div style={{ display: 'flex', gap: '16px' }}>
+                    <div className="stat-row">
                         <div style={{ flex: 1, border: '1px solid #E8ECF1', borderRadius: '8px', padding: '16px', backgroundColor: '#FFFFFF' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                                 <span style={{ fontSize: '11px', fontWeight: 600, color: '#1E293B', textTransform: 'uppercase' }}>Outstanding</span>
@@ -186,7 +186,7 @@ function Liabilities() {
                 {/* Bad Liability */}
                 <div style={{ marginBottom: '24px' }}>
                     <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#1E293B', textTransform: 'uppercase', marginBottom: '12px' }}>Bad Liability</h3>
-                    <div style={{ display: 'flex', gap: '16px' }}>
+                    <div className="stat-row">
                         <div style={{ flex: 1, border: '1px solid #E8ECF1', borderRadius: '8px', padding: '16px', backgroundColor: '#FFFFFF' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                                 <span style={{ fontSize: '11px', fontWeight: 600, color: '#1E293B', textTransform: 'uppercase' }}>Outstanding</span>
@@ -235,7 +235,7 @@ function Liabilities() {
             {/* ── Financial Analysis – Expenses & Liability Ratios ── */}
             <div>
                 <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', marginBottom: '16px' }}>Financial Analysis – Expenses & Liability Ratios</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                <div className="dashboard-3col">
                     {ratios.map((r, i) => (
                         <div key={i} className="card" style={{ padding: '20px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>

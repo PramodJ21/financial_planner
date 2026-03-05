@@ -52,12 +52,14 @@ function Investments() {
 
     const { assets, allocationIdeals } = data.investments;
 
+    const altTotal = (assets.altInvestments || 0) + (assets.realEstate || 0);
+    const altPct = assets.allocation ? parseFloat(((assets.allocation.altInvestments || 0) + (assets.allocation.realEstate || 0)).toFixed(2)) : 0;
+
     const pieData = [
         { name: 'Equity', value: assets.equity, pct: assets.allocation.equity },
-        { name: 'Real Estate', value: assets.realEstate, pct: assets.allocation.realEstate },
         { name: 'Commodity', value: assets.commodity, pct: assets.allocation.commodity },
         { name: 'Debt', value: assets.debt, pct: assets.allocation.debt },
-        { name: 'Alternative Investments', value: assets.altInvestments, pct: assets.allocation.altInvestments }
+        { name: 'Alternative Investments', value: altTotal, pct: altPct }
     ].filter(d => d.value > 0);
 
     const idealMap = {};
@@ -65,10 +67,9 @@ function Investments() {
 
     const allocationCards = [
         { name: 'Equity', actual: assets.equity },
-        { name: 'Real Estate', actual: assets.realEstate },
         { name: 'Commodity', actual: assets.commodity },
         { name: 'Debt', actual: assets.debt },
-        { name: 'Alternative Investments', actual: assets.altInvestments }
+        { name: 'Alternative Investments', actual: altTotal }
     ];
 
     return (
@@ -81,8 +82,8 @@ function Investments() {
             {/* Asset Holdings */}
             <div className="card" style={{ padding: '24px' }}>
                 <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', marginBottom: '20px' }}>Asset Holdings</h2>
-                <div style={{ display: 'flex', gap: '40px', alignItems: 'flex-start' }}>
-                    <div style={{ width: '220px', flexShrink: 0 }}>
+                <div className="chart-table-row">
+                    <div className="chart-sidebar">
                         <div style={{ height: '180px' }}>
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
@@ -103,11 +104,11 @@ function Investments() {
                         </div>
                     </div>
 
-                    <div style={{ flex: 1, overflowX: 'auto' }}>
+                    <div className="table-scroll-wrapper" style={{ flex: 1 }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
                                 <tr style={{ borderBottom: '1px solid #E8ECF1' }}>
-                                    {['Assets', '%', 'Asset Class', 'Growth (%)', 'Market Value', 'Monthly Investment'].map(h => (
+                                    {['Assets', '%', 'Asset Class', 'Growth (%)', 'Market Value'].map(h => (
                                         <th key={h} style={{ padding: '10px 12px', fontSize: '12px', fontWeight: 600, color: '#64748B', textAlign: h === 'Assets' ? 'left' : 'right', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{h}</th>
                                     ))}
                                 </tr>
@@ -120,13 +121,11 @@ function Investments() {
                                         <td style={{ padding: '12px', fontSize: '13px', textAlign: 'right', color: '#64748B' }}>{item.assetClass}</td>
                                         <td style={{ padding: '12px', fontSize: '13px', textAlign: 'right', color: '#1E293B' }}>{item.growth}%</td>
                                         <td style={{ padding: '12px', fontSize: '13px', textAlign: 'right', fontWeight: 500, color: '#1E293B' }}>{fmt(item.value)}</td>
-                                        <td style={{ padding: '12px', fontSize: '13px', textAlign: 'right', color: '#1E293B' }}>{item.sip > 0 ? fmtFull(item.sip) : '—'}</td>
                                     </tr>
                                 ))}
                                 <tr style={{ borderTop: '2px solid #E8ECF1' }}>
                                     <td style={{ padding: '12px', fontSize: '13px', fontWeight: 700, color: '#1E293B' }} colSpan={4}>Total</td>
                                     <td style={{ padding: '12px', fontSize: '13px', textAlign: 'right', fontWeight: 700, color: '#1E293B' }}>{fmt(assets.total)}</td>
-                                    <td style={{ padding: '12px', fontSize: '13px', textAlign: 'right', fontWeight: 700, color: '#1E293B' }}>{assets.monthlySip > 0 ? fmtFull(assets.monthlySip) : '₹0'}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -137,7 +136,7 @@ function Investments() {
             {/* Financial Analysis – Asset Allocation */}
             <div>
                 <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', marginBottom: '16px' }}>Financial Analysis – Asset Allocation</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px' }}>
+                <div className="dashboard-3col">
                     {allocationCards.map(card => {
                         const ideal = idealMap[card.name] || { min: 0, max: 0 };
                         const inRange = card.actual >= ideal.min && card.actual <= ideal.max;
@@ -156,72 +155,12 @@ function Investments() {
                 </div>
                 <SectionNote title="Understanding Asset Allocation & Ideal Ranges" lines={[
                     'Equity (Stocks + Equity MFs): High growth, high risk. Ideal allocation ≈ (100 − your age)%. A 30-year-old should target ~70% equity.',
-                    'Real Estate: Property value as an investment. Illiquid but inflation-beating. Ideal: 5–20% of portfolio depending on net worth.',
                     'Commodity (Gold/Silver): Acts as a hedge against inflation and market volatility. Ideal: 5–15% of total portfolio.',
                     'Debt (FDs, Bonds, PPF, EPF, NPS): Stable, lower returns, capital preservation. Ideal: roughly your age as a percentage (e.g., 30% at age 30).',
-                    'Alternative Investments (Crypto, REITs, P2P): High risk, potentially high return. Ideal: 0–5% for most risk profiles.',
+                    'Alternative Investments (Real Estate, Crypto, REITs, P2P): Includes property and other non-traditional assets. Ideal: 5–20% depending on net worth and risk profile.',
                     'On track = Your allocation is within the calculated ideal range for your age and risk profile. Outside range = Rebalancing recommended.',
                     'These ideal ranges are adjusted based on your stated risk comfort (1–10 scale) and investment experience from the questionnaire.'
                 ]} />
-            </div>
-
-            {/* MF Holdings Evaluation */}
-            <div className="card" style={{ padding: '24px' }}>
-                <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', marginBottom: '4px' }}>MF Holdings Evaluation</h2>
-                <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '16px' }}>MF Portfolio Impact Analysis</p>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                        <tr style={{ borderBottom: '1px solid #E8ECF1' }}>
-                            {['Scheme Name', 'Plan', 'Category', 'Scheme Type', 'Total Expense Ratio', 'Current Value', 'MF Score', 'Overlap'].map(h => (
-                                <th key={h} style={{ padding: '10px 12px', fontSize: '11px', fontWeight: 600, color: '#64748B', textAlign: 'left', textTransform: 'uppercase' }}>{h}</th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {assets.mfValue > 0 ? (
-                            <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
-                                <td style={{ padding: '12px', fontSize: '13px', fontWeight: 500, color: '#1E293B' }}>Equity Mutual Fund Portfolio</td>
-                                <td style={{ padding: '12px', fontSize: '13px', color: '#1E293B' }}>Direct</td>
-                                <td style={{ padding: '12px', fontSize: '13px', color: '#1E293B' }}>Equity</td>
-                                <td style={{ padding: '12px', fontSize: '13px', color: '#1E293B' }}>Open Ended</td>
-                                <td style={{ padding: '12px', fontSize: '13px', color: '#1E293B' }}>0.5%</td>
-                                <td style={{ padding: '12px', fontSize: '13px', fontWeight: 500, color: '#1E293B' }}>{fmt(assets.mfValue)}</td>
-                                <td style={{ padding: '12px', fontSize: '13px', color: '#1E293B' }}>—</td>
-                                <td style={{ padding: '12px', fontSize: '13px', color: '#1E293B' }}>—</td>
-                            </tr>
-                        ) : (
-                            <tr><td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#94A3B8', fontSize: '14px' }}>No Mutual Funds</td></tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
-
-            {/* Portfolio metrics */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-                <div className="card" style={{ padding: '16px' }}>
-                    <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '4px', textTransform: 'uppercase', fontWeight: 600 }}>Portfolio Allocation</div>
-                    {pieData.map((d, i) => (
-                        <div key={d.name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginTop: '6px' }}>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#1E293B' }}>
-                                <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: COLORS[i] }}></span>
-                                {d.name}
-                            </span>
-                            <span style={{ fontWeight: 500, color: '#1E293B' }}>{d.pct}%</span>
-                        </div>
-                    ))}
-                </div>
-                <div className="card" style={{ padding: '16px' }}>
-                    <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '4px', textTransform: 'uppercase', fontWeight: 600 }}>Mutual Funds</div>
-                    <div style={{ fontSize: '20px', fontWeight: 700, color: '#1E293B' }}>{assets.numMutualFunds || '—'}</div>
-                </div>
-                <div className="card" style={{ padding: '16px' }}>
-                    <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '4px', textTransform: 'uppercase', fontWeight: 600 }}>MF Portfolio Value</div>
-                    <div style={{ fontSize: '20px', fontWeight: 700, color: '#1E293B' }}>{assets.mfValue > 0 ? fmt(assets.mfValue) : '—'}</div>
-                </div>
-                <div className="card" style={{ padding: '16px' }}>
-                    <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '4px', textTransform: 'uppercase', fontWeight: 600 }}>Avg Portfolio Score</div>
-                    <div style={{ fontSize: '20px', fontWeight: 700, color: '#1E293B' }}>—</div>
-                </div>
             </div>
         </div>
     );

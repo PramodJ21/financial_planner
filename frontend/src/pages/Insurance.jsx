@@ -56,8 +56,8 @@ function Insurance() {
             {/* Coverage Summary */}
             <div className="card" style={{ padding: '24px' }}>
                 <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', marginBottom: '20px' }}>Coverage Summary</h2>
-                <div style={{ display: 'flex', gap: '40px', alignItems: 'flex-start' }}>
-                    <div style={{ width: '200px', flexShrink: 0 }}>
+                <div className="chart-table-row">
+                    <div className="chart-sidebar">
                         <div style={{ height: '160px' }}>
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
@@ -107,7 +107,7 @@ function Insurance() {
             {/* Financial Analysis – Emergency Planning */}
             <div>
                 <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', marginBottom: '16px' }}>Financial Analysis – Emergency Planning</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                <div className="dashboard-3col">
                     {[
                         { label: 'Emergency Funds', actual: emergency.emergencyFunds?.actual || 0, ideal: emergency.emergencyFunds?.ideal || 0 },
                         { label: 'Health Insurance', actual: emergency.healthInsurance?.actual || 0, ideal: emergency.healthInsurance?.ideal || 0 },
@@ -128,6 +128,18 @@ function Insurance() {
                             </div>
                         );
                     })}
+                </div>
+
+                {/* Understanding section */}
+                <div style={{ borderTop: '1px solid #E8ECF1', marginTop: '20px', paddingTop: '16px' }}>
+                    <h4 style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: '#1E293B', letterSpacing: '0.3px', marginBottom: '12px' }}>Understanding Insurance & Emergency Planning</h4>
+                    <ul style={{ listStyle: 'disc', paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <li style={{ fontSize: '12px', color: '#64748B', lineHeight: 1.6 }}>Emergency Fund ideal = 6 months of effective monthly expenses (monthly living costs + prorated annual obligations like insurance & school fees).</li>
+                        <li style={{ fontSize: '12px', color: '#64748B', lineHeight: 1.6 }}>Health Insurance ideal = MAX(₹5L, 50% of annual gross income). Family size and city tier may warrant ₹10-25L+ cover.</li>
+                        <li style={{ fontSize: '12px', color: '#64748B', lineHeight: 1.6 }}>Life Insurance ideal = 10× annual gross income as a pure Term Plan, applicable only if you have dependents (spouse, children, or elderly parents).</li>
+                        <li style={{ fontSize: '12px', color: '#64748B', lineHeight: 1.6 }}>Term plans offer the best premium-to-cover ratio. Endowment/ULIP plans are generally not recommended for pure protection.</li>
+                        <li style={{ fontSize: '12px', color: '#64748B', lineHeight: 1.6 }}>Status badge shows "On track" if your actual value is within 80%-150% of the ideal. Outside this range indicates a gap or over-allocation.</li>
+                    </ul>
                 </div>
             </div>
 

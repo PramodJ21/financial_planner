@@ -70,7 +70,7 @@ function Estate() {
             {/* Nominee Summary */}
             <div className="card" style={{ padding: '24px' }}>
                 <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', marginBottom: '20px' }}>Nominee Summary</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                <div className="estate-grid">
                     <div style={{ border: '1px solid #E8ECF1', borderRadius: '12px', padding: '20px', backgroundColor: '#FAFAFA' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                             <div>

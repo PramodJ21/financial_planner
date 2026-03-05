@@ -2,7 +2,57 @@ import React, { useEffect, useState } from 'react';
 import { fetchWithAuth } from '../api';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { Link } from 'react-router-dom';
-import { ArrowUpRight, AlertTriangle, Wallet, ShieldCheck, Users } from 'lucide-react';
+import { ArrowUpRight, AlertTriangle, Wallet, ShieldCheck, Users, ChevronDown, ChevronUp } from 'lucide-react';
+
+// Dynamic explanation maps
+const GENERATION_INFO = {
+    'Generation 1': 'You belong to the early wealth-building cohort (under 25). This generation typically has fewer financial commitments, higher risk appetite, and longer investment horizons. Focus areas: building strong financial habits, starting early investments, and avoiding lifestyle inflation.',
+    'Generation 2': 'You belong to the core earning cohort (25–45). This generation is typically in peak earning years, balancing between asset building, family responsibilities, and loan commitments. Focus areas: maximising savings rate, adequate insurance, and disciplined long-term investing.',
+    'Generation 3': 'You belong to the wealth preservation cohort (45+). This generation is transitioning from accumulation to preservation and eventual distribution. Focus areas: de-risking portfolio, ensuring retirement readiness, estate planning, and adequate health coverage.'
+};
+
+const LIFE_STAGE_INFO = {
+    'Foundation Phase': 'You are in the Foundation Phase (under 25). This is the time to build financial literacy, start an emergency fund, develop good saving habits, and begin investing — even small amounts. Avoid high-interest debt. Every rupee invested now benefits from decades of compounding.',
+    'Building Phase': 'You are in the Building Phase (25–35). This is when your income grows fastest. Prioritise building a diversified investment portfolio, getting adequate term and health insurance, clearing bad debts, and setting up systematic investments. Lifestyle inflation is the biggest risk at this stage.',
+    'Accumulation Phase': 'You are in the Accumulation Phase (35–50). You are likely at peak earning capacity with significant financial commitments (home loan, children\'s education). Focus on maximising tax-efficient investments, reviewing insurance adequacy, and ensuring your portfolio is on track for retirement goals.',
+    'Pre-Retirement Phase': 'You are in the Pre-Retirement Phase (50–60). Start gradually de-risking your portfolio by shifting from equity to debt. Ensure your retirement corpus is on track, enhance health insurance coverage, finalise estate planning (will, nominations), and plan for post-retirement cash flows.',
+    'Retirement Phase': 'You are in the Retirement Phase (60+). Capital preservation and generating a stable income stream are the primary goals. Maintain adequate liquidity for 2–3 years of expenses, keep health insurance at maximum, ensure your will and nominations are updated, and minimise tax liability on withdrawals.'
+};
+
+const FBS_INFO = (score) => {
+    if (score >= 80) return `Your FBS of ${score} is excellent — you demonstrate strong financial discipline, low impulsive spending, consistent investments, and healthy debt management. Keep maintaining these habits.`;
+    if (score >= 60) return `Your FBS of ${score} is good — you have a reasonably disciplined financial approach, but there is room to improve in areas like savings consistency, investment regularity, or debt management.`;
+    if (score >= 40) return `Your FBS of ${score} indicates moderate financial discipline. Consider building stronger saving habits, reducing discretionary spending, and setting up automated investments to improve your score.`;
+    if (score >= 20) return `Your FBS of ${score} suggests significant room for improvement in financial behaviour. Focus on building an emergency fund, reducing bad debt, and creating a monthly budget to track spending.`;
+    return `Your FBS of ${score} indicates your financial habits need urgent attention. Start with basic steps: track all expenses, stop new debt, build a small emergency fund, and seek guidance from a financial advisor.`;
+};
+
+const MONEY_SIGN_INFO = {
+    'Bold Eagle': 'As a Bold Eagle, you are highly aggressive and deeply engaged with markets. You actively seek high-growth opportunities and are comfortable with significant risk. While this can lead to strong returns, be cautious of overconcentration and ensure proper diversification.',
+    'Cautious Turtle': 'As a Cautious Turtle, you prioritise safety and guaranteed returns over market-beating growth. While this protects your capital, being too conservative — especially when young — can mean your wealth doesn\'t outpace inflation. Consider a small equity allocation for long-term goals.',
+    'Persistent Horse': 'As a Persistent Horse, you are steady and methodical. You set a solid long-term strategy and stick to it without over-monitoring. This disciplined approach is highly effective. Just ensure you review your portfolio at least annually to rebalance.',
+    'Curious Fox': 'As a Curious Fox, you are highly active and experimental, constantly looking for trends. While your curiosity can uncover opportunities, it can also lead to over-trading and chasing short-term returns. Consider a core-satellite approach: keep 80% in a stable portfolio and experiment with 20%.',
+    'Strategic Owl': 'As a Strategic Owl, you are wise and disciplined. You analyse thoroughly before acting and maintain strong emotional control during market volatility. This is one of the most effective investor profiles — just make sure analysis paralysis doesn\'t delay action.',
+    'Loyal Elephant': 'As a Loyal Elephant, you are patient and risk-averse, sticking to what you know. While loyalty to proven assets is admirable, be open to diversification. Over-reliance on fixed deposits and traditional assets may not beat inflation in the long run.',
+    'Balanced Dolphin': 'As a Balanced Dolphin, you maintain a healthy equilibrium between growth-seeking and wealth-preserving behaviours. You adapt well to changing conditions. Continue this balanced approach and review your allocation periodically to stay aligned with your life stage.'
+};
+
+const InfoDropdown = ({ isOpen, onToggle, text }) => (
+    <div>
+        <button onClick={onToggle} style={{
+            display: 'flex', alignItems: 'center', gap: '4px', border: 'none', background: 'none',
+            cursor: 'pointer', fontSize: '11px', color: '#94A3B8', fontWeight: 500, padding: '6px 0 0', marginTop: '4px'
+        }}>
+            {isOpen ? 'Hide details' : 'What does this mean?'}
+            {isOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+        </button>
+        {isOpen && (
+            <div style={{ marginTop: '8px', padding: '12px', backgroundColor: '#F8FAFC', borderRadius: '6px', border: '1px solid #E8ECF1', fontSize: '12px', color: '#475569', lineHeight: 1.7 }}>
+                {text}
+            </div>
+        )}
+    </div>
+);
 
 const SectionNote = ({ lines }) => (
     <div style={{ marginTop: '16px', padding: '12px 16px', backgroundColor: '#F8FAFC', borderRadius: '8px', border: '1px solid #E8ECF1' }}>
@@ -68,6 +118,8 @@ function Dashboard() {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('Emergency Planning');
+    const [openDropdowns, setOpenDropdowns] = useState({});
+    const toggleDropdown = (key) => setOpenDropdowns(prev => ({ ...prev, [key]: !prev[key] }));
 
     useEffect(() => {
         fetchWithAuth('/dashboard/full').then(res => {
@@ -104,8 +156,8 @@ function Dashboard() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
             {/* 1. Top Banner */}
-            <div style={{ display: 'flex', gap: '16px' }}>
-                <div className="card" style={{ flex: 2, padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'center', backgroundColor: '#F8FAFC' }}>
+            <div className="form-row" style={{ display: 'flex', gap: '16px' }}>
+                <div className="card" style={{ flex: 1, padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'center', backgroundColor: '#F8FAFC' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
                             <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', marginBottom: '8px' }}>Want to update your financial data?</h3>
@@ -121,6 +173,7 @@ function Dashboard() {
                     <div className="card" style={{ padding: '20px', flex: 1 }}>
                         <div style={{ fontSize: '11px', color: '#64748B', textTransform: 'uppercase', marginBottom: '8px', fontWeight: 600 }}>Generation Profile</div>
                         <div style={{ fontSize: '18px', fontWeight: 600, color: '#1E293B' }}>{overview.generation}</div>
+                        <InfoDropdown isOpen={openDropdowns.gen} onToggle={() => toggleDropdown('gen')} text={GENERATION_INFO[overview.generation] || 'Your generation profile helps determine your financial priorities and ideal asset allocation strategy.'} />
                     </div>
                     <div className="card" style={{ padding: '20px', flex: 1 }}>
                         <div style={{ fontSize: '11px', color: '#64748B', textTransform: 'uppercase', marginBottom: '8px', fontWeight: 600 }}>Life Stage</div>
@@ -128,6 +181,7 @@ function Dashboard() {
                             <div style={{ fontSize: '18px', fontWeight: 600, color: '#1E293B' }}>{overview.lifeStage.stage}</div>
                             <div style={{ backgroundColor: '#F1F5F9', color: '#475569', fontSize: '10px', padding: '4px 8px', borderRadius: '4px', fontWeight: 600 }}>Age: {overview.lifeStage.ageRange}</div>
                         </div>
+                        <InfoDropdown isOpen={openDropdowns.life} onToggle={() => toggleDropdown('life')} text={LIFE_STAGE_INFO[overview.lifeStage.stage] || 'Your life stage determines the financial priorities and risk tolerance appropriate for your age group.'} />
                     </div>
                 </div>
             </div>
@@ -136,9 +190,9 @@ function Dashboard() {
             <div className="card" style={{ padding: '24px' }}>
                 <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', marginBottom: '24px' }}>Your Financial Profile</h2>
 
-                <div style={{ display: 'flex', gap: '40px', borderBottom: '1px solid #E8ECF1', paddingBottom: '32px', marginBottom: '24px' }}>
-                    {/* FBS */}
-                    <div style={{ flex: 1, borderRight: '1px solid #E8ECF1', paddingRight: '40px' }}>
+                <div className="form-row" style={{ display: 'flex', gap: '24px' }}>
+                    {/* FBS Section */}
+                    <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '12px', color: '#64748B', display: 'flex', gap: '4px', alignItems: 'center', fontWeight: 600 }}>
                             FBS <span style={{ fontSize: '10px', fontWeight: 500 }}>(Financial Behaviour Score)</span>
                         </div>
@@ -159,15 +213,22 @@ function Dashboard() {
                                 <span>100</span>
                             </div>
                         </div>
+                        <InfoDropdown isOpen={openDropdowns.fbs} onToggle={() => toggleDropdown('fbs')} text={FBS_INFO(fbs)} />
                     </div>
-                    {/* MoneySign & Biases */}
+
+                    {/* Divider */}
+                    <div style={{ width: '1px', backgroundColor: '#E8ECF1' }}></div>
+
+                    {/* MoneySign & Biases Section */}
                     <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600, marginBottom: '12px' }}>MoneySign®</div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
                             <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#F8FAFC', border: '1px solid #E8ECF1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>{overview.moneySign.icon}</div>
                             <span style={{ fontSize: '16px', fontWeight: 600, color: '#1E293B' }}>{overview.moneySign.name}</span>
                         </div>
-                        <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '12px', fontWeight: 600 }}>Behavioural Biases</div>
+                        <div style={{ fontSize: '12px', color: '#475569', lineHeight: 1.6, marginBottom: '12px' }}>{overview.moneySign.desc}</div>
+                        <InfoDropdown isOpen={openDropdowns.money} onToggle={() => toggleDropdown('money')} text={MONEY_SIGN_INFO[overview.moneySign.name] || overview.moneySign.desc} />
+                        <div style={{ fontSize: '12px', color: '#64748B', marginTop: '20px', marginBottom: '12px', fontWeight: 600 }}>Behavioural Biases</div>
                         <ul style={{ margin: 0, paddingLeft: '16px', color: '#1E293B', fontSize: '12px', lineHeight: 1.8 }}>
                             {overview.biases.map(b => (
                                 <li key={b.name} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -179,8 +240,9 @@ function Dashboard() {
                     </div>
                 </div>
 
+
                 {/* Net Worth, Surplus, Credit Score */}
-                <div style={{ display: 'flex', gap: '16px' }}>
+                <div className="form-row" style={{ display: 'flex', gap: '16px' }}>
                     <div style={{ flex: 2, backgroundColor: '#F8FAFC', border: '1px solid #E8ECF1', borderRadius: '8px', padding: '24px', display: 'flex' }}>
                         <div style={{ flex: 1 }}>
                             <div style={{ fontSize: '13px', fontWeight: 700, color: '#1E293B', marginBottom: '16px' }}>Current Net Worth</div>
@@ -204,8 +266,8 @@ function Dashboard() {
                                     <div style={{ margin: 'auto' }}><Wallet size={14} color="#475569" /></div>
                                 </div>
                                 <div>
-                                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#1E293B' }}>Surplus</div>
-                                    <div style={{ fontSize: '10px', color: '#94A3B8', marginTop: '2px' }}>As of {currentDate}</div>
+                                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#1E293B' }}>True Monthly Surplus</div>
+                                    <div style={{ fontSize: '10px', color: '#94A3B8', marginTop: '2px' }} title="Your surplus after accounting for daily living expenses AND pro-rating your yearly obligations like insurance & school fees. This is your true investable amount.">Includes pro-rated annual bills ⓘ</div>
                                 </div>
                             </div>
                             <div style={{ fontSize: '20px', fontWeight: 700, color: '#1E293B' }}>{fmt(overview.surplus.monthly)}</div>
@@ -237,7 +299,7 @@ function Dashboard() {
                     <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', margin: 0 }}>Assets</h2>
                     <ArrowUpRight size={18} color="#1E293B" />
                 </Link>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+                <div className="dashboard-grid" style={{ display: 'grid', gap: '16px' }}>
                     <div style={{ border: '1px solid #E8ECF1', borderRadius: '8px', padding: '20px' }}>
                         <div style={{ fontSize: '12px', fontWeight: 600, color: '#1E293B', marginBottom: '20px' }}>Total Asset Portfolio</div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -252,22 +314,7 @@ function Dashboard() {
                             ))}
                         </div>
                     </div>
-                    <div style={{ border: '1px solid #E8ECF1', borderRadius: '8px', padding: '20px' }}>
-                        <div style={{ fontSize: '12px', fontWeight: 600, color: '#1E293B', marginBottom: '4px' }}>No. of Mutual Funds</div>
-                        <div style={{ fontSize: '10px', color: '#94A3B8', marginBottom: '20px' }}>As of {currentDate}</div>
-                        <div style={{ fontSize: '14px', color: '#1E293B', fontWeight: 600 }}>{overview.investments.numMutualFunds || 'No Mutual Funds'}</div>
-                    </div>
-                    <div style={{ border: '1px solid #E8ECF1', borderRadius: '8px', padding: '20px' }}>
-                        <div style={{ fontSize: '12px', fontWeight: 600, color: '#1E293B', marginBottom: '4px' }}>Mutual Fund Portfolio Value</div>
-                        <div style={{ fontSize: '10px', color: '#94A3B8', marginBottom: '20px' }}>As of {currentDate}</div>
-                        <div style={{ fontSize: '24px', fontWeight: 700, color: '#1E293B' }}>{fmtFull(overview.investments.mfValue)}</div>
-                    </div>
-                    <div style={{ border: '1px solid #E8ECF1', borderRadius: '8px', padding: '20px' }}>
-                        <div style={{ fontSize: '12px', fontWeight: 600, color: '#1E293B', marginBottom: '4px' }}>Avg Portfolio Score</div>
-                        <div style={{ fontSize: '10px', color: '#94A3B8', marginBottom: '20px' }}>As of {currentDate}</div>
-                        <div style={{ fontSize: '24px', fontWeight: 700, color: '#1E293B', marginBottom: '16px' }}>—</div>
-                        <div style={{ fontSize: '10px', color: '#94A3B8' }}>Based on the 1 Finance proprietary research</div>
-                    </div>
+
                 </div>
                 <SectionNote lines={[
                     'Asset allocation percentages are based on current market value of each asset class divided by your total portfolio value.',
@@ -294,7 +341,7 @@ function Dashboard() {
 
                 {/* Tabs Content */}
                 {activeTab === 'Emergency Planning' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                    <div className="alloc-cards" style={{ display: 'grid', gap: '16px' }}>
                         {[
                             { label: 'Emergency Funds', actual: overview.emergency.emergencyFunds.actual, ideal: overview.emergency.emergencyFunds.ideal, inRange: overview.emergency.emergencyFunds.actual >= overview.emergency.emergencyFunds.ideal },
                             { label: 'Health Insurance', actual: overview.emergency.healthInsurance.actual, ideal: overview.emergency.healthInsurance.ideal, inRange: overview.emergency.healthInsurance.actual >= overview.emergency.healthInsurance.ideal },
@@ -314,7 +361,7 @@ function Dashboard() {
                 )}
 
                 {activeTab === 'Expense and Liability Management' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                    <div className="alloc-cards" style={{ display: 'grid', gap: '16px' }}>
                         {liabilities.ratios.map(r => {
                             const inRange = r.actual >= r.idealMin && (r.idealMax === undefined || r.actual <= r.idealMax);
                             const valColor = inRange ? '#16A34A' : '#DC2626';
@@ -336,7 +383,7 @@ function Dashboard() {
                 )}
 
                 {activeTab === 'Asset Allocation' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px' }}>
+                    <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px' }}>
                         {investments.allocationIdeals.map(r => {
                             let actual = 0;
                             if (r.name === 'Equity') actual = investments.assets.equity;
@@ -364,7 +411,18 @@ function Dashboard() {
 
                 {/* Cashflow Table */}
                 <div style={{ marginTop: '32px', borderTop: '1px solid #E8ECF1', paddingTop: '32px' }}>
-                    <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#1E293B', marginBottom: '24px' }}>Next 3 Months Cashflow</h3>
+                    <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#1E293B', marginBottom: '16px' }}>Next 3 Months Cashflow</h3>
+
+                    <div style={{ padding: '16px', backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '8px', marginBottom: '24px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                        <ShieldCheck size={20} color="#16A34A" style={{ marginTop: '2px', flexShrink: 0 }} />
+                        <div>
+                            <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#166534', margin: '0 0 4px 0' }}>Why is my Surplus lower than I thought?</h4>
+                            <p style={{ fontSize: '12px', color: '#15803D', margin: 0, lineHeight: 1.6 }}>
+                                Most people mistakenly calculate surplus as <strong>Income - Monthly Expenses</strong>. But when an annual insurance premium or school fee comes due, they are forced to break their investments. We calculate your <strong>True Surplus</strong> by reserving a 12th of your annual obligations every month. We've projected this below.
+                            </p>
+                        </div>
+                    </div>
+
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
                             <tr style={{ borderBottom: '1px solid #E8ECF1' }}>
@@ -405,7 +463,7 @@ function Dashboard() {
             </div>
 
             {/* 5. 4 Grid (Income, Expenses, Liabilities, Insurance) */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+            <div className="dashboard-2col" style={{ display: 'grid', gap: '16px' }}>
                 {/* Income */}
                 <div className="card" style={{ padding: '24px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '32px' }}>
@@ -414,14 +472,14 @@ function Dashboard() {
                             <div style={{ width: '80px', height: '80px' }}>
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
-                                        <Pie data={overview.income.breakdown.filter(d => d.percent > 0).length ? overview.income.breakdown.filter(d => d.percent > 0) : [{ percent: 1 }]} dataKey="percent" innerRadius={25} outerRadius={40}>
-                                            {(overview.income.breakdown.filter(d => d.percent > 0).length ? overview.income.breakdown.filter(d => d.percent > 0) : [{ percent: 1 }]).map((_, i) => <Cell key={i} fill={overview.income.breakdown.filter(d => d.percent > 0).length ? NEUTRAL_PALETTE[i % NEUTRAL_PALETTE.length] : '#E8ECF1'} />)}
+                                        <Pie data={overview.income.breakdown.some(d => d.percent > 0) ? overview.income.breakdown : [{ percent: 1 }]} dataKey="percent" innerRadius={25} outerRadius={40}>
+                                            {(overview.income.breakdown.some(d => d.percent > 0) ? overview.income.breakdown : [{ percent: 1 }]).map((entry, i) => <Cell key={i} fill={overview.income.breakdown.some(d => d.percent > 0) ? (entry.percent > 0 ? NEUTRAL_PALETTE[i % NEUTRAL_PALETTE.length] : 'transparent') : '#E8ECF1'} stroke="none" />)}
                                         </Pie>
                                         {overview.income.breakdown.some(d => d.percent > 0) && <RechartsTooltip formatter={(v) => `${v}%`} contentStyle={{ fontSize: '11px', padding: '4px 8px' }} />}
                                     </PieChart>
                                 </ResponsiveContainer>
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'x-6px y-12px', columnGap: '20px', rowGap: '12px' }}>
+                            <div className="chart-legend-inline" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'x-6px y-12px', columnGap: '20px', rowGap: '12px' }}>
                                 {overview.income.breakdown.map((item, i) => (
                                     <PieLegendItem key={item.type} color={NEUTRAL_PALETTE[i % NEUTRAL_PALETTE.length]} label={item.type} percent={item.percent} />
                                 ))}
@@ -432,7 +490,8 @@ function Dashboard() {
                         <thead>
                             <tr style={{ borderBottom: '1px solid #E8ECF1' }}>
                                 <th style={{ padding: '8px 4px', fontSize: '11px', fontWeight: 600, color: '#64748B', textAlign: 'left', textTransform: 'uppercase' }}>Income Type</th>
-                                <th style={{ padding: '8px 4px', fontSize: '11px', fontWeight: 600, color: '#64748B', textAlign: 'right', textTransform: 'uppercase' }}>Annual Amount</th>
+                                <th style={{ padding: '8px 4px', fontSize: '11px', fontWeight: 600, color: '#64748B', textAlign: 'right', textTransform: 'uppercase' }}>Monthly</th>
+                                <th style={{ padding: '8px 4px', fontSize: '11px', fontWeight: 600, color: '#64748B', textAlign: 'right', textTransform: 'uppercase' }}>Annual</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -442,9 +501,15 @@ function Dashboard() {
                                         <div style={{ width: '6px', height: '6px', backgroundColor: NEUTRAL_PALETTE[i % NEUTRAL_PALETTE.length] }}></div>
                                         {item.type}
                                     </td>
+                                    <td style={{ padding: '12px 4px', fontSize: '12px', color: '#1E293B', textAlign: 'right' }}>{item.amount > 0 ? fmt(Math.round(item.amount / 12)) : '0'}</td>
                                     <td style={{ padding: '12px 4px', fontSize: '12px', color: '#1E293B', textAlign: 'right' }}>{item.amount > 0 ? fmt(item.amount) : '0'}</td>
                                 </tr>
                             ))}
+                            <tr style={{ borderTop: '2px solid #E8ECF1' }}>
+                                <td style={{ padding: '12px 4px', fontSize: '12px', fontWeight: 700, color: '#1E293B' }}>Total</td>
+                                <td style={{ padding: '12px 4px', fontSize: '12px', fontWeight: 700, color: '#1E293B', textAlign: 'right' }}>{fmt(Math.round(overview.income.breakdown.reduce((s, i) => s + (i.amount || 0), 0) / 12))}</td>
+                                <td style={{ padding: '12px 4px', fontSize: '12px', fontWeight: 700, color: '#1E293B', textAlign: 'right' }}>{fmt(overview.income.breakdown.reduce((s, i) => s + (i.amount || 0), 0))}</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -457,14 +522,14 @@ function Dashboard() {
                             <div style={{ width: '80px', height: '80px' }}>
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
-                                        <Pie data={overview.expenses.breakdown.filter(d => d.percent > 0).length ? overview.expenses.breakdown.filter(d => d.percent > 0) : [{ percent: 1 }]} dataKey="percent" innerRadius={25} outerRadius={40}>
-                                            {(overview.expenses.breakdown.filter(d => d.percent > 0).length ? overview.expenses.breakdown.filter(d => d.percent > 0) : [{ percent: 1 }]).map((_, i) => <Cell key={i} fill={overview.expenses.breakdown.filter(d => d.percent > 0).length ? NEUTRAL_PALETTE[i % NEUTRAL_PALETTE.length] : '#E8ECF1'} />)}
+                                        <Pie data={overview.expenses.breakdown.some(d => d.percent > 0) ? overview.expenses.breakdown : [{ percent: 1 }]} dataKey="percent" innerRadius={25} outerRadius={40}>
+                                            {(overview.expenses.breakdown.some(d => d.percent > 0) ? overview.expenses.breakdown : [{ percent: 1 }]).map((entry, i) => <Cell key={i} fill={overview.expenses.breakdown.some(d => d.percent > 0) ? (entry.percent > 0 ? NEUTRAL_PALETTE[i % NEUTRAL_PALETTE.length] : 'transparent') : '#E8ECF1'} stroke="none" />)}
                                         </Pie>
                                         {overview.expenses.breakdown.some(d => d.percent > 0) && <RechartsTooltip formatter={(v) => `${v}%`} contentStyle={{ fontSize: '11px', padding: '4px 8px' }} />}
                                     </PieChart>
                                 </ResponsiveContainer>
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'x-6px y-12px', columnGap: '20px', rowGap: '12px' }}>
+                            <div className="chart-legend-inline" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'x-6px y-12px', columnGap: '20px', rowGap: '12px' }}>
                                 {overview.expenses.breakdown.map((item, i) => (
                                     <PieLegendItem key={item.type} color={NEUTRAL_PALETTE[i % NEUTRAL_PALETTE.length]} label={item.type} percent={item.percent} />
                                 ))}
@@ -475,11 +540,11 @@ function Dashboard() {
                         <thead>
                             <tr style={{ borderBottom: '1px solid #E8ECF1' }}>
                                 <th style={{ padding: '8px 4px', fontSize: '11px', fontWeight: 600, color: '#64748B', textAlign: 'left', textTransform: 'uppercase' }}>Expenses</th>
-                                <th style={{ padding: '8px 4px', fontSize: '11px', fontWeight: 600, color: '#64748B', textAlign: 'right', textTransform: 'uppercase' }}>Annual Amount</th>
+                                <th style={{ padding: '8px 4px', fontSize: '11px', fontWeight: 600, color: '#64748B', textAlign: 'right', textTransform: 'uppercase' }}>Monthly Amount</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {overview.expenses.breakdown.map((item, i) => (
+                            {(overview.expenses.monthlyBreakdown || overview.expenses.breakdown).map((item, i) => (
                                 <tr key={item.type} style={{ borderBottom: '1px solid #F1F5F9' }}>
                                     <td style={{ padding: '12px 4px', fontSize: '12px', color: '#1E293B', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                         <div style={{ width: '6px', height: '6px', backgroundColor: NEUTRAL_PALETTE[i % NEUTRAL_PALETTE.length] }}></div>
@@ -488,6 +553,10 @@ function Dashboard() {
                                     <td style={{ padding: '12px 4px', fontSize: '12px', color: '#1E293B', textAlign: 'right' }}>{item.amount > 0 ? fmt(item.amount) : '0'}</td>
                                 </tr>
                             ))}
+                            <tr style={{ borderTop: '2px solid #E8ECF1' }}>
+                                <td style={{ padding: '12px 4px', fontSize: '12px', fontWeight: 700, color: '#1E293B' }}>Total</td>
+                                <td style={{ padding: '12px 4px', fontSize: '12px', fontWeight: 700, color: '#1E293B', textAlign: 'right' }}>{fmt((overview.expenses.monthlyBreakdown || overview.expenses.breakdown).reduce((s, i) => s + (i.amount || 0), 0))}</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -510,7 +579,7 @@ function Dashboard() {
                                     </PieChart>
                                 </ResponsiveContainer>
                             </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div className="chart-legend-inline" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                 <PieLegendItem color="#16A34A" label="Good Liabilities" percent={overview.liabilities.total > 0 ? ((overview.liabilities.goodLiability?.outstanding || 0) / overview.liabilities.total * 100) : 0} />
                                 <PieLegendItem color="#DC2626" label="Bad Liabilities" percent={overview.liabilities.total > 0 ? ((overview.liabilities.badLiability?.outstanding || 0) / overview.liabilities.total * 100) : 0} />
                             </div>
@@ -546,11 +615,7 @@ function Dashboard() {
                             </tr>
                         </tbody>
                     </table>
-                    <SectionNote lines={[
-                        'Good Liabilities (green) are Home Loans and Education Loans — they help build assets or earning capacity.',
-                        'Bad Liabilities (red) include Personal Loans, Car Loans, Gold Loans, and Credit Card outstanding — consumptive debt.',
-                        'Total Liabilities = sum of all outstanding loan amounts + credit card outstanding balance.'
-                    ]} />
+                    {/* Removed calculation notes */}
                 </div>
 
                 {/* Insurance */}
@@ -568,7 +633,7 @@ function Dashboard() {
                                     </PieChart>
                                 </ResponsiveContainer>
                             </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div className="chart-legend-inline" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                 <PieLegendItem color={NEUTRAL_PALETTE[0]} label="Life Insurance" percent={overview.insurance.lifePercent} />
                                 <PieLegendItem color={NEUTRAL_PALETTE[1]} label="Health Insurance" percent={overview.insurance.healthPercent} />
                             </div>
@@ -599,11 +664,7 @@ function Dashboard() {
                             </tr>
                         </tbody>
                     </table>
-                    <SectionNote lines={[
-                        'Health Insurance covers medical expenses. Ideal sum insured: ₹10-25L depending on family size and city tier.',
-                        'Life Insurance (term plan) pays a lump sum to nominees on death. Ideal cover: 10-15x your annual income.',
-                        'Premium-to-cover ratio: a lower ratio means better value. Term plans offer the best ratio compared to endowment or ULIP.'
-                    ]} />
+                    {/* Removed calculation notes */}
                 </div>
             </div>
 
@@ -625,7 +686,7 @@ function Dashboard() {
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '16px' }}>
+                <div className="will-cards-row">
                     <div style={{ flex: 1, border: '1px solid #E8ECF1', padding: '20px', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FAFAFA' }}>
                         <div>
                             <div style={{ fontSize: '12px', color: '#1E293B', fontWeight: 600, textTransform: 'uppercase', marginBottom: '8px' }}>Total Investment</div>

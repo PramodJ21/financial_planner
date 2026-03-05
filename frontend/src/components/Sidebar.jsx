@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-function Sidebar({ collapsed }) {
+function Sidebar({ collapsed, mobileOpen }) {
     const { logout } = useAuth();
     const location = useLocation();
 
@@ -29,7 +29,7 @@ function Sidebar({ collapsed }) {
     const width = collapsed ? 64 : 200;
 
     return (
-        <aside style={{
+        <aside className={`app-sidebar${mobileOpen ? ' mobile-open' : ''}`} style={{
             width: `${width}px`,
             minWidth: `${width}px`,
             backgroundColor: '#FFFFFF',
@@ -40,7 +40,6 @@ function Sidebar({ collapsed }) {
             position: 'fixed',
             zIndex: 10,
             fontFamily: "'Inter', sans-serif",
-            transition: 'width 0.2s ease, min-width 0.2s ease',
             overflow: 'hidden'
         }}>
             {/* Brand */}

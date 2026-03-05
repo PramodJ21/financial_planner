@@ -55,7 +55,7 @@ function Tax() {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             {/* Top cards */}
-            <div style={{ display: 'flex', gap: '16px' }}>
+            <div className="stat-row">
                 <div className="card" style={{ flex: 1, padding: '20px' }}>
                     <div style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>Potential Tax Savings</div>
                     <div style={{ fontSize: '28px', fontWeight: 700, color: '#1E293B' }}>{fmt(tax.potentialSavings)}</div>
@@ -73,9 +73,9 @@ function Tax() {
             </div>
             <div>
                 <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', marginBottom: '16px' }}>Tax Overview</h2>
-                <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
+                <div className="tax-overview-row">
                     {/* Left: Income Overview */}
-                    <div className="card" style={{ width: '280px', flexShrink: 0, padding: '24px', borderRadius: '8px 0 0 8px', borderRight: '1px solid #E8ECF1' }}>
+                    <div className="card tax-sidebar-card" style={{ padding: '24px', borderRadius: '8px 0 0 8px', borderRight: '1px solid #E8ECF1' }}>
                         <div style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '16px' }}>Income Overview</div>
                         <div style={{ height: '180px', position: 'relative' }}>
                             <ResponsiveContainer width="100%" height="100%">
@@ -189,7 +189,7 @@ function Tax() {
             {/* Recommendation */}
             <div className="card" style={{ padding: '24px' }}>
                 <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', marginBottom: '16px' }}>Our Recommendation</h2>
-                <div style={{ display: 'flex', gap: '16px' }}>
+                <div className="stat-row">
                     <div style={{ flex: 1, border: `2px solid ${tax.recommended === 'New Regime' ? '#1E293B' : '#E8ECF1'}`, borderRadius: '12px', padding: '20px', position: 'relative' }}>
                         {tax.recommended === 'New Regime' && <span style={{ position: 'absolute', top: '-10px', right: '12px', backgroundColor: '#1E293B', color: 'white', fontSize: '10px', fontWeight: 700, padding: '2px 10px', borderRadius: '8px' }}>Recommended</span>}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
@@ -219,7 +219,7 @@ function Tax() {
             ]} />
 
             {/* Tax Planning + Advance */}
-            <div style={{ display: 'flex', gap: '16px' }}>
+            <div className="stat-row">
                 <div className="card" style={{ flex: 1, padding: '24px' }}>
                     <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#1E293B', marginBottom: '16px' }}>Tax Planning</h3>
                     <div style={{ height: '200px' }}>

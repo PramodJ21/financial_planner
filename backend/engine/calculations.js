@@ -38,27 +38,57 @@ function computeIncome(p) {
 }
 
 function computeExpenses(p) {
+    // 1. Monthly 
     const household = Number(p.expense_household) || 0;
     const rent = Number(p.expense_rent) || 0;
     const utilities = Number(p.expense_utilities) || 0;
     const transport = Number(p.expense_transport) || 0;
     const food = Number(p.expense_food) || 0;
     const subs = Number(p.expense_subscriptions) || 0;
-    const insurance = Number(p.expense_insurance) || 0;
     const disc = Number(p.expense_discretionary) || 0;
 
-    const fixed = (rent + subs + insurance) * 12;
-    const variable = (household + utilities + transport + food) * 12;
-    const misc = disc * 12;
-    const totalMonthly = household + rent + utilities + transport + food + subs + insurance + disc;
-    const totalAnnual = totalMonthly * 12;
+    // Legacy mapping (in case older profiles have this)
+    const insurance_legacy = Number(p.expense_insurance) || 0;
+
+    // 2. Annual
+    const aInsure = (Number(p.expense_annual_insurance) || 0) + (insurance_legacy * 12);
+    const aEdu = Number(p.expense_annual_education) || 0;
+    const aProp = Number(p.expense_annual_property) || 0;
+    const aTravel = Number(p.expense_annual_travel) || 0;
+    const aOther = Number(p.expense_annual_other) || 0;
+
+    const totalAnnualOnly = aInsure + aEdu + aProp + aTravel + aOther;
+    const totalMonthlyOnly = household + rent + utilities + transport + food + subs + disc;
+
+    const fixedAnnual = (rent * 12) + (subs * 12) + aInsure + aEdu + aProp;
+    const variableAnnual = (household * 12) + (utilities * 12) + (transport * 12) + (food * 12);
+    const miscAnnual = (disc * 12) + aTravel + aOther;
+
+    const totalAnnualCombined = fixedAnnual + variableAnnual + miscAnnual;
+    const effectiveMonthly = totalMonthlyOnly + (totalAnnualOnly / 12);
+
+    const fixedMonthly = rent + subs + (aInsure / 12) + (aEdu / 12) + (aProp / 12);
+    const variableMonthly = household + utilities + transport + food;
+    const miscMonthly = disc + (aTravel / 12) + (aOther / 12);
 
     return {
-        totalMonthly, totalAnnual, fixed, variable, misc,
+        totalMonthly: totalMonthlyOnly, // Cash spent strictly monthly
+        totalAnnual: totalAnnualCombined,
+        totalAnnualOnly,
+        effectiveMonthly, // Monthly + Prorated Annual
+        fixed: fixedAnnual,
+        variable: variableAnnual,
+        misc: miscAnnual,
         breakdown: [
-            { type: 'Fixed', amount: fixed, percent: totalAnnual ? Math.round(fixed / totalAnnual * 100) : 0 },
-            { type: 'Variable', amount: variable, percent: totalAnnual ? Math.round(variable / totalAnnual * 100) : 0 },
-            { type: 'Miscellaneous', amount: misc, percent: totalAnnual ? Math.round(misc / totalAnnual * 100) : 0 },
+            { type: 'Fixed', amount: fixedAnnual, percent: totalAnnualCombined ? Math.round(fixedAnnual / totalAnnualCombined * 100) : 0 },
+            { type: 'Variable', amount: variableAnnual, percent: totalAnnualCombined ? Math.round(variableAnnual / totalAnnualCombined * 100) : 0 },
+            { type: 'Miscellaneous', amount: miscAnnual, percent: totalAnnualCombined ? Math.round(miscAnnual / totalAnnualCombined * 100) : 0 },
+            { type: 'Taxes', amount: 0, percent: 0 }
+        ],
+        monthlyBreakdown: [
+            { type: 'Fixed', amount: Math.round(fixedMonthly), percent: totalAnnualCombined ? Math.round(fixedAnnual / totalAnnualCombined * 100) : 0 },
+            { type: 'Variable', amount: Math.round(variableMonthly), percent: totalAnnualCombined ? Math.round(variableAnnual / totalAnnualCombined * 100) : 0 },
+            { type: 'Miscellaneous', amount: Math.round(miscMonthly), percent: totalAnnualCombined ? Math.round(miscAnnual / totalAnnualCombined * 100) : 0 },
             { type: 'Taxes', amount: 0, percent: 0 }
         ]
     };
@@ -111,26 +141,40 @@ function computeAssets(p) {
 }
 
 // ============ ASSET ALLOCATION IDEALS ============
-function getAssetAllocationIdeals(age, totalAssets) {
+function getAssetAllocationIdeals(age, totalAssets, moneySign, realEstateVal) {
+    const finAssets = totalAssets || 0;
+
+    // adjust risk based on age & moneySign
+    const signName = moneySign ? moneySign.name : 'Balanced Dolphin';
+    let isAggressive = signName === 'Bold Eagle' || signName === 'Curious Fox';
+    let isConservative = signName === 'Cautious Turtle' || signName === 'Loyal Elephant';
+
     let ranges;
-    if (age < 25) {
-        ranges = { equity: [40, 75], debt: [5, 25], realEstate: [0, 30], commodity: [3, 25], alt: [0, 25] };
-    } else if (age <= 35) {
-        ranges = { equity: [35, 75], debt: [5, 30], realEstate: [28, 53], commodity: [4, 30], alt: [0, 29] };
+    if (age < 30) {
+        ranges = { equity: [60, 90], debt: [0, 15], commodity: [5, 15], alt: [0, 20] };
+        if (isConservative) { ranges.equity = [50, 75]; ranges.debt = [10, 25]; }
+    } else if (age <= 40) {
+        ranges = { equity: [50, 80], debt: [5, 20], commodity: [5, 15], alt: [0, 20] };
+        if (isConservative) { ranges.equity = [40, 65]; ranges.debt = [15, 30]; }
     } else if (age <= 50) {
-        ranges = { equity: [25, 60], debt: [10, 35], realEstate: [30, 55], commodity: [5, 25], alt: [0, 20] };
+        ranges = { equity: [40, 70], debt: [10, 30], commodity: [5, 20], alt: [0, 15] };
+        if (isConservative) { ranges.equity = [30, 50]; ranges.debt = [25, 45]; }
     } else if (age <= 60) {
-        ranges = { equity: [15, 40], debt: [20, 45], realEstate: [30, 50], commodity: [5, 20], alt: [0, 15] };
+        ranges = { equity: [25, 50], debt: [25, 50], commodity: [5, 20], alt: [0, 10] };
     } else {
-        ranges = { equity: [10, 25], debt: [30, 50], realEstate: [30, 45], commodity: [5, 15], alt: [0, 10] };
+        ranges = { equity: [15, 35], debt: [40, 70], commodity: [5, 15], alt: [0, 10] };
+    }
+
+    if (isAggressive && age >= 30) {
+        ranges.equity[1] = Math.min(100, ranges.equity[1] + 10);
+        ranges.debt[0] = Math.max(0, ranges.debt[0] - 5);
     }
 
     return [
-        { name: 'Equity', min: totalAssets * ranges.equity[0] / 100, max: totalAssets * ranges.equity[1] / 100 },
-        { name: 'Real Estate', min: totalAssets * ranges.realEstate[0] / 100, max: totalAssets * ranges.realEstate[1] / 100 },
-        { name: 'Commodity', min: totalAssets * ranges.commodity[0] / 100, max: totalAssets * ranges.commodity[1] / 100 },
-        { name: 'Debt', min: totalAssets * ranges.debt[0] / 100, max: totalAssets * ranges.debt[1] / 100 },
-        { name: 'Alternative Investments', min: totalAssets * ranges.alt[0] / 100, max: totalAssets * ranges.alt[1] / 100 }
+        { name: 'Equity', min: finAssets * ranges.equity[0] / 100, max: finAssets * ranges.equity[1] / 100 },
+        { name: 'Commodity', min: finAssets * ranges.commodity[0] / 100, max: finAssets * ranges.commodity[1] / 100 },
+        { name: 'Debt', min: finAssets * ranges.debt[0] / 100, max: finAssets * ranges.debt[1] / 100 },
+        { name: 'Alternative Investments', min: finAssets * ranges.alt[0] / 100, max: finAssets * ranges.alt[1] / 100 }
     ];
 }
 
@@ -221,15 +265,25 @@ function computeLiabilities(p) {
 // ============ INSURANCE ============
 function computeInsurance(p) {
     const healthCover = Number(p.health_cover) || 0;
-    const healthPremium = Number(p.health_premium) || 0;
     const lifeCover = Number(p.life_cover) || 0;
-    const lifePremium = Number(p.life_premium) || 0;
+
+    // Fallbacks if user hasn't moved to the new annual insurance field yet
+    const legacyHealthPrem = Number(p.health_premium) || 0;
+    const legacyLifePrem = Number(p.life_premium) || 0;
+    const combinedLegacy = legacyHealthPrem + legacyLifePrem;
+
+    const totalPremium = Number(p.expense_annual_insurance) || combinedLegacy || 0;
+    const healthPercent = healthCover && lifeCover ? (healthCover / (healthCover + lifeCover)) : (healthCover ? 1 : 0);
+    const healthPremium = totalPremium * healthPercent;
+    const lifePremium = totalPremium * (1 - healthPercent);
+
     const totalCover = healthCover + lifeCover;
     const annualIncome = Number(p.annual_salary) || 0;
 
     const idealHealth = Math.max(500000, annualIncome * 0.5);
     const hasDependents = (Number(p.dependents) || 0) > 0 || p.marital_status === 'Married';
-    const idealLife = hasDependents ? annualIncome * 10 : 0;
+    const rawIdealLife = hasDependents ? annualIncome * 10 : 0;
+    const idealLife = rawIdealLife > 0 ? Math.ceil(rawIdealLife / 5000000) * 5000000 : 0;
 
     return {
         healthCover, healthPremium, lifeCover, lifePremium,
@@ -345,7 +399,8 @@ function computeTax(p) {
 function computeEmergency(p) {
     const expenses = computeExpenses(p);
     const actualEmergency = Number(p.emergency_fund) || 0;
-    const idealEmergency = expenses.totalMonthly * 3;
+    // Uses effectiveMonthly so users don't get caught out by annual bills (insurance, education fees) during an emergency
+    const idealEmergency = Math.round(expenses.effectiveMonthly * 6);
     const insurance = computeInsurance(p);
 
     return {
@@ -372,7 +427,8 @@ function computeSurplus(p) {
     const liabilities = computeLiabilities(p);
     const emi = liabilities.totalEmi || 0;
     const monthlyIncome = income.total / 12;
-    const monthly = monthlyIncome - expenses.totalMonthly - emi;
+    // We use effectiveMonthly here (Monthly + Prorated Annual) so that true investable surplus is accurate
+    const monthly = monthlyIncome - expenses.effectiveMonthly - emi;
     return { monthly, quarterly: monthly * 3 };
 }
 
@@ -383,28 +439,31 @@ function computeCashflow(p) {
     const liabilities = computeLiabilities(p);
     const emi = liabilities.totalEmi || 0;
     const sip = Number(p.inv_monthly_sip) || 0;
-    const insurancePremium = (Number(p.health_premium) || 0) + (Number(p.life_premium) || 0);
+    const insurancePremium = Number(p.expense_annual_insurance) || ((Number(p.health_premium) || 0) + (Number(p.life_premium) || 0));
 
     const grossIncome3m = income.total / 4; // 3 months
     const bonus3m = (income.bonus || 0) / 4;
+    // Use true monthly expenses for cashflow projection, and annuals are projected separately
     const expenses3m = expenses.totalMonthly * 3;
     const emi3m = emi * 3;
     const sip3m = sip * 3;
     const insurance3m = insurancePremium / 4;
+    const otherAnnual3m = (expenses.totalAnnualOnly - insurancePremium) / 4;
     const taxEstimate = computeTax(p);
     const tax3m = Math.min(taxEstimate.newRegime.taxLiability, taxEstimate.oldRegime.taxLiability) / 4;
 
-    const surplus = grossIncome3m + bonus3m - expenses3m - emi3m - sip3m - insurance3m - tax3m;
+    const surplus = grossIncome3m + bonus3m - expenses3m - emi3m - sip3m - insurance3m - otherAnnual3m - tax3m;
 
     return {
         items: [
             { name: 'Bonus Income', type: 'credit', amount: bonus3m },
             { name: 'Gross Income', type: 'credit', amount: grossIncome3m },
-            { name: 'Household & Lifestyle Expenses', type: 'debit', amount: expenses3m },
+            { name: 'Monthly Living Expenses', type: 'debit', amount: expenses3m },
             { name: 'Tax Expenses', type: 'debit', amount: tax3m },
             { name: 'EMIs', type: 'debit', amount: emi3m },
             { name: 'Planned Investments', type: 'debit', amount: sip3m },
-            { name: 'Insurance Premium', type: 'debit', amount: insurance3m }
+            { name: 'Insurance Premium Allocation', type: 'debit', amount: insurance3m },
+            { name: 'Other Annual Bills Allocation', type: 'debit', amount: otherAnnual3m }
         ],
         surplus
     };
@@ -471,23 +530,39 @@ function computeFBS(p) {
 
 // ============ MONEY SIGN ============
 function computeMoneySign(p) {
-    const risk = Number(p.risk_comfort) || 5;
-    const prefGuaranteed = Number(p.beh_prefer_guaranteed) || 3;
-    const followNews = Number(p.beh_follow_market_news) || 3;
-    const avoidDebt = Number(p.beh_avoid_debt) || 3;
-    const holdLosing = Number(p.beh_hold_losing) || 3;
-    const impulsive = Number(p.beh_spend_impulsively) || 3;
+    const risk = Number(p.risk_comfort) || 5; // 1-10
+    const prefGuaranteed = Number(p.beh_prefer_guaranteed) || 3; // 1-5
+    const followNews = Number(p.beh_follow_market_news) || 3; // 1-5
+    const avoidDebt = Number(p.beh_avoid_debt) || 3; // 1-5
+    const holdLosing = Number(p.beh_hold_losing) || 3; // 1-5
+    const impulsive = Number(p.beh_spend_impulsively) || 3; // 1-5
+    const review = Number(p.beh_review_monthly) || 3; // 1-5
 
-    const riskTolerance = risk + (6 - prefGuaranteed) + (6 - avoidDebt);
-    const discipline = (6 - impulsive) + (Number(p.beh_review_monthly) || 3);
-    const patience = holdLosing + (6 - followNews);
+    // Core dimensions (Out of 10)
+    const activeRiskTaking = (risk / 10 * 5) + (6 - prefGuaranteed);
+    const emotionalControl = (6 - impulsive) + holdLosing;
+    const engagement = review + followNews;
 
-    if (riskTolerance >= 15) return { name: 'Bold Eagle', icon: '🦅', desc: 'Aggressive, high risk tolerance, growth-focused' };
-    if (riskTolerance <= 8 && discipline >= 7) return { name: 'Cautious Turtle', icon: '🐢', desc: 'Very conservative, avoids all risk, safety-first' };
-    if (patience >= 8 && discipline >= 7) return { name: 'Persistent Horse', icon: '🐎', desc: 'Steady, methodical, patient long-term investor' };
-    if (followNews >= 4 && impulsive >= 4) return { name: 'Curious Fox', icon: '🦊', desc: 'Experimental, tries new investments, trend-follower' };
-    if (discipline >= 8) return { name: 'Loyal Elephant', icon: '🐘', desc: 'Long-term holder, trusts established brands' };
-    return { name: 'Balanced Dolphin', icon: '🐬', desc: 'Moderate risk, well-diversified approach' };
+    if (activeRiskTaking >= 8 && engagement >= 8) {
+        return { name: 'Bold Eagle', icon: '🦅', desc: 'Highly aggressive and engaged. You hunt for high growth opportunities and actively manage risks.' };
+    }
+    if (emotionalControl >= 8 && activeRiskTaking <= 4) {
+        return { name: 'Cautious Turtle', icon: '🐢', desc: 'Safety-first mindset. You prioritize wealth preservation and guaranteed returns over market-beating growth.' };
+    }
+    if (emotionalControl >= 7 && activeRiskTaking >= 6 && engagement <= 6) {
+        return { name: 'Persistent Horse', icon: '🐎', desc: 'Steady and methodical. You set a solid long-term strategy and stick to it without over-monitoring.' };
+    }
+    if (engagement >= 8 && emotionalControl <= 5) {
+        return { name: 'Curious Fox', icon: '🦊', desc: 'Highly active and experimental. You constantly look for the next trend but may suffer from over-trading.' };
+    }
+    if (emotionalControl >= 8 && engagement >= 7) {
+        return { name: 'Strategic Owl', icon: '🦉', desc: 'Wise and highly disciplined. You analyze thoroughly and maintain strong emotional control during volatility.' };
+    }
+    if (activeRiskTaking <= 5 && emotionalControl >= 6) {
+        return { name: 'Loyal Elephant', icon: '🐘', desc: 'Patient and risk-averse. You stick to what you know, relying heavily on established brands and conservative assets.' };
+    }
+
+    return { name: 'Balanced Dolphin', icon: '🐬', desc: 'Adaptive and balanced. You maintain a healthy mix of growth-seeking and wealth-preserving behaviors.' };
 }
 
 // ============ BEHAVIORAL BIASES ============
@@ -556,35 +631,35 @@ function generateActionPlan(p) {
 
     const actions = [];
     let priority = 1;
+    const fmtINR = (v) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(v || 0);
 
-    // ── 1. EMERGENCY FUND (highest priority) ──
+    // ── 1. EMERGENCY FUND ──
     const emGap = emergency.emergencyFunds.ideal - emergency.emergencyFunds.actual;
     if (emGap > 0) {
+        const monthsCovered = emergency.emergencyFunds.actual > 0 ? Math.round(emergency.emergencyFunds.actual / (emergency.emergencyFunds.ideal / 6)) : 0;
         const monthsToFill = Math.max(3, Math.ceil(emGap / (surplus.monthly > 0 ? surplus.monthly * 0.3 : 5000)));
         actions.push({
             category: 'Emergency Fund',
             title: 'Build Emergency Fund',
-            description: `Your emergency fund covers ${emergency.emergencyFunds.actual > 0 ? Math.round(emergency.emergencyFunds.actual / (emergency.emergencyFunds.ideal / 3)) : 0} months of expenses. Target 3 months (${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(emergency.emergencyFunds.ideal)}). Park in a liquid fund or high-yield savings account for instant access.`,
+            description: `Your emergency fund currently covers approximately ${monthsCovered} month(s) of expenses. The recommended target is 6 months of expenses (${fmtINR(emergency.emergencyFunds.ideal)}). Set aside ${fmtINR(Math.round(emGap / monthsToFill))}/month to reach this target in ${monthsToFill} months. Keep this amount in a readily accessible savings instrument.`,
             suggestedAmount: Math.round(emGap),
             monthlyContribution: Math.round(emGap / monthsToFill),
             status: 'pending',
             urgency: 'critical',
-            icon: 'shield',
             priority: priority++
         });
     }
 
-    // ── 2. INSURANCE GAPS ──
+    // ── 2. INSURANCE ──
     if (insurance.healthCover < insurance.idealHealth) {
         const gap = insurance.idealHealth - insurance.healthCover;
         actions.push({
             category: 'Insurance',
-            title: 'Increase Health Insurance Cover',
-            description: `Current cover: ${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(insurance.healthCover)}. Ideal: ${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(insurance.idealHealth)}. Consider a super top-up plan to bridge the gap cost-effectively.`,
+            title: 'Increase Health Insurance Coverage',
+            description: `Your current health cover is ${fmtINR(insurance.healthCover)} against a recommended cover of ${fmtINR(insurance.idealHealth)}. Consider increasing your health insurance to bridge the ${fmtINR(gap)} gap. Adequate health insurance protects your savings from being depleted by medical emergencies.`,
             suggestedAmount: Math.round(gap),
             status: 'pending',
             urgency: 'high',
-            icon: 'heart',
             priority: priority++
         });
     }
@@ -592,12 +667,11 @@ function generateActionPlan(p) {
     if (insurance.additionalCoverNeeded > 0) {
         actions.push({
             category: 'Insurance',
-            title: 'Get Term Life Insurance',
-            description: `You need ${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(insurance.additionalCoverNeeded)} additional life cover. A pure term plan provides the highest cover at the lowest premium. Apply before your next birthday for the best rates.`,
+            title: 'Increase Term Life Insurance Cover',
+            description: `Based on your income, liabilities, and dependents, you need an additional ${fmtINR(insurance.additionalCoverNeeded)} of life cover. The ideal term life cover for your profile is ${fmtINR(insurance.idealTermCover)}. A pure term insurance plan offers the highest cover at the most affordable premium.`,
             suggestedAmount: Math.round(insurance.additionalCoverNeeded),
             status: 'pending',
             urgency: 'high',
-            icon: 'umbrella',
             priority: priority++
         });
     }
@@ -606,107 +680,170 @@ function generateActionPlan(p) {
     if (liabilities.badLiability.outstanding > 0) {
         actions.push({
             category: 'Debt Management',
-            title: 'Pay Off High-Interest Debt',
-            description: `You have ${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(liabilities.badLiability.outstanding)} in bad liabilities. Prioritize paying these off using the avalanche method (highest interest rate first). Consider balance transfer if interest rate exceeds 15%.`,
+            title: 'Reduce Bad Liabilities',
+            description: `You currently have ${fmtINR(liabilities.badLiability.outstanding)} in bad liabilities (personal loans, credit cards, car loans, etc.). These typically carry high interest rates and erode your net worth. Prioritise clearing the highest-interest debt first while maintaining minimum payments on others.`,
             suggestedAmount: liabilities.badLiability.outstanding,
             monthlyContribution: liabilities.badLiability.emi,
             status: 'pending',
-            urgency: liabilities.badLiability.outstanding > income.total * 0.5 ? 'critical' : 'medium',
-            icon: 'trending-down',
+            urgency: liabilities.badLiability.outstanding > income.total * 0.5 ? 'critical' : 'high',
             priority: priority++
         });
     }
 
-    // ── 4. TAX OPTIMIZATION ──
+    // ── 4. TAX OPTIMISATION ──
     const optedRegime = p.tax_regime || 'New Regime';
-    if (tax.recommended !== optedRegime) {
+    if (tax.recommended !== optedRegime && tax.potentialSavings > 0) {
         actions.push({
             category: 'Tax Planning',
-            title: `Switch to ${tax.recommended}`,
-            description: `You can save ${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(tax.potentialSavings)} per year by switching to the ${tax.recommended}. Consult your CA before the next financial year starts.`,
+            title: `Evaluate Switching to ${tax.recommended}`,
+            description: `Based on your income and deductions, the ${tax.recommended} could save you approximately ${fmtINR(tax.potentialSavings)} per year compared to your current regime. Review this with your tax advisor before the start of the next financial year.`,
             suggestedAmount: tax.potentialSavings,
             status: 'pending',
             urgency: tax.potentialSavings > 20000 ? 'high' : 'medium',
-            icon: 'receipt',
             priority: priority++
         });
     }
 
-    // Check deduction utilization under old regime
     if (optedRegime === 'Old Regime' || tax.recommended === 'Old Regime') {
         const unusedDeductions = tax.deductionUtilization.filter(d => d.gap > 10000);
         unusedDeductions.forEach(d => {
             actions.push({
                 category: 'Tax Planning',
-                title: `Maximize ${d.name} Deduction`,
-                description: `You've used ${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(d.used)} of the ${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(d.limit)} limit under ${d.section}. Utilize the remaining ${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(d.gap)} to reduce taxable income.`,
+                title: `Utilise ${d.name} Deduction (${d.section})`,
+                description: `You have utilised ${fmtINR(d.used)} of the ${fmtINR(d.limit)} limit under ${d.section}. By deploying the remaining ${fmtINR(d.gap)}, you can reduce your taxable income and lower your overall tax liability.`,
                 suggestedAmount: d.gap,
                 status: 'pending',
                 urgency: 'medium',
-                icon: 'calculator',
                 priority: priority++
             });
         });
     }
 
-    // ── 5. INVESTMENT PLANNING ──
-    const investable = Math.max(0, surplus.monthly * 0.6);
-    if (investable > 0 || assets.monthlySip === 0) {
-        const sipAmount = Math.max(investable, 5000);
+    // ── 5. SAVINGS REALLOCATION ──
+    const savingsBalance = Number(p.savings_balance) || 0;
+    const fdBalance = Number(p.fd_balance) || 0;
+    const idleCash = savingsBalance + fdBalance;
+    const monthlyExpenses = (computeExpenses(p)).total / 12;
+    const emergencyReserve = monthlyExpenses * 6; // 6 months as emergency
+    const excessSavings = idleCash - emergencyReserve;
 
-        // Age-based allocation
-        let equityPct, debtPct, goldPct;
-        if (age < 30) {
-            equityPct = 80; debtPct = 10; goldPct = 10;
-        } else if (age < 40) {
-            equityPct = 70; debtPct = 20; goldPct = 10;
-        } else if (age < 50) {
-            equityPct = 60; debtPct = 30; goldPct = 10;
-        } else {
-            equityPct = 40; debtPct = 45; goldPct = 15;
+    if (excessSavings > 10000 && assets.total > 0) {
+        const savingsPct = Math.round(idleCash / assets.total * 100);
+        if (savingsPct > 30) {
+            actions.push({
+                category: 'Asset Reallocation',
+                title: 'Deploy Excess Savings into Investments',
+                description: `You have ${fmtINR(idleCash)} parked in savings accounts and fixed deposits, which is ${savingsPct}% of your total portfolio. After keeping ${fmtINR(Math.round(emergencyReserve))} as your emergency reserve, consider redeploying approximately ${fmtINR(Math.round(excessSavings))} into a diversified mix of equity, debt, and commodity instruments to earn better returns. Idle savings lose value to inflation over time.`,
+                suggestedAmount: Math.round(excessSavings),
+                status: 'pending',
+                urgency: savingsPct > 60 ? 'high' : 'medium',
+                priority: priority++
+            });
         }
-
-        const equityAmt = Math.round(sipAmount * equityPct / 100);
-        const debtAmt = Math.round(sipAmount * debtPct / 100);
-        const goldAmt = Math.round(sipAmount * goldPct / 100);
-
-        // Equity sub-allocation
-        const largeCap = Math.round(equityAmt * 0.40);
-        const midCap = Math.round(equityAmt * 0.25);
-        const smallCap = Math.round(equityAmt * 0.15);
-        const indexFund = Math.round(equityAmt * 0.20);
-
-        actions.push({
-            category: 'Investment Planning',
-            title: 'Start Monthly SIP Portfolio',
-            description: `Based on your ${lifeStage.stage} and risk profile, allocate ${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(sipAmount)}/month across equity (${equityPct}%), debt (${debtPct}%), and gold (${goldPct}%).`,
-            suggestedAmount: sipAmount,
-            status: 'pending',
-            urgency: 'high',
-            icon: 'bar-chart',
-            priority: priority++
-        });
-
-        actions.push(
-            { category: 'Investment Planning', title: 'Large Cap / Flexi Cap Fund', description: 'Core portfolio stability. Consider HDFC Flexi Cap, Parag Parikh Flexi Cap, or UTI Nifty 50 Index Fund.', suggestedAmount: largeCap, percent: 40, status: 'pending', urgency: 'medium', icon: 'trending-up', priority: priority++ },
-            { category: 'Investment Planning', title: 'Mid Cap Fund', description: 'Growth engine. Consider Motilal Oswal Nifty Midcap 150 Index or Kotak Emerging Equity.', suggestedAmount: midCap, percent: 25, status: 'pending', urgency: 'medium', icon: 'trending-up', priority: priority++ },
-            { category: 'Investment Planning', title: 'Small Cap Fund', description: 'High-growth potential with higher volatility. Consider Nippon Small Cap or SBI Small Cap. Only for 7+ year horizon.', suggestedAmount: smallCap, percent: 15, status: 'pending', urgency: 'low', icon: 'trending-up', priority: priority++ },
-            { category: 'Investment Planning', title: 'Nifty Next 50 Index Fund', description: 'Diversified large-mid cap exposure at low cost. Consider Navi Nifty Next 50 or UTI Nifty Next 50 Index Fund.', suggestedAmount: indexFund, percent: 20, status: 'pending', urgency: 'medium', icon: 'trending-up', priority: priority++ },
-            { category: 'Investment Planning', title: 'Debt Fund / PPF', description: 'Capital preservation and stable returns. Use for goals within 3-5 years.', suggestedAmount: debtAmt, percent: debtPct, status: 'pending', urgency: 'medium', icon: 'lock', priority: priority++ },
-            { category: 'Investment Planning', title: 'Gold ETF / Sovereign Gold Bond', description: 'Portfolio hedge against inflation and currency depreciation. SGB offers 2.5% annual interest.', suggestedAmount: goldAmt, percent: goldPct, status: 'pending', urgency: 'low', icon: 'coins', priority: priority++ }
-        );
     }
 
-    // ── 6. WILL & ESTATE ──
+    // ── 6. ASSET REALLOCATION (equity / debt / commodity) ──
+    const investable = Math.max(0, surplus.monthly * 0.6);
+    const totalPortfolio = (assets.total || 0) - (assets.realEstate || 0);
+
+    // Age-based ideal allocation
+    let idealEquity, idealDebt, idealGold;
+    if (age < 30) {
+        idealEquity = 80; idealDebt = 10; idealGold = 10;
+    } else if (age < 40) {
+        idealEquity = 70; idealDebt = 20; idealGold = 10;
+    } else if (age < 50) {
+        idealEquity = 60; idealDebt = 30; idealGold = 10;
+    } else {
+        idealEquity = 40; idealDebt = 45; idealGold = 15;
+    }
+
+    // Compute current allocation percentages (excluding real estate)
+    const equityActual = totalPortfolio > 0 ? Math.round((assets.equity || 0) / totalPortfolio * 100) : 0;
+    const debtActual = totalPortfolio > 0 ? Math.round((assets.debt || 0) / totalPortfolio * 100) : 0;
+    const goldActual = totalPortfolio > 0 ? Math.round((assets.commodity || 0) / totalPortfolio * 100) : 0;
+
+    // Equity rebalancing
+    const equityGap = idealEquity - equityActual;
+    if (Math.abs(equityGap) >= 10 && totalPortfolio > 0) {
+        const direction = equityGap > 0 ? 'Increase' : 'Reduce';
+        const amt = Math.abs(Math.round(totalPortfolio * Math.abs(equityGap) / 100));
+        actions.push({
+            category: 'Asset Reallocation',
+            title: `${direction} Equity Allocation`,
+            description: `Your equity allocation is currently ${equityActual}% against a recommended range of ${idealEquity}% for your age group. ${direction} your equity exposure by approximately ${fmtINR(amt)} to align with the ideal allocation. This may involve rebalancing from ${equityGap > 0 ? 'debt or commodity' : 'equity'} into ${equityGap > 0 ? 'equity' : 'debt or commodity'} instruments.`,
+            suggestedAmount: amt,
+            currentPercent: equityActual,
+            idealPercent: idealEquity,
+            status: 'pending',
+            urgency: Math.abs(equityGap) >= 20 ? 'high' : 'medium',
+            priority: priority++
+        });
+    }
+
+    // Debt rebalancing
+    const debtGap = idealDebt - debtActual;
+    if (Math.abs(debtGap) >= 10 && totalPortfolio > 0) {
+        const direction = debtGap > 0 ? 'Increase' : 'Reduce';
+        const amt = Math.abs(Math.round(totalPortfolio * Math.abs(debtGap) / 100));
+        actions.push({
+            category: 'Asset Reallocation',
+            title: `${direction} Debt Allocation`,
+            description: `Your debt allocation is currently ${debtActual}% against a recommended ${idealDebt}% for your age group. Adjust by approximately ${fmtINR(amt)}. Debt instruments provide stability and capital preservation in your portfolio.`,
+            suggestedAmount: amt,
+            currentPercent: debtActual,
+            idealPercent: idealDebt,
+            status: 'pending',
+            urgency: 'medium',
+            priority: priority++
+        });
+    }
+
+    // Commodity (gold) rebalancing
+    const goldGap = idealGold - goldActual;
+    if (Math.abs(goldGap) >= 5 && totalPortfolio > 0) {
+        const direction = goldGap > 0 ? 'Increase' : 'Reduce';
+        const amt = Math.abs(Math.round(totalPortfolio * Math.abs(goldGap) / 100));
+        actions.push({
+            category: 'Asset Reallocation',
+            title: `${direction} Commodity / Gold Allocation`,
+            description: `Your commodity allocation is currently ${goldActual}% against a recommended ${idealGold}%. Adjust by approximately ${fmtINR(amt)}. Gold and commodities serve as a hedge against inflation and currency depreciation.`,
+            suggestedAmount: amt,
+            currentPercent: goldActual,
+            idealPercent: idealGold,
+            status: 'pending',
+            urgency: 'low',
+            priority: priority++
+        });
+    }
+
+    // Monthly investment plan (if surplus exists)
+    if (investable > 0) {
+        const sipAmount = Math.max(investable, 5000);
+        const eqAmt = Math.round(sipAmount * idealEquity / 100);
+        const dtAmt = Math.round(sipAmount * idealDebt / 100);
+        const glAmt = Math.round(sipAmount * idealGold / 100);
+        actions.push({
+            category: 'Asset Reallocation',
+            title: 'Set Up Monthly Investment Plan',
+            description: `Based on your surplus income, allocate approximately ${fmtINR(sipAmount)}/month across asset classes: Equity ${fmtINR(eqAmt)} (${idealEquity}%), Debt ${fmtINR(dtAmt)} (${idealDebt}%), and Commodity ${fmtINR(glAmt)} (${idealGold}%). Consistent monthly investing helps benefit from rupee-cost averaging over time.`,
+            suggestedAmount: sipAmount,
+            monthlyContribution: sipAmount,
+            status: 'pending',
+            urgency: 'medium',
+            priority: priority++
+        });
+    }
+
+    // ── 6. ESTATE PLANNING ──
     if (p.has_will !== 'Yes') {
         actions.push({
             category: 'Estate Planning',
             title: 'Create or Update Your Will',
-            description: 'A legally valid will ensures your assets are distributed according to your wishes. Consider using an online will service or consulting a lawyer.',
+            description: 'A legally valid will ensures your assets are distributed according to your wishes and prevents legal complications for your family. Review or create your will with a legal professional.',
             suggestedAmount: 0,
             status: 'pending',
             urgency: 'medium',
-            icon: 'file-text',
             priority: priority++
         });
     }
@@ -714,12 +851,11 @@ function generateActionPlan(p) {
     if (p.nominees_set !== 'Yes') {
         actions.push({
             category: 'Estate Planning',
-            title: 'Set Nominees for All Accounts',
-            description: 'Ensure nominees are updated across bank accounts, demat, mutual funds, insurance, and PPF. This prevents legal complications for your family.',
+            title: 'Update Nominees Across All Accounts',
+            description: 'Ensure nominees are set for all financial accounts — bank accounts, demat accounts, mutual funds, insurance policies, PF, and NPS. Missing nominees can cause significant delays in claim settlement.',
             suggestedAmount: 0,
             status: 'pending',
             urgency: 'medium',
-            icon: 'users',
             priority: priority++
         });
     }
@@ -729,11 +865,10 @@ function generateActionPlan(p) {
         actions.push({
             category: 'Credit Health',
             title: 'Improve Your Credit Score',
-            description: `Your credit score is ${liabilities.creditScore}. Aim for 750+. Pay all EMIs on time, keep credit utilization below 30%, and avoid multiple loan applications.`,
+            description: `Your credit score is ${liabilities.creditScore}. A score of 750+ unlocks better interest rates on loans and credit products. Ensure all EMIs and credit card bills are paid on time, keep your credit utilisation below 30%, and avoid multiple credit applications in a short period.`,
             suggestedAmount: 0,
             status: 'pending',
             urgency: liabilities.creditScore < 650 ? 'high' : 'medium',
-            icon: 'award',
             priority: priority++
         });
     }
@@ -761,7 +896,7 @@ function computeFullDashboard(p, user) {
     const ratios = computeFinancialRatios(p);
     const willEstate = computeWillEstate(p);
     const actionPlan = generateActionPlan(p);
-    const allocationIdeals = getAssetAllocationIdeals(age, assets.total);
+    const allocationIdeals = getAssetAllocationIdeals(age, assets.total, moneySign, assets.realEstate);
 
     // Determine generation (simplified)
     let generation = 'Generation 2';

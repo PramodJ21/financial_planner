@@ -19,6 +19,8 @@
   --border-light: #E5E7EB;
 
   --font-family: 'Inter', sans-serif;
+  --sidebar-width: 200px;
+  --sidebar-collapsed: 64px;
 }
 
 * {
@@ -177,4 +179,284 @@ button {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+/* ═══════════════════════════════════════════════════
+   QUESTIONNAIRE MOBILE CLASSES
+   ═══════════════════════════════════════════════════ */
+.questionnaire-layout {
+  display: flex;
+  height: 100vh;
+}
+
+.questionnaire-sidebar {
+  width: 240px;
+  min-width: 240px;
+}
+
+.questionnaire-sidebar nav {
+  display: flex;
+  flex-direction: column;
+}
+
+.questionnaire-main-scroll {
+  padding: 40px 48px;
+}
+
+.form-row {
+  display: flex;
+  gap: 20px;
+}
+
+/* ═══════════════════════════════════════════════════
+   DASHBOARD / PAGE LAYOUT CLASSES
+   ═══════════════════════════════════════════════════ */
+
+/* Main layout wrapper (sidebar + content) */
+.app-sidebar {
+  transition: width 0.2s ease, min-width 0.2s ease, transform 0.25s ease;
+}
+
+.app-main-content {
+  transition: margin-left 0.2s ease, width 0.2s ease;
+}
+
+.app-main-area {
+  padding: 28px 32px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Grid utilities for dashboard pages */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+}
+
+.dashboard-2col {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+.dashboard-3col {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.alloc-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+/* Chart + table side-by-side layout */
+.chart-table-row {
+  display: flex;
+  gap: 40px;
+  align-items: flex-start;
+}
+
+.chart-sidebar {
+  width: 200px;
+  flex-shrink: 0;
+}
+
+/* Top stat cards as flex row */
+.stat-row {
+  display: flex;
+  gap: 16px;
+}
+
+/* Tab row */
+.tab-row {
+  display: flex;
+  gap: 24px;
+  overflow-x: auto;
+}
+
+/* Tax overview row */
+.tax-overview-row {
+  display: flex;
+  gap: 0;
+  align-items: stretch;
+}
+
+.tax-sidebar-card {
+  width: 280px;
+  flex-shrink: 0;
+}
+
+/* Estate 3-card grid */
+.estate-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+/* Will/Estate flex row */
+.will-cards-row {
+  display: flex;
+  gap: 16px;
+}
+
+/* Mobile sidebar overlay backdrop */
+.sidebar-overlay {
+  display: none;
+}
+
+.hide-mobile {
+  display: flex;
+}
+
+/* ═══════════════════════════════════════════════════
+   MOBILE BREAKPOINT (768px)
+   ═══════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+  /* --- Questionnaire --- */
+  .questionnaire-layout {
+    flex-direction: column;
+  }
+
+  .questionnaire-sidebar {
+    width: 100%;
+    min-width: 100%;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid #E2E8F0;
+  }
+
+  .questionnaire-sidebar nav {
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 10px 0;
+  }
+
+  .questionnaire-sidebar nav>div {
+    white-space: nowrap;
+    padding: 8px 12px;
+  }
+
+  .questionnaire-main-scroll {
+    padding: 20px 16px;
+  }
+
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* --- App Sidebar --- */
+  .app-sidebar {
+    position: fixed !important;
+    z-index: 100 !important;
+    transform: translateX(-100%);
+    width: 200px !important;
+    min-width: 200px !important;
+  }
+
+  .app-sidebar.mobile-open {
+    transform: translateX(0);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.12);
+  }
+
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 99;
+  }
+
+  .sidebar-overlay.visible {
+    display: block;
+  }
+
+  /* --- Main content area --- */
+  .app-main-content {
+    margin-left: 0 !important;
+    width: 100% !important;
+    overflow-x: hidden;
+  }
+
+  .app-main-area {
+    padding: 16px;
+    overflow-x: hidden;
+  }
+
+  /* --- Prevent page-level horizontal overflow --- */
+  body {
+    overflow-x: hidden;
+  }
+
+  /* --- Cards clip overflow, tables scroll inside --- */
+  .card {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    min-width: 500px;
+  }
+
+  /* --- Grid collapses --- */
+  .dashboard-grid,
+  .dashboard-2col,
+  .dashboard-3col,
+  .alloc-cards,
+  .estate-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* --- Flex rows stack vertically --- */
+  .stat-row,
+  .will-cards-row {
+    flex-direction: column;
+  }
+
+  /* --- Chart + table combos stack --- */
+  .chart-table-row {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .chart-sidebar {
+    width: 100%;
+    max-width: 240px;
+    margin: 0 auto;
+  }
+
+  /* --- Inline pie legends (beside chart) → hide on mobile since table shows colors --- */
+  .chart-legend-inline {
+    display: none !important;
+  }
+
+  /* --- Tax overview stacks --- */
+  .tax-overview-row {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .tax-sidebar-card {
+    width: 100%;
+  }
+
+  /* --- Tab row scroll --- */
+  .tab-row {
+    gap: 12px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* --- Explicit scroll wrapper (for non-card containers) --- */
+  .table-scroll-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .hide-mobile {
+    display: none !important;
+  }
 }
