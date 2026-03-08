@@ -5,6 +5,7 @@ const cors = require('cors');
 const authRoutes = require('./routes/auth');
 const questionnaireRoutes = require('./routes/questionnaire');
 const dashboardRoutes = require('./routes/dashboard');
+const goalsRoutes = require('./routes/goals');
 
 const app = express();
 
@@ -20,6 +21,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/questionnaire', questionnaireRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/goals', goalsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

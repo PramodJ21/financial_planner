@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { fetchWithAuth } from '../api';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { Link } from 'react-router-dom';
-import { ArrowUpRight, AlertTriangle, Wallet, ShieldCheck, Users, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowUpRight, AlertTriangle, Wallet, ShieldCheck, Users, ChevronDown, ChevronUp, Briefcase, TrendingUp, Receipt } from 'lucide-react';
 
 // Dynamic explanation maps
 const GENERATION_INFO = {
@@ -152,6 +152,12 @@ function Dashboard() {
     // FBS Position
     const fbs = overview.fbs;
 
+    // Top 3 Actions to improve FBS
+    const fbsActions = data.actionPlan
+        .filter(a => a.fbsImpact > 0)
+        .sort((a, b) => b.fbsImpact - a.fbsImpact)
+        .slice(0, 3);
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
@@ -214,6 +220,23 @@ function Dashboard() {
                             </div>
                         </div>
                         <InfoDropdown isOpen={openDropdowns.fbs} onToggle={() => toggleDropdown('fbs')} text={FBS_INFO(fbs)} />
+
+                        {/* Level up your FBS Panel */}
+                        {fbsActions.length > 0 && fbs < 100 && (
+                            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #F1F5F9' }}>
+                                <Link to="/reports" style={{ textDecoration: 'none', fontSize: '13px', fontWeight: 700, color: '#1E293B', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                    <ArrowUpRight size={16} color="#3B82F6" /> Level up your FBS
+                                </Link>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    {fbsActions.map((action, idx) => (
+                                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'transparent', padding: '8px 0', borderBottom: idx < fbsActions.length - 1 ? '1px solid #F8FAFC' : 'none' }}>
+                                            <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>{action.title}</span>
+                                            <span style={{ fontSize: '10px', fontWeight: 700, color: '#059669', backgroundColor: '#ECFDF5', padding: '2px 8px', borderRadius: '4px' }}>+{action.fbsImpact} pts</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Divider */}
@@ -241,60 +264,83 @@ function Dashboard() {
                 </div>
 
 
-                {/* Net Worth, Surplus, Credit Score */}
-                <div className="form-row" style={{ display: 'flex', gap: '16px' }}>
-                    <div style={{ flex: 2, backgroundColor: '#F8FAFC', border: '1px solid #E8ECF1', borderRadius: '8px', padding: '24px', display: 'flex' }}>
-                        <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: '13px', fontWeight: 700, color: '#1E293B', marginBottom: '16px' }}>Current Net Worth</div>
-                            <div style={{ fontSize: '28px', fontWeight: 700, color: '#1E293B' }}>{fmt(overview.netWorth?.netWorth)}</div>
-                        </div>
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '24px', borderLeft: '1px solid #E8ECF1', paddingLeft: '24px', justifyContent: 'center' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                                <span style={{ color: '#64748B' }}>Assets</span>
-                                <span style={{ fontWeight: 600, color: '#1E293B' }}>{fmt(overview.investments.total)}</span>
+                {/* Combined Financial Stats Area */}
+                <div style={{ display: 'flex', gap: '24px', marginTop: '40px', marginBottom: '24px', alignItems: 'stretch' }}>
+                    {/* Left Group: Net Worth + Assets/Liabs (flex: 2) */}
+                    <div style={{ flex: 2, display: 'flex', gap: '16px' }}>
+                        {/* Large Current Net Worth Card */}
+                        <div style={{ flex: 1.2, border: '1px solid #E8ECF1', borderRadius: '12px', padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'center', backgroundColor: '#FFFFFF', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px' }}>
+                                <div style={{ width: '36px', height: '36px', backgroundColor: '#F1F5F9', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <TrendingUp size={18} color="#475569" />
+                                </div>
+                                <div style={{ fontSize: '14px', fontWeight: 700, color: '#1E293B' }}>Current Net Worth</div>
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                                <span style={{ color: '#64748B' }}>Liabilities</span>
-                                <span style={{ fontWeight: 600, color: '#1E293B' }}>{fmt(overview.liabilities.total)}</span>
+                            <div style={{ fontSize: '32px', fontWeight: 800, color: '#1E293B', letterSpacing: '-0.02em' }}>{fmt(overview.netWorth?.netWorth)}</div>
+                            <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '8px' }}>Total Assets - Total Liabilities</div>
+                        </div>
+
+                        {/* Stacked Assets & Liabilities */}
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div style={{ flex: 1, border: '1px solid #E8ECF1', borderRadius: '8px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
+                                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                    <div style={{ width: '28px', height: '28px', backgroundColor: '#F1F5F9', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <Briefcase size={14} color="#475569" />
+                                    </div>
+                                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#1E293B' }}>Total Assets</div>
+                                </div>
+                                <div style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B' }}>{fmt(overview.investments.total)}</div>
+                            </div>
+                            <div style={{ flex: 1, border: '1px solid #E8ECF1', borderRadius: '8px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
+                                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                    <div style={{ width: '28px', height: '28px', backgroundColor: '#F1F5F9', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <Receipt size={14} color="#475569" />
+                                    </div>
+                                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#1E293B' }}>Total Liabilities</div>
+                                </div>
+                                <div style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B' }}>{fmt(overview.liabilities.total)}</div>
                             </div>
                         </div>
                     </div>
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        <div style={{ border: '1px solid #E8ECF1', borderRadius: '8px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flex: 1 }}>
-                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                                <div style={{ width: '28px', height: '28px', backgroundColor: '#F1F5F9', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyItems: 'center' }}>
-                                    <div style={{ margin: 'auto' }}><Wallet size={14} color="#475569" /></div>
+
+                    {/* Vertical Divider */}
+                    <div style={{ width: '1px', backgroundColor: '#E8ECF1', margin: '8px 0' }}></div>
+
+                    {/* Right Group: Surplus + Credit Score (flex: 1) */}
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ flex: 1, border: '1px solid #E8ECF1', borderRadius: '8px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
+                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                <div style={{ width: '28px', height: '28px', backgroundColor: '#F1F5F9', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Wallet size={14} color="#475569" />
                                 </div>
                                 <div>
-                                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#1E293B' }}>True Monthly Surplus</div>
-                                    <div style={{ fontSize: '10px', color: '#94A3B8', marginTop: '2px' }} title="Your surplus after accounting for daily living expenses AND pro-rating your yearly obligations like insurance & school fees. This is your true investable amount.">Includes pro-rated annual bills ⓘ</div>
+                                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#1E293B' }}>Monthly Surplus</div>
+                                    <div style={{ fontSize: '9px', color: '#94A3B8' }}>True Investable Amount</div>
                                 </div>
                             </div>
-                            <div style={{ fontSize: '20px', fontWeight: 700, color: '#1E293B' }}>{fmt(overview.surplus.monthly)}</div>
+                            <div style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B' }}>{fmt(overview.surplus.monthly)}</div>
                         </div>
-                        <div style={{ border: '1px solid #E8ECF1', borderRadius: '8px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flex: 1 }}>
-                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                                <div style={{ width: '28px', height: '28px', backgroundColor: '#F1F5F9', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyItems: 'center' }}>
-                                    <div style={{ margin: 'auto' }}><ShieldCheck size={14} color="#475569" /></div>
+                        <div style={{ flex: 1, border: '1px solid #E8ECF1', borderRadius: '8px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
+                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                <div style={{ width: '28px', height: '28px', backgroundColor: '#F1F5F9', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <ShieldCheck size={14} color="#475569" />
                                 </div>
-                                <div>
-                                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#1E293B' }}>Credit Score</div>
-                                    <div style={{ fontSize: '10px', color: '#94A3B8', marginTop: '2px' }}>As of {currentDate}</div>
-                                </div>
+                                <div style={{ fontSize: '12px', fontWeight: 700, color: '#1E293B' }}>Credit Score</div>
                             </div>
-                            <div style={{ fontSize: '20px', fontWeight: 700, color: '#1E293B' }}>{overview.creditScore || '-'}</div>
+                            <div style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B' }}>{overview.creditScore || '—'}</div>
                         </div>
                     </div>
                 </div>
-                <SectionNote lines={[
+                <SectionNote title="HOW THIS IS CALCULATED" lines={[
                     'Net Worth = Total Assets (investments + savings + real estate) minus Total Liabilities (all loans + credit card outstanding).',
                     'Surplus = Monthly take-home income minus all monthly expenses and EMIs. A positive surplus means you have room to invest.',
                     'Credit Score is sourced from CIBIL/Experian. 750+ is considered good. It affects your loan eligibility and interest rates.'
                 ]} />
-            </div>
+            </div >
 
             {/* 3. Assets */}
-            <div className="card" style={{ padding: '24px' }}>
+            < div className="card" style={{ padding: '24px' }
+            }>
                 <Link to="/investments" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '24px' }}>
                     <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', margin: 0 }}>Assets</h2>
                     <ArrowUpRight size={18} color="#1E293B" />
@@ -321,9 +367,9 @@ function Dashboard() {
                     'Equity includes direct stocks + equity mutual funds. Debt includes FDs, debt funds, EPF/PPF/NPS. Commodity = gold/commodities.',
                     'Ideal allocation depends on your age and risk profile — younger investors can hold more equity, older investors should shift towards debt.'
                 ]} />
-            </div>
+            </div >
             {/* 4. Financial Analysis */}
-            <div className="card" style={{ padding: '24px' }}>
+            < div className="card" style={{ padding: '24px' }}>
                 <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', marginBottom: '24px' }}>Financial Analysis</h2>
                 <div style={{ display: 'flex', gap: '24px', borderBottom: '1px solid #E8ECF1', marginBottom: '24px' }}>
                     {['Emergency Planning', 'Expense and Liability Management', 'Asset Allocation'].map(tab => (
@@ -340,74 +386,80 @@ function Dashboard() {
                 </div>
 
                 {/* Tabs Content */}
-                {activeTab === 'Emergency Planning' && (
-                    <div className="alloc-cards" style={{ display: 'grid', gap: '16px' }}>
-                        {[
-                            { label: 'Emergency Funds', actual: overview.emergency.emergencyFunds.actual, ideal: overview.emergency.emergencyFunds.ideal, inRange: overview.emergency.emergencyFunds.actual >= overview.emergency.emergencyFunds.ideal },
-                            { label: 'Health Insurance', actual: overview.emergency.healthInsurance.actual, ideal: overview.emergency.healthInsurance.ideal, inRange: overview.emergency.healthInsurance.actual >= overview.emergency.healthInsurance.ideal },
-                            { label: 'Life Insurance', actual: overview.emergency.lifeInsurance.actual, ideal: overview.emergency.lifeInsurance.ideal, inRange: overview.emergency.lifeInsurance.actual >= overview.emergency.lifeInsurance.ideal }
-                        ].map(item => (
-                            <div key={item.label} style={{ border: '1px solid #E8ECF1', borderRadius: '8px', padding: '20px', backgroundColor: '#FFFFFF', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                                    <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: '#1E293B', letterSpacing: '0.3px', maxWidth: '120px' }}>{item.label}</span>
-                                    <StatusBadge actual={item.actual} min={item.ideal} />
-                                </div>
-                                <div style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '4px' }}>Actual Value</div>
-                                <div style={{ fontSize: '20px', fontWeight: 700, color: item.inRange ? '#16A34A' : '#DC2626', marginBottom: '8px' }}>{item.actual > 0 ? fmt(item.actual) : '₹0'}</div>
-                                <div style={{ fontSize: '12px', color: '#94A3B8' }}>Ideal: {item.ideal > 0 ? fmt(item.ideal) : '₹0'}</div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {activeTab === 'Expense and Liability Management' && (
-                    <div className="alloc-cards" style={{ display: 'grid', gap: '16px' }}>
-                        {liabilities.ratios.map(r => {
-                            const inRange = r.actual >= r.idealMin && (r.idealMax === undefined || r.actual <= r.idealMax);
-                            const valColor = inRange ? '#16A34A' : '#DC2626';
-                            return (
-                                <div key={r.name} style={{ border: '1px solid #E8ECF1', borderRadius: '8px', padding: '20px', backgroundColor: '#FFFFFF', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                {
+                    activeTab === 'Emergency Planning' && (
+                        <div className="alloc-cards" style={{ display: 'grid', gap: '16px' }}>
+                            {[
+                                { label: 'Emergency Funds', actual: overview.emergency.emergencyFunds.actual, ideal: overview.emergency.emergencyFunds.ideal, inRange: overview.emergency.emergencyFunds.actual >= overview.emergency.emergencyFunds.ideal },
+                                { label: 'Health Insurance', actual: overview.emergency.healthInsurance.actual, ideal: overview.emergency.healthInsurance.ideal, inRange: overview.emergency.healthInsurance.actual >= overview.emergency.healthInsurance.ideal },
+                                { label: 'Life Insurance', actual: overview.emergency.lifeInsurance.actual, ideal: overview.emergency.lifeInsurance.ideal, inRange: overview.emergency.lifeInsurance.actual >= overview.emergency.lifeInsurance.ideal }
+                            ].map(item => (
+                                <div key={item.label} style={{ border: item.inRange ? '1px solid #E8ECF1' : '1px solid #DC2626', borderRadius: '8px', padding: '20px', backgroundColor: '#FFFFFF', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#1E293B', paddingRight: '12px', textTransform: 'uppercase', letterSpacing: '0.3px', maxWidth: '140px' }}>{r.name}</div>
-                                        <StatusBadge actual={r.actual} min={r.idealMin} max={r.idealMax} />
+                                        <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: '#1E293B', letterSpacing: '0.3px', maxWidth: '120px' }}>{item.label}</span>
+                                        <StatusBadge actual={item.actual} min={item.ideal} />
                                     </div>
                                     <div style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '4px' }}>Actual Value</div>
-                                    <div style={{ fontSize: '20px', fontWeight: 700, color: valColor, marginBottom: '8px' }}>{fmt(r.actual)}</div>
-                                    <div style={{ fontSize: '12px', color: '#94A3B8' }}>
-                                        Ideal: {r.idealMin === 0 ? `₹0 - ${fmt(r.idealMax)}` : r.idealMax === 0 ? fmt(r.idealMin) : `${fmt(r.idealMin)} - ${fmt(r.idealMax)}`}
-                                    </div>
+                                    <div style={{ fontSize: '20px', fontWeight: 700, color: item.inRange ? '#16A34A' : '#DC2626', marginBottom: '8px' }}>{item.actual > 0 ? fmt(item.actual) : '₹0'}</div>
+                                    <div style={{ fontSize: '12px', color: '#94A3B8' }}>Ideal: {item.ideal > 0 ? fmt(item.ideal) : '₹0'}</div>
                                 </div>
-                            );
-                        })}
-                    </div>
-                )}
+                            ))}
+                        </div>
+                    )
+                }
 
-                {activeTab === 'Asset Allocation' && (
-                    <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px' }}>
-                        {investments.allocationIdeals.map(r => {
-                            let actual = 0;
-                            if (r.name === 'Equity') actual = investments.assets.equity;
-                            if (r.name === 'Real Estate') actual = investments.assets.realEstate;
-                            if (r.name === 'Commodity') actual = investments.assets.commodity;
-                            if (r.name === 'Debt') actual = investments.assets.debt;
-                            if (r.name === 'Alternative Investments') actual = investments.assets.altInvestments;
-                            const inRange = actual >= r.min && actual <= r.max;
-                            const valColor = inRange ? '#16A34A' : '#DC2626';
-
-                            return (
-                                <div key={r.name} style={{ border: '1px solid #E8ECF1', borderRadius: '8px', padding: '20px', backgroundColor: '#FFFFFF', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                                        <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: '#1E293B', letterSpacing: '0.3px', maxWidth: '60px' }}>{r.name}</span>
-                                        <StatusBadge actual={actual} min={r.min} max={r.max} />
+                {
+                    activeTab === 'Expense and Liability Management' && (
+                        <div className="alloc-cards" style={{ display: 'grid', gap: '16px' }}>
+                            {liabilities.ratios.map(r => {
+                                const inRange = r.actual >= r.idealMin && (r.idealMax === undefined || r.actual <= r.idealMax);
+                                const valColor = inRange ? '#16A34A' : '#DC2626';
+                                return (
+                                    <div key={r.name} style={{ border: inRange ? '1px solid #E8ECF1' : '1px solid #DC2626', borderRadius: '8px', padding: '20px', backgroundColor: '#FFFFFF', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                                            <div style={{ fontSize: '13px', fontWeight: 600, color: '#1E293B', paddingRight: '12px', textTransform: 'uppercase', letterSpacing: '0.3px', maxWidth: '140px' }}>{r.name}</div>
+                                            <StatusBadge actual={r.actual} min={r.idealMin} max={r.idealMax} />
+                                        </div>
+                                        <div style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '4px' }}>Actual Value</div>
+                                        <div style={{ fontSize: '20px', fontWeight: 700, color: valColor, marginBottom: '8px' }}>{fmt(r.actual)}</div>
+                                        <div style={{ fontSize: '12px', color: '#94A3B8' }}>
+                                            Ideal: {r.idealMin === 0 ? `₹0 - ${fmt(r.idealMax)}` : r.idealMax === 0 ? fmt(r.idealMin) : `${fmt(r.idealMin)} - ${fmt(r.idealMax)}`}
+                                        </div>
                                     </div>
-                                    <div style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '4px' }}>Actual Value</div>
-                                    <div style={{ fontSize: '20px', fontWeight: 700, color: valColor, marginBottom: '8px' }}>{actual > 0 ? fmt(actual) : '₹0'}</div>
-                                    <div style={{ fontSize: '12px', color: '#94A3B8' }}>Ideal: {r.min === 0 ? `₹0 - ${fmt(r.max)}` : `${fmt(r.min)} - ${fmt(r.max)}`}</div>
-                                </div>
-                            )
-                        })}
-                    </div>
-                )}
+                                );
+                            })}
+                        </div>
+                    )
+                }
+
+                {
+                    activeTab === 'Asset Allocation' && (
+                        <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px' }}>
+                            {investments.allocationIdeals.map(r => {
+                                let actual = 0;
+                                if (r.name === 'Equity') actual = investments.assets.equity;
+                                if (r.name === 'Real Estate') actual = investments.assets.realEstate;
+                                if (r.name === 'Commodity') actual = investments.assets.commodity;
+                                if (r.name === 'Debt') actual = investments.assets.debt;
+                                if (r.name === 'Alternative Investments') actual = investments.assets.altInvestments;
+                                const inRange = actual >= r.min && actual <= r.max;
+                                const valColor = inRange ? '#16A34A' : '#DC2626';
+
+                                return (
+                                    <div key={r.name} style={{ border: inRange ? '1px solid #E8ECF1' : '1px solid #DC2626', borderRadius: '8px', padding: '20px', backgroundColor: '#FFFFFF', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                                            <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: '#1E293B', letterSpacing: '0.3px', maxWidth: '60px' }}>{r.name}</span>
+                                            <StatusBadge actual={actual} min={r.min} max={r.max} />
+                                        </div>
+                                        <div style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '4px' }}>Actual Value</div>
+                                        <div style={{ fontSize: '20px', fontWeight: 700, color: valColor, marginBottom: '8px' }}>{actual > 0 ? fmt(actual) : '₹0'}</div>
+                                        <div style={{ fontSize: '12px', color: '#94A3B8' }}>Ideal: {r.min === 0 ? `₹0 - ${fmt(r.max)}` : `${fmt(r.min)} - ${fmt(r.max)}`}</div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    )
+                }
 
                 {/* Cashflow Table */}
                 <div style={{ marginTop: '32px', borderTop: '1px solid #E8ECF1', paddingTop: '32px' }}>
@@ -460,12 +512,12 @@ function Dashboard() {
                     'Asset allocation ideal ranges adjust by age: Equity % \u2248 (100 - age), modified for your stated risk comfort.',
                     'Cashflow = (Annual income \u00f7 4) minus 3 months of (expenses + EMIs + SIPs + insurance + estimated tax).'
                 ]} />
-            </div>
+            </div >
 
             {/* 5. 4 Grid (Income, Expenses, Liabilities, Insurance) */}
-            <div className="dashboard-2col" style={{ display: 'grid', gap: '16px' }}>
+            < div className="dashboard-2col" style={{ display: 'grid', gap: '16px' }}>
                 {/* Income */}
-                <div className="card" style={{ padding: '24px' }}>
+                < div className="card" style={{ padding: '24px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '32px' }}>
                         <SectionHeader title="Income" link="/tax" date={currentDate} />
                         <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
@@ -512,10 +564,10 @@ function Dashboard() {
                             </tr>
                         </tbody>
                     </table>
-                </div>
+                </div >
 
                 {/* Expenses */}
-                <div className="card" style={{ padding: '24px' }}>
+                < div className="card" style={{ padding: '24px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '32px' }}>
                         <SectionHeader title="Expenses" link="/tax" date={currentDate} />
                         <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
@@ -559,10 +611,10 @@ function Dashboard() {
                             </tr>
                         </tbody>
                     </table>
-                </div>
+                </div >
 
                 {/* Liabilities */}
-                <div className="card" style={{ padding: '24px' }}>
+                < div className="card" style={{ padding: '24px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '32px' }}>
                         <SectionHeader title="Liabilities" link="/liabilities" date={currentDate} />
                         <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
@@ -616,10 +668,10 @@ function Dashboard() {
                         </tbody>
                     </table>
                     {/* Removed calculation notes */}
-                </div>
+                </div >
 
                 {/* Insurance */}
-                <div className="card" style={{ padding: '24px' }}>
+                < div className="card" style={{ padding: '24px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '32px', alignItems: 'flex-start' }}>
                         <SectionHeader title="Insurance" link="/insurance" date={currentDate} />
                         <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
@@ -665,11 +717,11 @@ function Dashboard() {
                         </tbody>
                     </table>
                     {/* Removed calculation notes */}
-                </div>
-            </div>
+                </div >
+            </div >
 
             {/* 6. Will & Estate */}
-            <div className="card" style={{ padding: '24px' }}>
+            < div className="card" style={{ padding: '24px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                     <Link to="/estate" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', margin: 0, textTransform: 'uppercase' }}>Will & Estate</h2>
@@ -714,9 +766,9 @@ function Dashboard() {
                     'Nominees are custodians, not automatic owners. A registered Will overrides nominee designation in most cases.',
                     'Total Investment here is the sum of all your investment assets. Insurance Cover is the sum of health + life sum insured.'
                 ]} />
-            </div>
+            </div >
 
-        </div>
+        </div >
     );
 }
 

@@ -141,7 +141,7 @@ function Investments() {
                         const ideal = idealMap[card.name] || { min: 0, max: 0 };
                         const inRange = card.actual >= ideal.min && card.actual <= ideal.max;
                         return (
-                            <div key={card.name} className="card" style={{ padding: '20px' }}>
+                            <div key={card.name} className="card" style={{ padding: '20px', border: inRange ? '1px solid #E8ECF1' : '1px solid #DC2626' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                                     <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: '#1E293B', letterSpacing: '0.5px' }}>{card.name}</span>
                                     <StatusBadge actual={card.actual} min={ideal.min} max={ideal.max} />

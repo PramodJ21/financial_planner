@@ -117,7 +117,7 @@ function Insurance() {
                         const max = item.ideal * 1.5;
                         const inRange = item.actual >= min && item.actual <= max;
                         return (
-                            <div key={item.label} className="card" style={{ padding: '20px' }}>
+                            <div key={item.label} className="card" style={{ padding: '20px', border: inRange ? '1px solid #E8ECF1' : '1px solid #DC2626' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                                     <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: '#1E293B', letterSpacing: '0.3px' }}>{item.label}</span>
                                     <StatusBadge actual={item.actual} min={min} max={max} />

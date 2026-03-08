@@ -12,6 +12,7 @@ import Insurance from './pages/Insurance';
 import Tax from './pages/Tax';
 import Estate from './pages/Estate';
 import Reports from './pages/Reports';
+import GoalPlanner from './pages/GoalPlanner';
 import Layout from './components/Layout';
 
 const ProtectedRoute = ({ children }) => {
@@ -38,6 +39,7 @@ function App() {
         <Route path="/tax" element={<ProtectedRoute><Layout><Tax /></Layout></ProtectedRoute>} />
         <Route path="/estate" element={<ProtectedRoute><Layout><Estate /></Layout></ProtectedRoute>} />
         <Route path="/reports" element={<ProtectedRoute><Layout><Reports /></Layout></ProtectedRoute>} />
+        <Route path="/goal-planner" element={<ProtectedRoute><Layout><GoalPlanner /></Layout></ProtectedRoute>} />
 
         {/* Protected Questionnaire */}
         <Route path="/questionnaire" element={<ProtectedRoute><Questionnaire /></ProtectedRoute>} />

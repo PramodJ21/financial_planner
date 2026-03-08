@@ -162,7 +162,7 @@ function Liabilities() {
                 <div style={{ marginBottom: '24px' }}>
                     <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#1E293B', textTransform: 'uppercase', marginBottom: '12px' }}>Good Liability</h3>
                     <div className="stat-row">
-                        <div style={{ flex: 1, border: '1px solid #E8ECF1', borderRadius: '8px', padding: '16px', backgroundColor: '#FFFFFF' }}>
+                        <div style={{ flex: 1, border: liab.goodLiability.outstanding >= liab.idealRanges.goodOutstanding.min && liab.goodLiability.outstanding <= liab.idealRanges.goodOutstanding.max ? '1px solid #E8ECF1' : '1px solid #DC2626', borderRadius: '8px', padding: '16px', backgroundColor: '#FFFFFF' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                                 <span style={{ fontSize: '11px', fontWeight: 600, color: '#1E293B', textTransform: 'uppercase' }}>Outstanding</span>
                                 <StatusBadge actual={liab.goodLiability.outstanding} min={liab.idealRanges.goodOutstanding.min} max={liab.idealRanges.goodOutstanding.max} />
@@ -171,7 +171,7 @@ function Liabilities() {
                             <div style={{ fontSize: '20px', fontWeight: 700, color: liab.goodLiability.outstanding >= liab.idealRanges.goodOutstanding.min && liab.goodLiability.outstanding <= liab.idealRanges.goodOutstanding.max ? '#059669' : '#DC2626', marginBottom: '4px' }}>{fmtFull(liab.goodLiability.outstanding)}</div>
                             <div style={{ fontSize: '11px', color: '#94A3B8' }}>Ideal: {fmtFull(liab.idealRanges.goodOutstanding.min)} – {fmtFull(liab.idealRanges.goodOutstanding.max)}</div>
                         </div>
-                        <div style={{ flex: 1, border: '1px solid #E8ECF1', borderRadius: '8px', padding: '16px', backgroundColor: '#FFFFFF' }}>
+                        <div style={{ flex: 1, border: liab.goodLiability.emi >= (liab.idealRanges.goodEmi?.min || 0) && liab.goodLiability.emi <= (liab.idealRanges.goodEmi?.max || 0) ? '1px solid #E8ECF1' : '1px solid #DC2626', borderRadius: '8px', padding: '16px', backgroundColor: '#FFFFFF' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                                 <span style={{ fontSize: '11px', fontWeight: 600, color: '#1E293B', textTransform: 'uppercase' }}>EMI</span>
                                 <StatusBadge actual={liab.goodLiability.emi} min={liab.idealRanges.goodEmi?.min || 0} max={liab.idealRanges.goodEmi?.max || 0} />
@@ -187,7 +187,7 @@ function Liabilities() {
                 <div style={{ marginBottom: '24px' }}>
                     <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#1E293B', textTransform: 'uppercase', marginBottom: '12px' }}>Bad Liability</h3>
                     <div className="stat-row">
-                        <div style={{ flex: 1, border: '1px solid #E8ECF1', borderRadius: '8px', padding: '16px', backgroundColor: '#FFFFFF' }}>
+                        <div style={{ flex: 1, border: liab.badLiability.outstanding >= liab.idealRanges.badOutstanding.min && liab.badLiability.outstanding <= liab.idealRanges.badOutstanding.max ? '1px solid #E8ECF1' : '1px solid #DC2626', borderRadius: '8px', padding: '16px', backgroundColor: '#FFFFFF' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                                 <span style={{ fontSize: '11px', fontWeight: 600, color: '#1E293B', textTransform: 'uppercase' }}>Outstanding</span>
                                 <StatusBadge actual={liab.badLiability.outstanding} min={liab.idealRanges.badOutstanding.min} max={liab.idealRanges.badOutstanding.max} />
@@ -196,7 +196,7 @@ function Liabilities() {
                             <div style={{ fontSize: '20px', fontWeight: 700, color: liab.badLiability.outstanding >= liab.idealRanges.badOutstanding.min && liab.badLiability.outstanding <= liab.idealRanges.badOutstanding.max ? '#059669' : '#DC2626', marginBottom: '4px' }}>{fmtFull(liab.badLiability.outstanding)}</div>
                             <div style={{ fontSize: '11px', color: '#94A3B8' }}>Ideal: {fmtFull(liab.idealRanges.badOutstanding.min)} – {fmtFull(liab.idealRanges.badOutstanding.max)}</div>
                         </div>
-                        <div style={{ flex: 1, border: '1px solid #E8ECF1', borderRadius: '8px', padding: '16px', backgroundColor: '#FFFFFF' }}>
+                        <div style={{ flex: 1, border: liab.badLiability.emi >= liab.idealRanges.badEmi.min && liab.badLiability.emi <= liab.idealRanges.badEmi.max ? '1px solid #E8ECF1' : '1px solid #DC2626', borderRadius: '8px', padding: '16px', backgroundColor: '#FFFFFF' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                                 <span style={{ fontSize: '11px', fontWeight: 600, color: '#1E293B', textTransform: 'uppercase' }}>EMI</span>
                                 <StatusBadge actual={liab.badLiability.emi} min={liab.idealRanges.badEmi.min} max={liab.idealRanges.badEmi.max} />
@@ -236,17 +236,20 @@ function Liabilities() {
             <div>
                 <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', marginBottom: '16px' }}>Financial Analysis – Expenses & Liability Ratios</h2>
                 <div className="dashboard-3col">
-                    {ratios.map((r, i) => (
-                        <div key={i} className="card" style={{ padding: '20px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: '#1E293B', letterSpacing: '0.3px' }}>{r.name}</span>
-                                <StatusBadge actual={r.actual} min={r.idealMin} max={r.idealMax} />
+                    {ratios.map((r, i) => {
+                        const inRange = r.actual >= r.idealMin && (r.idealMax === undefined || r.actual <= r.idealMax);
+                        return (
+                            <div key={i} className="card" style={{ padding: '20px', border: inRange ? '1px solid #E8ECF1' : '1px solid #DC2626' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                    <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: '#1E293B', letterSpacing: '0.3px' }}>{r.name}</span>
+                                    <StatusBadge actual={r.actual} min={r.idealMin} max={r.idealMax} />
+                                </div>
+                                <div style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '4px' }}>Actual Value</div>
+                                <div style={{ fontSize: '20px', fontWeight: 700, color: '#1E293B', marginBottom: '8px' }}>{fmt(r.actual)}</div>
+                                <div style={{ fontSize: '12px', color: '#94A3B8' }}>Ideal: {fmt(r.idealMin)} – {fmt(r.idealMax)}</div>
                             </div>
-                            <div style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '4px' }}>Actual Value</div>
-                            <div style={{ fontSize: '20px', fontWeight: 700, color: '#1E293B', marginBottom: '8px' }}>{fmt(r.actual)}</div>
-                            <div style={{ fontSize: '12px', color: '#94A3B8' }}>Ideal: {fmt(r.idealMin)} – {fmt(r.idealMax)}</div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
                 <SectionNote title="Understanding Expense & Liability Ratios" lines={[
                     'Good Liabilities-to-Total Assets: Measures what % of your total assets is funded by wealth-building debt (home/education loans). Ideal: 20–50%. Higher means over-leveraged.',

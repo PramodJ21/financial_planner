@@ -478,54 +478,63 @@ function computeFBS(p) {
     const income = computeIncome(p);
     const tax = computeTax(p);
 
-    let score = 0;
+    let breakdown = {
+        assetDiversity: 0,
+        investmentRegularity: 0,
+        emergencyFund: 0,
+        insurance: 0,
+        liabilities: 0,
+        tax: 0,
+        behavior: 0
+    };
 
     // 1. Asset allocation diversity (20 pts)
     const alloc = assets.allocation;
     const maxAlloc = Math.max(alloc.equity, alloc.debt, alloc.commodity, alloc.realEstate, alloc.altInvestments);
-    if (maxAlloc < 50) score += 20;
-    else if (maxAlloc < 70) score += 12;
-    else if (maxAlloc < 85) score += 6;
-    else score += 2;
+    if (maxAlloc < 50) breakdown.assetDiversity = 20;
+    else if (maxAlloc < 70) breakdown.assetDiversity = 12;
+    else if (maxAlloc < 85) breakdown.assetDiversity = 6;
+    else breakdown.assetDiversity = 2;
 
     // 2. Investment regularity (15 pts)
     const sipRatio = income.total ? (assets.monthlySip * 12 / income.total * 100) : 0;
-    if (sipRatio >= 20) score += 15;
-    else if (sipRatio >= 10) score += 10;
-    else if (sipRatio >= 5) score += 5;
-    else score += 1;
+    if (sipRatio >= 20) breakdown.investmentRegularity = 15;
+    else if (sipRatio >= 10) breakdown.investmentRegularity = 10;
+    else if (sipRatio >= 5) breakdown.investmentRegularity = 5;
+    else breakdown.investmentRegularity = 1;
 
     // 3. Emergency fund adequacy (15 pts)
     const emRatio = emergency.emergencyFunds.ideal ? emergency.emergencyFunds.actual / emergency.emergencyFunds.ideal : 0;
-    if (emRatio >= 2) score += 15;
-    else if (emRatio >= 1) score += 12;
-    else if (emRatio >= 0.5) score += 6;
-    else score += 2;
+    if (emRatio >= 2) breakdown.emergencyFund = 15;
+    else if (emRatio >= 1) breakdown.emergencyFund = 12;
+    else if (emRatio >= 0.5) breakdown.emergencyFund = 6;
+    else breakdown.emergencyFund = 2;
 
     // 4. Insurance coverage (15 pts)
     const healthOk = insurance.healthCover >= insurance.idealHealth;
     const lifeOk = insurance.lifeCover >= insurance.idealLife || insurance.idealLife === 0;
-    if (healthOk && lifeOk) score += 15;
-    else if (healthOk || lifeOk) score += 8;
-    else score += 2;
+    if (healthOk && lifeOk) breakdown.insurance = 15;
+    else if (healthOk || lifeOk) breakdown.insurance = 8;
+    else breakdown.insurance = 2;
 
     // 5. Liability management (10 pts)
-    if (!liabilities.hasLiabilities) score += 8;
-    else if (liabilities.goodLiability.outstanding > liabilities.badLiability.outstanding) score += 7;
-    else score += 3;
+    if (!liabilities.hasLiabilities) breakdown.liabilities = 10; // Correction: max is 10
+    else if (liabilities.goodLiability.outstanding > liabilities.badLiability.outstanding) breakdown.liabilities = 7;
+    else breakdown.liabilities = 3;
 
     // 6. Tax efficiency (10 pts)
-    if (tax.recommended === (p.tax_regime || 'New Regime')) score += 10;
-    else score += 4;
+    if (tax.recommended === (p.tax_regime || 'New Regime')) breakdown.tax = 10;
+    else breakdown.tax = 4;
 
     // 7. Behavioral score (15 pts)
     const bReview = Number(p.beh_review_monthly) || 3;
     const bDelay = Number(p.beh_delay_decisions) || 3;
     const bImpulse = Number(p.beh_spend_impulsively) || 3;
     const behavScore = (bReview * 3 + (6 - bDelay) * 2 + (6 - bImpulse) * 2) / 35 * 15;
-    score += Math.round(behavScore);
+    breakdown.behavior = Math.round(behavScore);
 
-    return Math.min(100, Math.max(0, score));
+    const totalScore = Math.min(100, Math.max(0, Object.values(breakdown).reduce((sum, val) => sum + val, 0)));
+    return { total: totalScore, breakdown };
 }
 
 // ============ MONEY SIGN ============
@@ -628,6 +637,16 @@ function generateActionPlan(p) {
     const tax = computeTax(p);
     const age = getAge(p.date_of_birth);
     const lifeStage = getLifeStage(p.date_of_birth);
+    const fbs = computeFBS(p);
+    const missingFBS = {
+        emergencyFund: 15 - fbs.breakdown.emergencyFund,
+        insurance: 15 - fbs.breakdown.insurance,
+        liabilities: 10 - fbs.breakdown.liabilities,
+        tax: 10 - fbs.breakdown.tax,
+        investmentRegularity: 15 - fbs.breakdown.investmentRegularity,
+        assetDiversity: 20 - fbs.breakdown.assetDiversity,
+        behavior: 15 - fbs.breakdown.behavior
+    };
 
     const actions = [];
     let priority = 1;
@@ -646,8 +665,10 @@ function generateActionPlan(p) {
             monthlyContribution: Math.round(emGap / monthsToFill),
             status: 'pending',
             urgency: 'critical',
+            fbsImpact: missingFBS.emergencyFund > 0 ? missingFBS.emergencyFund : 0,
             priority: priority++
         });
+        missingFBS.emergencyFund = 0; // Clear it so we don't assign it again
     }
 
     // ── 2. INSURANCE ──
@@ -660,8 +681,10 @@ function generateActionPlan(p) {
             suggestedAmount: Math.round(gap),
             status: 'pending',
             urgency: 'high',
+            fbsImpact: missingFBS.insurance > 0 ? missingFBS.insurance : 0,
             priority: priority++
         });
+        missingFBS.insurance = 0;
     }
 
     if (insurance.additionalCoverNeeded > 0) {
@@ -672,8 +695,10 @@ function generateActionPlan(p) {
             suggestedAmount: Math.round(insurance.additionalCoverNeeded),
             status: 'pending',
             urgency: 'high',
+            fbsImpact: missingFBS.insurance > 0 ? missingFBS.insurance : 0, // In case Health was fine but Life is missing
             priority: priority++
         });
+        missingFBS.insurance = 0;
     }
 
     // ── 3. DEBT MANAGEMENT ──
@@ -686,8 +711,10 @@ function generateActionPlan(p) {
             monthlyContribution: liabilities.badLiability.emi,
             status: 'pending',
             urgency: liabilities.badLiability.outstanding > income.total * 0.5 ? 'critical' : 'high',
+            fbsImpact: missingFBS.liabilities > 0 ? missingFBS.liabilities : 0,
             priority: priority++
         });
+        missingFBS.liabilities = 0;
     }
 
     // ── 4. TAX OPTIMISATION ──
@@ -700,8 +727,10 @@ function generateActionPlan(p) {
             suggestedAmount: tax.potentialSavings,
             status: 'pending',
             urgency: tax.potentialSavings > 20000 ? 'high' : 'medium',
+            fbsImpact: missingFBS.tax > 0 ? missingFBS.tax : 0,
             priority: priority++
         });
+        missingFBS.tax = 0;
     }
 
     if (optedRegime === 'Old Regime' || tax.recommended === 'Old Regime') {
@@ -714,8 +743,10 @@ function generateActionPlan(p) {
                 suggestedAmount: d.gap,
                 status: 'pending',
                 urgency: 'medium',
+                fbsImpact: missingFBS.tax > 0 ? missingFBS.tax : 0,
                 priority: priority++
             });
+            missingFBS.tax = 0;
         });
     }
 
@@ -737,8 +768,10 @@ function generateActionPlan(p) {
                 suggestedAmount: Math.round(excessSavings),
                 status: 'pending',
                 urgency: savingsPct > 60 ? 'high' : 'medium',
+                fbsImpact: missingFBS.assetDiversity > 0 ? missingFBS.assetDiversity : 0,
                 priority: priority++
             });
+            missingFBS.assetDiversity = 0;
         }
     }
 
@@ -777,8 +810,10 @@ function generateActionPlan(p) {
             idealPercent: idealEquity,
             status: 'pending',
             urgency: Math.abs(equityGap) >= 20 ? 'high' : 'medium',
+            fbsImpact: missingFBS.assetDiversity > 0 ? missingFBS.assetDiversity : 0,
             priority: priority++
         });
+        missingFBS.assetDiversity = 0;
     }
 
     // Debt rebalancing
@@ -831,8 +866,10 @@ function generateActionPlan(p) {
             monthlyContribution: sipAmount,
             status: 'pending',
             urgency: 'medium',
+            fbsImpact: missingFBS.investmentRegularity > 0 ? missingFBS.investmentRegularity : 0,
             priority: priority++
         });
+        missingFBS.investmentRegularity = 0;
     }
 
     // ── 6. ESTATE PLANNING ──
@@ -873,6 +910,20 @@ function generateActionPlan(p) {
         });
     }
 
+    // ── 8. BEHAVIORAL ADJUSTMENTS ──
+    if (missingFBS.behavior > 0) {
+        actions.push({
+            category: 'Financial Habits',
+            title: 'Improve Financial Habits',
+            description: `Review your portfolio regularly and avoid impulsive spending or holding onto losing investments. Delay significant financial decisions to remove emotional bias. Mastering these habits will increase your score and long-term wealth execution.`,
+            suggestedAmount: 0,
+            status: 'pending',
+            urgency: 'medium',
+            fbsImpact: missingFBS.behavior,
+            priority: priority++
+        });
+    }
+
     return actions;
 }
 
@@ -890,7 +941,7 @@ function computeFullDashboard(p, user) {
     const netWorth = computeNetWorth(p);
     const surplus = computeSurplus(p);
     const cashflow = computeCashflow(p);
-    const fbs = computeFBS(p);
+    const fbsObj = computeFBS(p);
     const moneySign = computeMoneySign(p);
     const biases = computeBiases(p);
     const ratios = computeFinancialRatios(p);
@@ -908,7 +959,7 @@ function computeFullDashboard(p, user) {
         overview: {
             generation,
             lifeStage,
-            fbs,
+            fbs: fbsObj.total,
             moneySign,
             biases,
             netWorth,

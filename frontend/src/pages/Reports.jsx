@@ -209,11 +209,22 @@ p { font-size: 13px; color: #475569; margin-bottom: 8px; }
                                                     <div style={{ fontSize: '10px', fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: '2px' }}>
                                                         {action.category}
                                                     </div>
-                                                    <div style={{
-                                                        fontSize: '14px', fontWeight: 600, color: '#1E293B',
-                                                        textDecoration: isCompleted ? 'line-through' : 'none'
-                                                    }}>
-                                                        {action.title}
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                        <div style={{
+                                                            fontSize: '14px', fontWeight: 600, color: '#1E293B',
+                                                            textDecoration: isCompleted ? 'line-through' : 'none'
+                                                        }}>
+                                                            {action.title}
+                                                        </div>
+                                                        {action.fbsImpact > 0 && (
+                                                            <div style={{
+                                                                fontSize: '10px', fontWeight: 700, color: '#10B981',
+                                                                backgroundColor: '#ECFDF5', padding: '2px 6px', borderRadius: '4px',
+                                                                border: '1px solid #A7F3D0'
+                                                            }}>
+                                                                +{action.fbsImpact} FBS Points
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
 

@@ -17,3 +17,22 @@ For each goal consider all the possible constraints that comes with it.
 Take into account his current monthly surplus and then suggest.
 Only suggest investing in equity, debt, commodity
 Show chart for each goal, description
+
+06-03-2026z
+
+Goal Planner:
+Before starting remove the budget planner system entirely and just have a monthly budget input field above that does nothing for now.
+I need you to change the goal planner system. There is a general risk level at the top , i dont need that anymore. Each goal would have its own risk level now. CHanging the risk level changes the allocation in equities debt and commodities. Currently the allocation is done only on the basis of risk level, now we are going to consider the time period to achieve that goal as well. Here's an example to understand the allocation strategy, let's say the goal is to save some X rs in 2yrs. Now this is a short term goal so investing more in equities is a dumb idea as its volatile as compared to debt and commodities so more priority will be given to debt and commodities. Now if the user increases the risk level for that goal, incerase the allocation in equities slightly but dont put everything in equities. So its like user wants to take more risk to achieve that goal faster but that risk should be calculated so that the goal is achievable. Now if the goal is a long term goal lets say like 10Y+ now you can put more in equities and less in debt and commodities. Even if the risk level is at the lowest for a long term goal you can put more than 50% in equities becuase over the time period the returns would be high. So before writing code come with a suitable allocation strategy. Now about the returns this would depend on the risk level only. Again consider a scenario where the goal is to save X rs in 2yrs and the risk level is low, then the user would invest leess in equities and even in equities user would invest in stable stocks and indexes if the risk is high the investment would go to high risk high return equities. We dont directly suggest stocks or indexes we would just show the allocation in the equity debt and commodity the calulation will be done internally. So come up with a streatgy first and then implement it.   
+
+We need to add different metrics like bar chart for each goal with line chart for the combined goal.
+A table for monthly breakdown and yearly breakdown for each goal and the combined goals as well
+A button to export everything into a neatly formatted excel, and one more button to import everything from a neatly formatted excel and then we can show the data. A button for user to download a sample template of the excel if they want to import the goals through excel file. So import would just take input for goals no calculation metrics.
+
+Financial Planner
+In the overview section, based on the financial behaviour score of the user we will show the tasks that the user needs to achieve to go the next bucket of the finanical behaviour score . This will also be highlighted in the action plan section. So instead of following goals randomly we can tell the user to complete these goals to reach the next tier in financial behaviour score and so on.
+
+A small change the outside range tagged cards in each section should have a red border. 
+
+08-03-2026
+Keep toggle for inflation adjustment
+Custom allocation and risk options

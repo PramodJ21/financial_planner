@@ -8,6 +8,7 @@ import {
     Receipt,
     FileText,
     ClipboardList,
+    Target,
     LogOut
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -24,6 +25,10 @@ function Sidebar({ collapsed, mobileOpen }) {
         { name: 'Tax', path: '/tax', icon: Receipt },
         { name: 'Will & Estate', path: '/estate', icon: FileText },
         { name: 'Action Plan', path: '/reports', icon: ClipboardList },
+    ];
+
+    const toolItems = [
+        { name: 'Goal Planner', path: '/goal-planner', icon: Target },
     ];
 
     const width = collapsed ? 64 : 200;
@@ -64,6 +69,43 @@ function Sidebar({ collapsed, mobileOpen }) {
             {/* Navigation */}
             <nav style={{ flex: 1, padding: '8px 0', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 {navItems.map((item) => {
+                    const isActive = location.pathname === item.path;
+                    const Icon = item.icon;
+                    return (
+                        <NavLink
+                            key={item.name}
+                            to={item.path}
+                            title={collapsed ? item.name : undefined}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                padding: collapsed ? '9px 0' : '9px 20px',
+                                justifyContent: collapsed ? 'center' : 'flex-start',
+                                fontSize: '13px',
+                                color: isActive ? '#1E293B' : '#64748B',
+                                fontWeight: isActive ? 600 : 400,
+                                borderLeft: isActive ? '3px solid #3B82F6' : '3px solid transparent',
+                                backgroundColor: isActive ? '#EFF6FF' : 'transparent',
+                                textDecoration: 'none',
+                                transition: 'all 0.12s ease',
+                                whiteSpace: 'nowrap'
+                            }}
+                        >
+                            <Icon size={17} strokeWidth={isActive ? 2.2 : 1.8} style={{ flexShrink: 0 }} />
+                            {!collapsed && item.name}
+                        </NavLink>
+                    );
+                })}
+
+                {/* Tools Section Separator */}
+                <div style={{ margin: '12px 0 4px', borderTop: '1px solid #E8ECF1' }}>
+                    {!collapsed && (
+                        <div style={{ padding: '10px 20px 4px', fontSize: '10px', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tools</div>
+                    )}
+                </div>
+
+                {toolItems.map((item) => {
                     const isActive = location.pathname === item.path;
                     const Icon = item.icon;
                     return (
