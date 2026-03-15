@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap"
+    rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --paper: #F7F4EF;
+      --ink: #1C1A17;
+      --ink-soft: #6B6760;
+      --ink-ghost: #C4BFB8;
+      --accent: #C4703A;
+      --green: #2D5A3D;
+      --preview-bg: #141210;
+      --preview-surface: #1E1C1A;
+      --preview-card: #242220;
+      --preview-border: #333130;
+      --preview-soft: #6B6760;
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      font-size: 14px;
+      font-variant-numeric: lining-nums;
+      background: var(--paper);
+    }
+
+    .screen {
+      display: none;
+      height: 100vh;
+      width: 100%;
+    }
+
+    .screen.active {
+      display: flex;
+    }
+
+    /* ====== LEFT ====== */
+    .left {
+      width: 420px;
+      flex-shrink: 0;
+      background: var(--paper);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 0 64px;
+      border-right: 0.5px solid var(--ink-ghost);
+      position: relative;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      position: absolute;
+      top: 40px;
+      left: 64px;
+    }
+
+    .brand-box {
+      width: 32px;
+      height: 32px;
+      background: var(--ink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .brand-box span {
+      font-family: 'Playfair Display', serif;
+      font-size: 12px;
+      color: var(--paper);
+    }
+
+    .brand-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 18px;
+      font-weight: 400;
+      color: var(--ink);
+    }
+
+    .brand-name em {
+      color: var(--accent);
+      font-style: normal;
+    }
+
+    /* LANDING LEFT */
+    .landing-eyebrow {
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--ink-ghost);
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+
+    .landing-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 44px;
+      font-weight: 400;
+      color: var(--ink);
+      line-height: 1.1;
+      margin-bottom: 20px;
+    }
+
+    .landing-desc {
+      font-size: 13px;
+      color: var(--ink-soft);
+      font-weight: 300;
+      line-height: 1.8;
+      margin-bottom: 36px;
+    }
+
+    .landing-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 44px;
+    }
+
+    .landing-meta-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 12px;
+      color: var(--ink-soft);
+      font-weight: 300;
+    }
+
+    .meta-dot {
+      width: 4px;
+      height: 4px;
+      background: var(--accent);
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .btn-primary {
+      font-family: 'Outfit', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--paper);
+      background: var(--ink);
+      border: none;
+      padding: 15px;
+      width: 100%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      letter-spacing: 0.02em;
+      transition: background 0.2s;
+      margin-bottom: 14px;
+    }
+
+    .btn-primary:hover {
+      background: #2e2b27;
+    }
+
+    .link-small {
+      font-size: 12px;
+      color: var(--ink-ghost);
+      font-weight: 300;
+      text-align: center;
+    }
+
+    .link-small a {
+      color: var(--ink-soft);
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .link-small a:hover {
+      color: var(--ink);
+    }
+
+    /* AUTH LEFT */
+    .auth-eyebrow {
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--ink-ghost);
+      font-weight: 600;
+      margin-bottom: 14px;
+    }
+
+    .auth-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 40px;
+      font-weight: 400;
+      color: var(--ink);
+      line-height: 1.1;
+      margin-bottom: 10px;
+    }
+
+    .auth-sub {
+      font-size: 13px;
+      color: var(--ink-soft);
+      font-weight: 300;
+      margin-bottom: 48px;
+    }
+
+    .auth-form {
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    .auth-field {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .auth-field label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      color: #4a4642;
+      text-transform: uppercase;
+    }
+
+    .auth-field label .opt {
+      font-size: 10px;
+      color: var(--ink-ghost);
+      font-weight: 300;
+      text-transform: none;
+      letter-spacing: 0;
+      margin-left: 4px;
+    }
+
+    .auth-field input {
+      font-family: 'Outfit', sans-serif;
+      font-size: 14px;
+      color: var(--ink);
+      background: none;
+      border: none;
+      border-bottom: 0.5px solid var(--ink-ghost);
+      padding: 11px 0;
+      outline: none;
+      width: 100%;
+      transition: border-color 0.2s;
+    }
+
+    .auth-field input:focus {
+      border-bottom-color: var(--ink);
+    }
+
+    .auth-field input::placeholder {
+      color: var(--ink-ghost);
+      font-weight: 300;
+    }
+
+    .auth-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    .btn-auth {
+      font-family: 'Outfit', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--paper);
+      background: var(--ink);
+      border: none;
+      padding: 15px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      transition: background 0.2s;
+      margin-top: 10px;
+      letter-spacing: 0.02em;
+    }
+
+    .btn-auth:hover {
+      background: #2e2b27;
+    }
+
+    .auth-footer {
+      font-size: 12px;
+      color: var(--ink-ghost);
+      margin-top: 22px;
+      font-weight: 300;
+    }
+
+    .auth-footer a {
+      color: var(--ink-soft);
+      font-weight: 500;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .auth-footer a:hover {
+      color: var(--ink);
+    }
+
+    /* ====== RIGHT ====== */
+    .right {
+      flex: 1;
+      background: var(--preview-bg);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .right::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: linear-gradient(var(--preview-border) 1px, transparent 1px), linear-gradient(90deg, var(--preview-border) 1px, transparent 1px);
+      background-size: 36px 36px;
+      opacity: 0.45;
+      pointer-events: none;
+    }
+
+    /* ====== PREVIEW CARD ====== */
+    .preview-float {
+      position: relative;
+      z-index: 2;
+      width: 520px;
+      background: var(--preview-surface);
+      border: 0.5px solid var(--preview-border);
+      box-shadow: 0 32px 80px rgba(0, 0, 0, 0.7), 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .preview-chrome {
+      background: #252321;
+      border-bottom: 0.5px solid var(--preview-border);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .chrome-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+    }
+
+    .preview-inner {
+      padding: 18px;
+    }
+
+    .p-card {
+      background: var(--preview-card);
+      border: 0.5px solid var(--preview-border);
+      padding: 14px 16px;
+      margin-bottom: 10px;
+    }
+
+    .p-card-label {
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--preview-soft);
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .p-score-row {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+
+    .p-score-num {
+      font-family: 'Playfair Display', serif;
+      font-size: 36px;
+      font-weight: 400;
+      color: var(--paper);
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .p-moneysign {
+      font-size: 14px;
+      color: var(--accent);
+      letter-spacing: 0.1em;
+      margin-top: 3px;
+    }
+
+    .p-score-right {
+      flex: 1;
+    }
+
+    .p-bar-track {
+      height: 2px;
+      background: #333130;
+      width: 100%;
+      margin-bottom: 6px;
+    }
+
+    .p-bar-fill {
+      height: 100%;
+      background: var(--accent);
+      transition: width 1.8s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .p-score-sub {
+      font-size: 9px;
+      color: var(--preview-soft);
+      font-weight: 300;
+    }
+
+    .p-kpi-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      margin-bottom: 10px;
+    }
+
+    .p-kpi {
+      background: var(--preview-card);
+      border: 0.5px solid var(--preview-border);
+      border-right: none;
+      padding: 10px 12px;
+    }
+
+    .p-kpi:last-child {
+      border-right: 0.5px solid var(--preview-border);
+    }
+
+    .p-kpi-label {
+      font-size: 8px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--preview-soft);
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .p-kpi-val {
+      font-family: 'Playfair Display', serif;
+      font-size: 15px;
+      font-weight: 400;
+      color: var(--paper);
+    }
+
+    .p-kpi-sub {
+      font-size: 8px;
+      color: var(--preview-soft);
+      font-weight: 300;
+      margin-top: 2px;
+    }
+
+    .p-actions {
+      background: var(--preview-card);
+      border: 0.5px solid var(--preview-border);
+    }
+
+    .p-actions-hdr {
+      padding: 9px 12px 8px;
+      border-bottom: 0.5px solid var(--preview-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .p-actions-title {
+      font-size: 8px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--paper);
+      font-weight: 600;
+    }
+
+    .p-actions-ct {
+      font-size: 8px;
+      color: var(--preview-soft);
+    }
+
+    .p-ai {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 9px 12px;
+      border-bottom: 0.5px solid var(--preview-border);
+      transition: opacity 0.5s;
+    }
+
+    .p-ai:last-child {
+      border-bottom: none;
+    }
+
+    .p-ai.done {
+      opacity: 0.3;
+    }
+
+    .p-cb {
+      width: 12px;
+      height: 12px;
+      border: 0.5px solid var(--preview-border);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.3s;
+    }
+
+    .p-cb.checked {
+      background: var(--green);
+      border-color: var(--green);
+    }
+
+    .p-cb.checked::after {
+      content: '✓';
+      font-size: 7px;
+      color: #fff;
+    }
+
+    .p-ai-meta {
+      font-size: 7px;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--preview-soft);
+    }
+
+    .p-ai-name {
+      font-size: 10px;
+      color: var(--paper);
+      font-weight: 400;
+    }
+
+    .p-ai-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .p-fbs {
+      font-size: 7px;
+      color: var(--green);
+      border: 0.5px solid var(--green);
+      padding: 1px 5px;
+    }
+
+    .p-ai-amt {
+      font-family: 'Playfair Display', serif;
+      font-size: 10px;
+      color: var(--paper);
+    }
+
+    .p-cursor {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      opacity: 0.85;
+      pointer-events: none;
+      transition: left 1.6s cubic-bezier(0.4, 0, 0.2, 1), top 1.6s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 10;
+      box-shadow: 0 0 10px var(--accent);
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- LANDING -->
+  <div class="screen active" id="landing">
+    <div class="left">
+      <div class="brand">
+        <div class="brand-box"><span>FH</span></div>
+        <div class="brand-name">FinHealth<em>.</em></div>
+      </div>
+      <div>
+        <div class="landing-eyebrow">Wealth Analytics</div>
+        <div class="landing-title">Build Your Complete Financial Health Profile</div>
+        <div class="landing-desc">Answer a few questions about your finances. We'll generate a comprehensive health
+          score, identify gaps, and create a personalised action plan.</div>
+        <div class="landing-meta">
+          <div class="landing-meta-item">
+            <div class="meta-dot"></div>10 sections to complete
+          </div>
+          <div class="landing-meta-item">
+            <div class="meta-dot"></div>8–12 minutes to finish
+          </div>
+          <div class="landing-meta-item">
+            <div class="meta-dot"></div>Save &amp; resume anytime
+          </div>
+        </div>
+        <button class="btn-primary" onclick="show('signup')">Start Assessment <svg width="12" height="12"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+            stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg></button>
+        <div class="link-small">Already have an account? <a onclick="show('login')">Log in →</a></div>
+      </div>
+    </div>
+    <div class="right" id="landingRight">
+      <div class="preview-float">
+        <div class="preview-chrome">
+          <div class="chrome-dot" style="background:#FF5F57;"></div>
+          <div class="chrome-dot" style="background:#FEBC2E;"></div>
+          <div class="chrome-dot" style="background:#28C840;"></div>
+          <span style="font-size:9px;color:#4A4846;margin-left:10px;">finhealth.app · dashboard</span>
+        </div>
+        <div class="preview-inner">
+          <div class="p-card">
+            <div class="p-card-label">Financial Balance Score</div>
+            <div class="p-score-row">
+              <div>
+                <div class="p-score-num" id="lScore">0</div>
+                <div class="p-moneysign" id="lMoney"></div>
+              </div>
+              <div class="p-score-right">
+                <div class="p-bar-track">
+                  <div class="p-bar-fill" id="lFill" style="width:0%"></div>
+                </div>
+                <div class="p-score-sub" id="lLabel">Calculating your score…</div>
+              </div>
+            </div>
+          </div>
+          <div class="p-kpi-row">
+            <div class="p-kpi">
+              <div class="p-kpi-label">Net Worth</div>
+              <div class="p-kpi-val" id="lNW">₹0</div>
+              <div class="p-kpi-sub">Assets minus liabilities</div>
+            </div>
+            <div class="p-kpi">
+              <div class="p-kpi-label">Monthly Savings</div>
+              <div class="p-kpi-val" id="lSav">₹0</div>
+              <div class="p-kpi-sub">After expenses &amp; EMIs</div>
+            </div>
+            <div class="p-kpi">
+              <div class="p-kpi-label">Tax Saved</div>
+              <div class="p-kpi-val" id="lTax">₹0</div>
+              <div class="p-kpi-sub">Annually</div>
+            </div>
+          </div>
+          <div class="p-actions">
+            <div class="p-actions-hdr"><span class="p-actions-title">Action Plan</span><span class="p-actions-ct"
+                id="lPending">11 pending</span></div>
+            <div class="p-ai" id="lai1">
+              <div class="p-cb" id="lcb1"></div>
+              <div>
+                <div class="p-ai-meta">Emergency Fund</div>
+                <div class="p-ai-name">Build Emergency Fund</div>
+              </div>
+              <div class="p-ai-right"><span class="p-fbs">+13 FBS</span><span class="p-ai-amt">₹9,20,000</span></div>
+            </div>
+            <div class="p-ai" id="lai2">
+              <div class="p-cb" id="lcb2"></div>
+              <div>
+                <div class="p-ai-meta">Insurance</div>
+                <div class="p-ai-name">Increase Health Insurance Coverage</div>
+              </div>
+              <div class="p-ai-right"><span class="p-fbs">+13 FBS</span><span class="p-ai-amt">₹22,50,000</span></div>
+            </div>
+            <div class="p-ai" id="lai3">
+              <div class="p-cb" id="lcb3"></div>
+              <div>
+                <div class="p-ai-meta">Asset Reallocation</div>
+                <div class="p-ai-name">Increase Equity Allocation</div>
+              </div>
+              <div class="p-ai-right"><span class="p-fbs">+8 FBS</span><span class="p-ai-amt">₹36,50,000</span></div>
+            </div>
+            <div class="p-ai" id="lai4">
+              <div class="p-cb" id="lcb4"></div>
+              <div>
+                <div class="p-ai-meta">Debt Management</div>
+                <div class="p-ai-name">Reduce Bad Liabilities</div>
+              </div>
+              <div class="p-ai-right"><span class="p-fbs">+3 FBS</span><span class="p-ai-amt">₹5,00,000</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="p-cursor" id="lCursor"></div>
+    </div>
+  </div>
+
+  <!-- LOGIN -->
+  <div class="screen" id="login">
+    <div class="left">
+      <div class="brand">
+        <div class="brand-box"><span>FH</span></div>
+        <div class="brand-name">FinHealth<em>.</em></div>
+      </div>
+      <div>
+        <div class="auth-eyebrow">Welcome back</div>
+        <div class="auth-title">Log in to your account</div>
+        <div class="auth-sub">Your financial dashboard is waiting.</div>
+        <div class="auth-form">
+          <div class="auth-field"><label>Email</label><input type="email" placeholder="you@example.com"></div>
+          <div class="auth-field"><label>Password</label><input type="password" placeholder="Enter your password"></div>
+          <button class="btn-auth">Log In <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg></button>
+        </div>
+        <div class="auth-footer">Don't have an account? <a onclick="show('signup')">Sign Up</a></div>
+        <div class="auth-footer" style="margin-top:10px;"><a onclick="show('landing')" style="color:var(--ink-ghost);">←
+            Back</a></div>
+      </div>
+    </div>
+    <div class="right" id="loginRight">
+      <div class="preview-float">
+        <div class="preview-chrome">
+          <div class="chrome-dot" style="background:#FF5F57;"></div>
+          <div class="chrome-dot" style="background:#FEBC2E;"></div>
+          <div class="chrome-dot" style="background:#28C840;"></div>
+          <span style="font-size:9px;color:#4A4846;margin-left:10px;">finhealth.app · dashboard</span>
+        </div>
+        <div class="preview-inner">
+          <div class="p-card">
+            <div class="p-card-label">Financial Balance Score</div>
+            <div class="p-score-row">
+              <div>
+                <div class="p-score-num" id="aScore">0</div>
+                <div class="p-moneysign" id="aMoney"></div>
+              </div>
+              <div class="p-score-right">
+                <div class="p-bar-track">
+                  <div class="p-bar-fill" id="aFill" style="width:0%"></div>
+                </div>
+                <div class="p-score-sub" id="aLabel">Calculating your score…</div>
+              </div>
+            </div>
+          </div>
+          <div class="p-kpi-row">
+            <div class="p-kpi">
+              <div class="p-kpi-label">Net Worth</div>
+              <div class="p-kpi-val" id="aNW">₹0</div>
+              <div class="p-kpi-sub">Assets minus liabilities</div>
+            </div>
+            <div class="p-kpi">
+              <div class="p-kpi-label">Monthly Savings</div>
+              <div class="p-kpi-val" id="aSav">₹0</div>
+              <div class="p-kpi-sub">After expenses &amp; EMIs</div>
+            </div>
+            <div class="p-kpi">
+              <div class="p-kpi-label">Tax Saved</div>
+              <div class="p-kpi-val" id="aTax">₹0</div>
+              <div class="p-kpi-sub">Annually</div>
+            </div>
+          </div>
+          <div class="p-actions">
+            <div class="p-actions-hdr"><span class="p-actions-title">Action Plan</span><span class="p-actions-ct"
+                id="aPending">11 pending</span></div>
+            <div class="p-ai" id="aai1">
+              <div class="p-cb" id="acb1"></div>
+              <div>
+                <div class="p-ai-meta">Emergency Fund</div>
+                <div class="p-ai-name">Build Emergency Fund</div>
+              </div>
+              <div class="p-ai-right"><span class="p-fbs">+13 FBS</span><span class="p-ai-amt">₹9,20,000</span></div>
+            </div>
+            <div class="p-ai" id="aai2">
+              <div class="p-cb" id="acb2"></div>
+              <div>
+                <div class="p-ai-meta">Insurance</div>
+                <div class="p-ai-name">Increase Health Insurance Coverage</div>
+              </div>
+              <div class="p-ai-right"><span class="p-fbs">+13 FBS</span><span class="p-ai-amt">₹22,50,000</span></div>
+            </div>
+            <div class="p-ai" id="aai3">
+              <div class="p-cb" id="acb3"></div>
+              <div>
+                <div class="p-ai-meta">Asset Reallocation</div>
+                <div class="p-ai-name">Increase Equity Allocation</div>
+              </div>
+              <div class="p-ai-right"><span class="p-fbs">+8 FBS</span><span class="p-ai-amt">₹36,50,000</span></div>
+            </div>
+            <div class="p-ai" id="aai4">
+              <div class="p-cb" id="acb4"></div>
+              <div>
+                <div class="p-ai-meta">Debt Management</div>
+                <div class="p-ai-name">Reduce Bad Liabilities</div>
+              </div>
+              <div class="p-ai-right"><span class="p-fbs">+3 FBS</span><span class="p-ai-amt">₹5,00,000</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="p-cursor" id="aCursor"></div>
+    </div>
+  </div>
+
+  <!-- SIGNUP -->
+  <div class="screen" id="signup">
+    <div class="left">
+      <div class="brand">
+        <div class="brand-box"><span>FH</span></div>
+        <div class="brand-name">FinHealth<em>.</em></div>
+      </div>
+      <div>
+        <div class="auth-eyebrow">Get started</div>
+        <div class="auth-title">Create your account</div>
+        <div class="auth-sub">Start your financial health journey.</div>
+        <div class="auth-form">
+          <div class="auth-field"><label>Full Name</label><input type="text" placeholder="Enter your full name"></div>
+          <div class="auth-field"><label>Email</label><input type="email" placeholder="you@example.com"></div>
+          <div class="auth-field"><label>Phone Number <span class="opt">(Optional)</span></label><input type="tel"
+              placeholder="+91 XXXXX XXXXX"></div>
+          <div class="auth-row">
+            <div class="auth-field"><label>Password</label><input type="password" placeholder="Min 6 characters"></div>
+            <div class="auth-field"><label>Confirm</label><input type="password" placeholder="Re-enter"></div>
+          </div>
+          <button class="btn-auth">Sign Up <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg></button>
+        </div>
+        <div class="auth-footer">Already have an account? <a onclick="show('login')">Log In</a></div>
+        <div class="auth-footer" style="margin-top:10px;"><a onclick="show('landing')" style="color:var(--ink-ghost);">←
+            Back</a></div>
+      </div>
+    </div>
+    <div class="right" id="signupRight">
+      <div class="preview-float">
+        <div class="preview-chrome">
+          <div class="chrome-dot" style="background:#FF5F57;"></div>
+          <div class="chrome-dot" style="background:#FEBC2E;"></div>
+          <div class="chrome-dot" style="background:#28C840;"></div>
+          <span style="font-size:9px;color:#4A4846;margin-left:10px;">finhealth.app · dashboard</span>
+        </div>
+        <div class="preview-inner">
+          <div class="p-card">
+            <div class="p-card-label">Financial Balance Score</div>
+            <div class="p-score-row">
+              <div>
+                <div class="p-score-num" id="sScore">0</div>
+                <div class="p-moneysign" id="sMoney"></div>
+              </div>
+              <div class="p-score-right">
+                <div class="p-bar-track">
+                  <div class="p-bar-fill" id="sFill" style="width:0%"></div>
+                </div>
+                <div class="p-score-sub" id="sLabel">Calculating your score…</div>
+              </div>
+            </div>
+          </div>
+          <div class="p-kpi-row">
+            <div class="p-kpi">
+              <div class="p-kpi-label">Net Worth</div>
+              <div class="p-kpi-val" id="sNW">₹0</div>
+              <div class="p-kpi-sub">Assets minus liabilities</div>
+            </div>
+            <div class="p-kpi">
+              <div class="p-kpi-label">Monthly Savings</div>
+              <div class="p-kpi-val" id="sSav">₹0</div>
+              <div class="p-kpi-sub">After expenses &amp; EMIs</div>
+            </div>
+            <div class="p-kpi">
+              <div class="p-kpi-label">Tax Saved</div>
+              <div class="p-kpi-val" id="sTax">₹0</div>
+              <div class="p-kpi-sub">Annually</div>
+            </div>
+          </div>
+          <div class="p-actions">
+            <div class="p-actions-hdr"><span class="p-actions-title">Action Plan</span><span class="p-actions-ct"
+                id="sPending">11 pending</span></div>
+            <div class="p-ai" id="sai1">
+              <div class="p-cb" id="scb1"></div>
+              <div>
+                <div class="p-ai-meta">Emergency Fund</div>
+                <div class="p-ai-name">Build Emergency Fund</div>
+              </div>
+              <div class="p-ai-right"><span class="p-fbs">+13 FBS</span><span class="p-ai-amt">₹9,20,000</span></div>
+            </div>
+            <div class="p-ai" id="sai2">
+              <div class="p-cb" id="scb2"></div>
+              <div>
+                <div class="p-ai-meta">Insurance</div>
+                <div class="p-ai-name">Increase Health Insurance Coverage</div>
+              </div>
+              <div class="p-ai-right"><span class="p-fbs">+13 FBS</span><span class="p-ai-amt">₹22,50,000</span></div>
+            </div>
+            <div class="p-ai" id="sai3">
+              <div class="p-cb" id="scb3"></div>
+              <div>
+                <div class="p-ai-meta">Asset Reallocation</div>
+                <div class="p-ai-name">Increase Equity Allocation</div>
+              </div>
+              <div class="p-ai-right"><span class="p-fbs">+8 FBS</span><span class="p-ai-amt">₹36,50,000</span></div>
+            </div>
+            <div class="p-ai" id="sai4">
+              <div class="p-cb" id="scb4"></div>
+              <div>
+                <div class="p-ai-meta">Debt Management</div>
+                <div class="p-ai-name">Reduce Bad Liabilities</div>
+              </div>
+              <div class="p-ai-right"><span class="p-fbs">+3 FBS</span><span class="p-ai-amt">₹5,00,000</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="p-cursor" id="sCursor"></div>
+    </div>
+  </div>
+
+  <script>
+    function show(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+      window.scrollTo(0, 0);
+    }
+
+    function fmtInr(n) {
+      if (n >= 10000000) return '₹' + (n / 10000000).toFixed(2) + 'Cr';
+      if (n >= 100000) return '₹' + (n / 100000).toFixed(2) + 'L';
+      return '₹' + n.toLocaleString('en-IN');
+    }
+    function countUp(el, target, fmt, duration) {
+      let startTime = null;
+      function step(ts) {
+        if (!startTime) startTime = ts;
+        const p = Math.min((ts - startTime) / duration, 1);
+        const ease = 1 - Math.pow(1 - p, 3);
+        el.textContent = fmt(Math.floor(ease * target));
+        if (p < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+    function animateMoney(el) {
+      const seq = ['', '₹', '₹₹', '₹₹₹']; let i = 0;
+      const t = setInterval(() => { el.textContent = seq[i++]; if (i >= seq.length) clearInterval(t); }, 500);
+    }
+
+    function runPreview(p) {
+      const ids = [1, 2, 3, 4];
+      // reset
+      ids.forEach(i => {
+        const item = document.getElementById(p + 'ai' + i);
+        const cb = document.getElementById(p + 'cb' + i);
+        if (item) item.classList.remove('done');
+        if (cb) cb.classList.remove('checked');
+      });
+      document.getElementById(p + 'Score').textContent = '0';
+      document.getElementById(p + 'Fill').style.width = '0%';
+      document.getElementById(p + 'Money').textContent = '';
+      document.getElementById(p + 'Label').textContent = 'Calculating your score…';
+      document.getElementById(p + 'NW').textContent = '₹0';
+      document.getElementById(p + 'Sav').textContent = '₹0';
+      document.getElementById(p + 'Tax').textContent = '₹0';
+      document.getElementById(p + 'Pending').textContent = '11 pending';
+
+      let pending = 11;
+      setTimeout(() => {
+        document.getElementById(p + 'Fill').style.width = '67%';
+        countUp(document.getElementById(p + 'Score'), 67, v => v, 1800);
+        setTimeout(() => {
+          document.getElementById(p + 'Label').textContent = 'Good - above average for your age';
+          animateMoney(document.getElementById(p + 'Money'));
+        }, 1900);
+      }, 400);
+      setTimeout(() => countUp(document.getElementById(p + 'NW'), 14100000, fmtInr, 1400), 700);
+      setTimeout(() => countUp(document.getElementById(p + 'Sav'), 156279, fmtInr, 1400), 950);
+      setTimeout(() => countUp(document.getElementById(p + 'Tax'), 135200, fmtInr, 1400), 1150);
+
+      let step = 0;
+      const iv = setInterval(() => {
+        if (step < 4) {
+          const cb = document.getElementById(p + 'cb' + (step + 1));
+          const item = document.getElementById(p + 'ai' + (step + 1));
+          if (cb) cb.classList.add('checked');
+          setTimeout(() => {
+            if (item) item.classList.add('done');
+            pending = Math.max(0, pending - 1);
+            const pel = document.getElementById(p + 'Pending');
+            if (pel) pel.textContent = pending + ' pending';
+          }, 500);
+          step++;
+        } else {
+          clearInterval(iv);
+          setTimeout(() => runPreview(p), 2500);
+        }
+      }, 2600);
+
+      // Cursor
+      const positions = [{ left: '22%', top: '18%' }, { left: '72%', top: '40%' }, { left: '42%', top: '68%' }, { left: '80%', top: '20%' }, { left: '28%', top: '80%' }];
+      let posIdx = 0;
+      const cursor = document.getElementById(p + 'Cursor');
+      function wander() { if (!cursor) return; const pos = positions[posIdx++ % positions.length]; cursor.style.left = pos.left; cursor.style.top = pos.top; }
+      wander();
+      setInterval(wander, 2000);
+    }
+
+    // Start landing preview on load
+    setTimeout(() => runPreview('l'), 600);
+  </script>
+</body>
+
+</html>

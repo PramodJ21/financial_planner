@@ -6,7 +6,7 @@ const router = express.Router();
 
 // Column mapping for each step
 const STEP_COLUMNS = {
-    1: ['date_of_birth', 'city', 'marital_status', 'dependents', 'employment_type', 'risk_comfort', 'investment_experience'],
+    1: ['date_of_birth', 'city', 'marital_status', 'dependents', 'employment_type', 'risk_comfort', 'investment_experience', 'gen_q1', 'gen_q2', 'gen_q3', 'gen_q4', 'gen_q5', 'gen_q6', 'gen_q6_selections', 'gen_q7', 'gen_q8', 'gen_q9', 'gen_q10'],
     2: ['monthly_take_home', 'annual_salary', 'business_income', 'annual_bonus', 'other_income', 'expected_income_growth'],
     3: ['expense_household', 'expense_rent', 'expense_utilities', 'expense_transport', 'expense_food', 'expense_subscriptions', 'expense_insurance', 'expense_discretionary'],
     4: ['savings_balance', 'fd_balance', 'fd_rate', 'emergency_fund', 'monthly_surplus'],
@@ -15,7 +15,7 @@ const STEP_COLUMNS = {
     7: ['health_cover', 'health_premium', 'life_cover', 'life_premium'],
     8: ['tax_regime', 'tax_80c_used', 'tax_nps_80ccd', 'tax_hra', 'tax_home_loan_interest', 'tax_80d'],
     9: ['has_will', 'nominees_set', 'num_nominees'],
-    10: ['beh_delay_decisions', 'beh_prefer_guaranteed', 'beh_follow_market_news', 'beh_spend_impulsively', 'beh_review_monthly', 'beh_avoid_debt', 'beh_hold_losing', 'beh_anxious_decisions', 'beh_familiar_brands', 'beh_compare_peers']
+    10: ['beh_delay_decisions', 'beh_spend_impulsively', 'beh_review_monthly', 'beh_avoid_debt', 'beh_hold_losing', 'beh_compare_peers', 'beh_market_reaction', 'beh_windfall_behaviour', 'beh_product_understanding']
 };
 
 // Get full questionnaire data
@@ -52,7 +52,7 @@ router.put('/step/:step', auth, async (req, res) => {
             if (data[col] !== undefined) {
                 setClauses.push(`${col} = $${paramIndex}`);
                 // JSONB columns need explicit stringification
-                if (col === 'loans') {
+                if (col === 'loans' || col === 'gen_q6_selections') {
                     values.push(JSON.stringify(data[col]));
                 } else {
                     values.push(data[col]);

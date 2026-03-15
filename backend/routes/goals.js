@@ -8,16 +8,24 @@ const router = express.Router();
 router.get('/', auth, async (req, res) => {
     try {
         const result = await pool.query(
-            'SELECT client_id, name, target, years, risk_level FROM user_goals WHERE user_id = $1 ORDER BY created_at ASC',
+            'SELECT client_id, name, target, years, risk_level, include_inflation, equity_alloc, debt_alloc, commodity_alloc, equity_return, debt_return, commodity_return, priority_weight FROM user_goals WHERE user_id = $1 ORDER BY created_at ASC',
             [req.userId]
         );
         // Map back to frontend expected format
         const goals = result.rows.map(row => ({
-            id: row.client_id, // Important: use the text client_id
+            id: row.client_id,
             name: row.name,
             target: parseFloat(row.target),
             years: row.years,
-            riskLevel: row.risk_level
+            riskLevel: row.risk_level,
+            includeInflation: row.include_inflation ?? true,
+            customEquityAlloc: row.equity_alloc ? parseFloat(row.equity_alloc) : null,
+            customDebtAlloc: row.debt_alloc ? parseFloat(row.debt_alloc) : null,
+            customCommodityAlloc: row.commodity_alloc ? parseFloat(row.commodity_alloc) : null,
+            customEquityReturn: row.equity_return ? parseFloat(row.equity_return) : null,
+            customDebtReturn: row.debt_return ? parseFloat(row.debt_return) : null,
+            customCommodityReturn: row.commodity_return ? parseFloat(row.commodity_return) : null,
+            priorityWeight: row.priority_weight ?? 3
         }));
         res.json(goals);
     } catch (err) {
@@ -43,8 +51,12 @@ router.post('/', auth, async (req, res) => {
         // Insert new goals
         if (goals.length > 0) {
             const insertQuery = `
-                INSERT INTO user_goals (user_id, client_id, name, target, years, risk_level)
-                VALUES ($1, $2, $3, $4, $5, $6)
+                INSERT INTO user_goals (
+                    user_id, client_id, name, target, years, risk_level, include_inflation,
+                    equity_alloc, debt_alloc, commodity_alloc, equity_return, debt_return, commodity_return,
+                    priority_weight
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             `;
             for (const goal of goals) {
                 await client.query(insertQuery, [
@@ -53,7 +65,15 @@ router.post('/', auth, async (req, res) => {
                     goal.name || 'Untitled Goal',
                     goal.target || 0,
                     goal.years || 1,
-                    goal.riskLevel
+                    goal.riskLevel,
+                    goal.includeInflation ?? true,
+                    goal.customEquityAlloc,
+                    goal.customDebtAlloc,
+                    goal.customCommodityAlloc,
+                    goal.customEquityReturn,
+                    goal.customDebtReturn,
+                    goal.customCommodityReturn,
+                    goal.priorityWeight ?? 3
                 ]);
             }
         }

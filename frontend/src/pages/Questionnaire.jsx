@@ -18,18 +18,18 @@ const STEPS = [
 
 /* ─── colour tokens ─── */
 const C = {
-    navy: '#1E293B',
-    navyLight: '#334155',
-    label: '#1E293B',
-    sublabel: '#64748B',
-    border: '#E2E8F0',
-    bg: '#F8FAFC',
+    navy: '#111B2E',
+    navyLight: '#1C2D45',
+    label: '#0D1B2A',
+    sublabel: '#5C6B7A',
+    border: '#D6E0EB',
+    bg: '#EEF3F8',
     sidebarBg: '#FFFFFF',
-    activeBg: '#EFF6FF',
-    activeText: '#1E293B',
-    inactiveText: '#94A3B8',
-    completedIcon: '#22C55E',
-    progressBar: '#1E293B',
+    activeBg: '#EAF1F8',
+    activeText: '#0D1B2A',
+    inactiveText: '#8A9AA8',
+    completedIcon: '#1A8A5E',
+    progressBar: '#4F79B7',
     white: '#FFFFFF'
 };
 
@@ -61,7 +61,9 @@ function Questionnaire() {
         try {
             const data = await fetchWithAuth(`/questionnaire/step/${step}`, { method: 'PUT', body: JSON.stringify(formData) });
             setFormData(data);
-            if (isFinal) navigate('/dashboard');
+            if (isFinal) {
+                navigate('/dashboard');
+            }
             else setCurrentStep(s => Math.min(s + 1, 10));
         } catch (err) { alert('Failed to save. Please try again.'); }
         finally { setSaving(false); }
@@ -70,134 +72,109 @@ function Questionnaire() {
     const handleNext = (e) => { e.preventDefault(); saveStep(currentStep, currentStep === 10); };
 
     if (loading) return (
-        <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg }}>
-            <div style={{ color: C.navy, fontWeight: 600 }}>Loading your profile…</div>
+        <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F7F4EF' }}>
+            <div style={{ color: '#1C1A17', fontWeight: 600 }}>Loading your profile…</div>
         </div>
     );
 
     return (
-        <div className="questionnaire-layout" style={{ backgroundColor: C.bg, fontFamily: "'Inter', sans-serif" }}>
-
+        <div className="layout">
             {/* ─── SIDEBAR ─── */}
-            <div className="questionnaire-sidebar" style={{
-                backgroundColor: C.sidebarBg,
-                borderRight: `1px solid ${C.border}`,
-                display: 'flex', flexDirection: 'column',
-                overflowY: 'auto'
-            }}>
+            <div className="qn-sidebar">
                 {/* Brand */}
-                <div style={{ padding: '20px 20px 24px', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: `1px solid ${C.border}` }}>
-                    <div style={{
-                        width: '32px', height: '32px', backgroundColor: C.navy, borderRadius: '8px',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: 'white', fontWeight: 700, fontSize: '12px'
-                    }}>FH</div>
-                    <span style={{ fontWeight: 700, fontSize: '16px', color: C.navy }}>FinHealth</span>
+                <div className="sidebar-brand" style={{ marginBottom: '32px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div className="sidebar-brand-mark" style={{ width: '32px', height: '32px', background: '#1C1A17', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <span style={{ fontFamily: "'Playfair Display', serif", fontSize: '13px', color: '#F7F4EF', fontWeight: 400 }}>FH</span>
+                    </div>
+                    <div className="sidebar-brand-name" style={{ fontFamily: "'Playfair Display', serif", fontSize: '18px', fontWeight: 400, color: '#1C1A17' }}>FinHealth</div>
                 </div>
 
                 {/* Step List */}
-                <nav style={{ padding: '16px 0', flex: 1 }}>
+                <div style={{ flex: 1 }}>
                     {STEPS.map(step => {
                         const isActive = currentStep === step.id;
                         const isCompleted = step.id < currentStep;
-                        return (
-                            <div
-                                key={step.id}
-                                onClick={() => isCompleted && setCurrentStep(step.id)}
-                                style={{
-                                    display: 'flex', alignItems: 'center', gap: '12px',
-                                    padding: '10px 20px',
-                                    cursor: isCompleted ? 'pointer' : 'default',
-                                    backgroundColor: isActive ? C.activeBg : 'transparent',
-                                    borderLeft: isActive ? `3px solid ${C.navy}` : '3px solid transparent',
-                                    transition: 'all 0.15s'
-                                }}
-                            >
-                                {/* Step indicator */}
-                                {isCompleted ? (
-                                    <div style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: C.completedIcon, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                        <Check size={13} color="white" strokeWidth={3} />
-                                    </div>
-                                ) : (
-                                    <div style={{
-                                        width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0,
-                                        border: isActive ? `2px solid ${C.navy}` : `2px solid ${C.border}`,
-                                        backgroundColor: isActive ? C.navy : 'transparent',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                    }}>
-                                        {isActive && <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'white' }}></div>}
-                                    </div>
-                                )}
 
-                                <span style={{
-                                    fontSize: '13px',
-                                    fontWeight: isActive ? 600 : 400,
-                                    color: isActive ? C.activeText : (isCompleted ? C.navyLight : C.inactiveText)
-                                }}>
-                                    {String(step.id).padStart(2, '0')}  {step.name}
+                        let circleClass = 'qn-step-circle';
+                        if (isCompleted) circleClass += ' done';
+                        else if (isActive) circleClass += ' active';
+
+                        let labelClass = 'qn-step-label';
+                        if (isCompleted) labelClass += ' done';
+                        else if (isActive) labelClass += ' active';
+
+                        return (
+                            <button
+                                key={step.id}
+                                className="qn-step-item"
+                                onClick={() => isCompleted && setCurrentStep(step.id)}
+                                disabled={!isCompleted && !isActive}
+                                type="button"
+                            >
+                                <div className={circleClass}>
+                                    {isCompleted ? (
+                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="20 6 9 17 4 12" />
+                                        </svg>
+                                    ) : (
+                                        <span>{step.id}</span>
+                                    )}
+                                </div>
+                                <span className={labelClass}>
+                                    {String(step.id).padStart(2, '0')} {step.name}
                                 </span>
-                            </div>
+                            </button>
                         );
                     })}
-                </nav>
+                </div>
             </div>
 
             {/* ─── MAIN CONTENT AREA ─── */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-
+            <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', overflowY: 'auto' }}>
                 {/* Top Progress Bar */}
-                <div style={{
-                    height: '52px', backgroundColor: C.white,
-                    borderBottom: `1px solid ${C.border}`,
-                    display: 'flex', alignItems: 'center',
-                    padding: '0 32px', flexShrink: 0
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
-                        <span style={{ color: C.sublabel, fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap' }}>Step {currentStep} of 10</span>
-                        <div style={{ height: '4px', backgroundColor: '#E2E8F0', flex: 1, maxWidth: '300px', borderRadius: '2px', overflow: 'hidden' }}>
-                            <div style={{ height: '100%', backgroundColor: C.progressBar, width: `${(currentStep / 10) * 100}%`, transition: 'width 0.3s ease', borderRadius: '2px' }}></div>
-                        </div>
-                        <span style={{ color: C.sublabel, fontSize: '13px', fontWeight: 500 }}>{Math.round((currentStep / 10) * 100)}%</span>
+                <div className="qn-progress-bar-wrap">
+                    <span className="qn-progress-step-label">Step {currentStep} of 10</span>
+                    <div className="qn-progress-track">
+                        <div className="qn-progress-fill" style={{ width: `${(currentStep / 10) * 100}%` }}></div>
                     </div>
+                    <span className="qn-progress-pct">{Math.round((currentStep / 10) * 100)}%</span>
                 </div>
 
                 {/* Scrollable Form Area */}
-                <div className="questionnaire-main-scroll" style={{ flex: 1, overflowY: 'auto', display: 'flex', justifyContent: 'center' }}>
-                    <div style={{ width: '100%', maxWidth: '640px' }}>
-                        <h1 style={{ fontSize: '22px', fontWeight: 700, color: C.navy, marginBottom: '4px' }}>{STEPS[currentStep - 1].name}</h1>
-                        <p style={{ fontSize: '14px', color: C.sublabel, marginBottom: '32px' }}>{STEPS[currentStep - 1].short}</p>
-
-                        <form onSubmit={handleNext}>
-                            {currentStep === 1 && <Step1 formData={formData} onChange={handleInputChange} />}
-                            {currentStep === 2 && <Step2 formData={formData} onChange={handleInputChange} />}
-                            {currentStep === 3 && <Step3 formData={formData} onChange={handleInputChange} />}
-                            {currentStep === 4 && <Step4 formData={formData} onChange={handleInputChange} />}
-                            {currentStep === 5 && <Step5 formData={formData} onChange={handleInputChange} />}
-                            {currentStep === 6 && <Step6 formData={formData} onChange={handleInputChange} setFormData={setFormData} />}
-                            {currentStep === 7 && <Step7 formData={formData} onChange={handleInputChange} />}
-                            {currentStep === 8 && <Step8 formData={formData} onChange={handleInputChange} />}
-                            {currentStep === 9 && <Step9 formData={formData} onChange={handleInputChange} />}
-                            {currentStep === 10 && <Step10 formData={formData} onChange={handleInputChange} />}
-
-                            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '40px', gap: '12px', padding: '0 24px' }}>
-                                {currentStep > 1 && (
-                                    <button type="button" onClick={() => setCurrentStep(s => s - 1)} style={{
-                                        padding: '12px 28px', borderRadius: '24px', fontSize: '14px', fontWeight: 600,
-                                        border: `1px solid ${C.border}`, backgroundColor: C.white, color: C.navy, cursor: 'pointer'
-                                    }}>Back</button>
-                                )}
-                                <button type="submit" disabled={saving} style={{
-                                    padding: '12px 32px', borderRadius: '24px', fontSize: '14px', fontWeight: 600,
-                                    backgroundColor: C.navy, color: 'white', border: 'none', cursor: 'pointer',
-                                    display: 'flex', alignItems: 'center', gap: '8px',
-                                    opacity: saving ? 0.7 : 1
-                                }}>
-                                    {saving ? 'Saving…' : (currentStep === 10 ? 'Generate Dashboard' : 'Next Step')}
-                                    <ChevronRight size={16} />
-                                </button>
-                            </div>
-                        </form>
+                <div className="qn-page">
+                    <div>
+                        <div className="page-title">{STEPS[currentStep - 1].name}</div>
+                        <div className="page-desc">{STEPS[currentStep - 1].short}</div>
                     </div>
+
+                    <form onSubmit={handleNext} style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '48px' }}>
+                        {currentStep === 1 && <Step1 formData={formData} onChange={handleInputChange} />}
+                        {currentStep === 2 && <Step2 formData={formData} onChange={handleInputChange} />}
+                        {currentStep === 3 && <Step3 formData={formData} onChange={handleInputChange} />}
+                        {currentStep === 4 && <Step4 formData={formData} onChange={handleInputChange} />}
+                        {currentStep === 5 && <Step5 formData={formData} onChange={handleInputChange} />}
+                        {currentStep === 6 && <Step6 formData={formData} onChange={handleInputChange} setFormData={setFormData} />}
+                        {currentStep === 7 && <Step7 formData={formData} onChange={handleInputChange} />}
+                        {currentStep === 8 && <Step8 formData={formData} onChange={handleInputChange} />}
+                        {currentStep === 9 && <Step9 formData={formData} onChange={handleInputChange} />}
+                        {currentStep === 10 && <Step10 formData={formData} onChange={handleInputChange} />}
+
+                        <div className="qn-nav-buttons">
+                            {currentStep > 1 && (
+                                <button type="button" className="qn-btn-back" onClick={() => setCurrentStep(s => s - 1)}>
+                                    Back
+                                </button>
+                            )}
+                            <button type="submit" className="qn-btn-next" disabled={saving}>
+                                {saving ? 'Saving...' : (currentStep === 10 ? 'Generate Dashboard' : 'Next Step')}
+                                {!saving && currentStep < 10 && (
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                        <polyline points="9 18 15 12 9 6" />
+                                    </svg>
+                                )}
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -210,81 +187,217 @@ export default Questionnaire;
    SHARED INPUT COMPONENTS
    ═══════════════════════════════════════════════ */
 
-const labelStyle = { fontSize: '13px', fontWeight: 600, color: '#1E293B', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' };
+const InputField = ({ label, description, name, type = 'text', value, onChange, placeholder, info, prefix, suffix, required, min, max }) => {
+    const inputChild = (
+        <input
+            type={type === 'currency' || type === 'percentage' ? 'number' : type}
+            name={name} value={value !== undefined && value !== null ? value : ''} onChange={onChange} placeholder={placeholder}
+            required={required}
+            min={min} max={max}
+        />
+    );
 
-const inputStyle = {
-    width: '100%', padding: '10px 14px', borderRadius: '6px',
-    border: '1px solid #E2E8F0', outline: 'none', fontSize: '14px',
-    color: '#1E293B', backgroundColor: '#FFFFFF', transition: 'border-color 0.15s'
+    return (
+        <div className="qn-field">
+            <label>
+                {label}
+                {required && <span className="qn-required">*</span>}
+                {info && <span className="qn-info-icon" title={info}>i</span>}
+            </label>
+            {description && <div style={{ fontSize: '11px', color: '#64748B', lineHeight: '1.4' }}>{description}</div>}
+
+            {prefix ? (
+                <div className="qn-rupee-wrap">
+                    <span>{prefix}</span>
+                    {inputChild}
+                </div>
+            ) : suffix ? (
+                <div className="qn-pct-wrap">
+                    {inputChild}
+                    <span>{suffix}</span>
+                </div>
+            ) : inputChild}
+        </div>
+    );
 };
 
-const selectStyle = { ...inputStyle, appearance: 'none', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' fill=\'%2394A3B8\' viewBox=\'0 0 16 16\'%3E%3Cpath d=\'M4.646 5.646a.5.5 0 0 1 .708 0L8 8.293l2.646-2.647a.5.5 0 0 1 .708.708l-3 3a.5.5 0 0 1-.708 0l-3-3a.5.5 0 0 1 0-.708z\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', paddingRight: '36px' };
-
-const InputField = ({ label, description, name, type = 'text', value, onChange, placeholder, info, prefix, suffix, required, min, max }) => (
-    <div style={{ flex: 1, marginBottom: '20px' }}>
-        <label style={labelStyle}>
-            {label}
-            {required && <span style={{ color: '#EF4444', marginLeft: '2px' }}>*</span>}
-            {info && <span title={info} style={{ cursor: 'help' }}><Info size={13} color="#94A3B8" /></span>}
-        </label>
-        {description && <div style={{ fontSize: '11px', color: '#64748B', marginBottom: '8px', lineHeight: '1.4' }}>{description}</div>}
-        <div style={{ position: 'relative' }}>
-            {prefix && <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8', fontSize: '14px', pointerEvents: 'none' }}>{prefix}</span>}
-            <input
-                type={type === 'currency' || type === 'percentage' ? 'number' : type}
-                name={name} value={value !== undefined && value !== null ? value : ''} onChange={onChange} placeholder={placeholder}
-                required={required}
-                min={min} max={max}
-                style={{ ...inputStyle, ...(prefix ? { paddingLeft: '30px' } : {}), ...(suffix ? { paddingRight: '36px' } : {}) }}
-                onFocus={(e) => e.target.style.borderColor = '#1E293B'}
-                onBlur={(e) => e.target.style.borderColor = '#E2E8F0'}
-            />
-            {suffix && <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8', fontSize: '14px', pointerEvents: 'none' }}>{suffix}</span>}
-        </div>
-    </div>
-);
-
 const SelectField = ({ label, name, value, onChange, options, info, required }) => (
-    <div style={{ flex: 1, marginBottom: '20px' }}>
-        <label style={labelStyle}>
+    <div className="qn-field">
+        <label>
             {label}
-            {required && <span style={{ color: '#EF4444', marginLeft: '2px' }}>*</span>}
-            {info && <span title={info} style={{ cursor: 'help' }}><Info size={13} color="#94A3B8" /></span>}
+            {required && <span className="qn-required">*</span>}
+            {info && <span className="qn-info-icon" title={info}>i</span>}
         </label>
-        <select name={name} value={value !== undefined && value !== null ? value : ''} onChange={onChange} required={required} style={selectStyle}
-            onFocus={(e) => e.target.style.borderColor = '#1E293B'}
-            onBlur={(e) => e.target.style.borderColor = '#E2E8F0'}
-        >
+        <select name={name} value={value !== undefined && value !== null ? value : ''} onChange={onChange} required={required}>
             <option value="" disabled>Select</option>
             {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
         </select>
     </div>
 );
 
-const Row = ({ children }) => <div className="form-row">{children}</div>;
+const Row = ({ children, full }) => <div className={`qn-form-grid${full ? ' full' : ''}`}>{children}</div>;
 
 /* ═══════════════════════════════════════════════
    STEP FORMS
    ═══════════════════════════════════════════════ */
 
-const Step1 = ({ formData: f, onChange }) => (
-    <>
-        <InputField label="Full Name" name="full_name" value={f.full_name} onChange={onChange} placeholder="Enter your full name" required />
-        <Row>
-            <InputField label="Date of Birth" name="date_of_birth" type="date" value={f.date_of_birth?.split('T')[0]} onChange={onChange} required />
-            <SelectField label="City" name="city" value={f.city} onChange={onChange} options={['Mumbai', 'Delhi', 'Bengaluru', 'Hyderabad', 'Chennai', 'Kolkata', 'Pune', 'Ahmedabad', 'Other']} required />
-        </Row>
-        <Row>
-            <SelectField label="Marital Status" name="marital_status" value={f.marital_status} onChange={onChange} options={['Single', 'Married', 'Divorced', 'Widowed']} required />
-            <InputField label="Dependents" name="dependents" type="number" value={f.dependents} onChange={onChange} placeholder="0" info="Number of people financially dependent on you" required />
-        </Row>
-        <SelectField label="Employment Type" name="employment_type" value={f.employment_type} onChange={onChange} options={['Salaried', 'Self-Employed', 'Business', 'Retired', 'Student']} required />
-        <Row>
-            <SelectField label="Risk Comfort" name="risk_comfort" value={f.risk_comfort} onChange={onChange} options={['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']} required info="Rate your comfort with financial risk, 1 = very low, 10 = very high" />
-            <SelectField label="Investment Experience" name="investment_experience" value={f.investment_experience} onChange={onChange} options={['None', '< 1 year', '1-3 years', '3-5 years', '5+ years']} required />
-        </Row>
-    </>
-);
+const Step1 = ({ formData: f, onChange }) => {
+    // Helper for 1-5 scale questions
+    const renderScaleQuestion = (num, label, name) => {
+        const scaleLabels = ['1', '2', '3', '4', '5'];
+        const current = f[name] ? String(f[name]) : '';
+        // Custom text for options to make the UI cleaner, mapping 1-5 to short texts based on question
+        let optionsText = [];
+        if (num === 1) optionsText = ['Struggled', 'Tight', 'Comfortable', 'Well-off', 'Wealthy'];
+        else if (num === 2) optionsText = ['Rented', 'Stable, no own', 'Modest home', 'Valuable home', 'Multiple props'];
+        else if (num === 3) optionsText = ['No higher ed', 'Self-funded', 'Partially funded', 'Fully funded', 'Elite funded'];
+        else if (num === 4) optionsText = ['Never', 'Rarely', 'Occasionally', 'Regularly', 'Extensively'];
+        else if (num === 5) optionsText = ['None', 'Minimal', 'Modest <₹50L', 'Meaningful <₹5Cr', 'Substantial ₹5Cr+'];
+        else if (num === 7) optionsText = ['Poverty', 'Working class', 'Stable', 'Prosperous', 'Wealthy'];
+        else if (num === 8) optionsText = ['No', 'Unlikely', 'Small amount', 'Modest', 'Significant'];
+        else if (num === 9) optionsText = ['No, I support them', 'No help available', 'Limited help', 'Moderate support', 'Full cushion'];
+        else if (num === 10) optionsText = ['All self-built', 'Hope to build', 'Minor assets', 'Meaningful assets', 'Significant trust'];
+
+        return (
+            <div className="qn-scale-question">
+                <p>Q{num}. {label} <span className="qn-required">*</span></p>
+                <div className="qn-scale-options">
+                    {scaleLabels.map((val, j) => {
+                        const selected = current === val;
+                        return (
+                            <button key={val} type="button"
+                                className={`qn-scale-btn ${selected ? 'selected' : ''}`}
+                                onClick={() => onChange({ target: { name, value: val, type: 'number' } })}
+                            >
+                                <span className="num">{val}</span>
+                                <span className="lbl">{optionsText[j]}</span>
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    };
+
+    // Helper for multi-select Q6
+    const renderQ6 = () => {
+        const options = [
+            { id: 'A', text: 'Paying for or contributing to my education' },
+            { id: 'B', text: 'Covering rent or living expenses' },
+            { id: 'C', text: 'Buying or contributing to a vehicle' },
+            { id: 'D', text: 'Helping during a financial emergency' },
+            { id: 'E', text: 'Down payment or purchase of a home' },
+            { id: 'F', text: 'Starting or funding a business' },
+            { id: 'G', text: 'Investing or opening financial accounts' },
+            { id: 'H', text: 'Paying off a loan or debt' },
+            { id: 'I', text: 'Regular financial support (monthly transfers, allowance)' },
+            { id: 'J', text: 'None of the above' }
+        ];
+
+        let selections = f.gen_q6_selections || [];
+        if (typeof selections === 'string') {
+            try { selections = JSON.parse(selections); } catch (e) { selections = []; }
+        }
+
+        const handleToggle = (id) => {
+            let newSelections = [...selections];
+            if (id === 'J') {
+                newSelections = ['J']; // Exclusive ('None of the above')
+            } else {
+                if (newSelections.includes('J')) newSelections = newSelections.filter(x => x !== 'J');
+                if (newSelections.includes(id)) newSelections = newSelections.filter(x => x !== id);
+                else newSelections.push(id);
+            }
+            // Also calculate the score (1 to 5)
+            let score = 1;
+            if (!newSelections.includes('J') && newSelections.length > 0) {
+                // Keep the exact same max logic: 4 items = 5 points
+                score = Math.min(5, newSelections.length + 1);
+            }
+
+            // Artificial event payload to bubble up to Questionnaire's onChange logic
+            onChange({ target: { name: 'gen_q6_selections', value: newSelections, type: 'object' } });
+            onChange({ target: { name: 'gen_q6', value: score, type: 'number' } });
+        };
+
+        return (
+            <div className="qn-scale-question">
+                <p>Q6. Have your parents ever helped you with any of the following? (pick all that apply) <span className="qn-required">*</span></p>
+                <div className="qn-checkbox-list">
+                    {options.map(opt => {
+                        const selected = selections.includes(opt.id);
+                        return (
+                            <label key={opt.id} className={`qn-check-item ${selected ? 'checked' : ''}`}>
+                                <input type="checkbox" checked={selected} onChange={() => handleToggle(opt.id)} />
+                                <span>{opt.text}</span>
+                            </label>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    };
+
+
+    return (
+        <>
+            <Row>
+                <InputField label="Date of Birth" name="date_of_birth" type="date" value={f.date_of_birth?.split('T')[0]} onChange={onChange} required />
+                <SelectField label="City" name="city" value={f.city} onChange={onChange} options={['Mumbai', 'Delhi', 'Bengaluru', 'Hyderabad', 'Chennai', 'Kolkata', 'Pune', 'Ahmedabad', 'Other']} required />
+            </Row>
+            <Row>
+                <SelectField label="Marital Status" name="marital_status" value={f.marital_status} onChange={onChange} options={['Single', 'Married', 'Divorced', 'Widowed']} required />
+                <InputField label="Dependents" name="dependents" type="number" value={f.dependents} onChange={onChange} placeholder="0" info="Number of people financially dependent on you" required />
+            </Row>
+            <SelectField label="Employment Type" name="employment_type" value={f.employment_type} onChange={onChange} options={['Salaried', 'Self-Employed', 'Business', 'Retired', 'Student']} required />
+            <Row>
+                <SelectField label="Risk Comfort" name="risk_comfort" value={f.risk_comfort} onChange={onChange} options={['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']} required info="Rate your comfort with financial risk, 1 = very low, 10 = very high" />
+                <SelectField label="Investment Experience" name="investment_experience" value={f.investment_experience} onChange={onChange} options={['None', '< 1 year', '1-3 years', '3-5 years', '5+ years']} required />
+            </Row>
+
+            <div className="qn-form-section">
+                <div>
+                    <div className="qn-form-section-title">Generational Wealth Background</div>
+                    <div className="qn-form-section-desc">Understanding your family's financial history helps us contextualise your starting point and the safety net available to you.</div>
+                </div>
+
+                <div>
+                    <div className="qn-block-label">Block A - Childhood Financial Environment</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+                        {renderScaleQuestion(1, "Growing up, how would you describe your family's financial situation?", 'gen_q1')}
+                        {renderScaleQuestion(2, "Did your parents own the home you grew up in?", 'gen_q2')}
+                        {renderScaleQuestion(3, "How was your education funded?", 'gen_q3')}
+                    </div>
+                </div>
+
+                <div>
+                    <div className="qn-block-label">Block B - Direct Parental Financial Support</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+                        {renderScaleQuestion(4, "Did your parents ever provide financial help in your adult life? (e.g. rent, car, emergencies)", 'gen_q4')}
+                        {renderScaleQuestion(5, "Did or will you receive any inheritance from your parents?", 'gen_q5')}
+                        {renderQ6()}
+                    </div>
+                </div>
+
+                <div>
+                    <div className="qn-block-label">Block C - Grandparental & Ancestral Wealth</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+                        {renderScaleQuestion(7, "How would you describe your grandparents' financial situation?", 'gen_q7')}
+                        {renderScaleQuestion(8, "Did your parents receive any inheritance or financial help from their parents?", 'gen_q8')}
+                    </div>
+                </div>
+
+                <div>
+                    <div className="qn-block-label">Block D - Current Safety Net & Wealth Signals</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+                        {renderScaleQuestion(9, "If you lost your job or faced a crisis, do you have family you could turn to for meaningful support?", 'gen_q9')}
+                        {renderScaleQuestion(10, "Do you currently own or expect to own assets that came from your family?", 'gen_q10')}
+                    </div>
+                </div>
+            </div>
+        </>
+    );
+};
 
 const Step2 = ({ formData: f, onChange }) => (
     <>
@@ -303,7 +416,7 @@ const Step2 = ({ formData: f, onChange }) => (
 
 const Step3 = ({ formData: f, onChange }) => (
     <>
-        <p style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', color: '#94A3B8', letterSpacing: '0.5px', marginBottom: '16px' }}>Part A: Monthly Expenses</p>
+        <div className="qn-subsection-label">Part A: Monthly Expenses</div>
         <Row>
             <InputField label="Household & Lifestyle" description="Groceries, maid, maintenance, clothing, personal care." name="expense_household" type="currency" prefix="₹" value={f.expense_household} onChange={onChange} />
             <InputField label="Rent / Home EMI" description="House rent or EMI for your primary residence." name="expense_rent" type="currency" prefix="₹" value={f.expense_rent} onChange={onChange} />
@@ -316,11 +429,11 @@ const Step3 = ({ formData: f, onChange }) => (
             <InputField label="Food & Dining" description="Eating out, ordering in, coffee shop visits." name="expense_food" type="currency" prefix="₹" value={f.expense_food} onChange={onChange} />
             <InputField label="Subscriptions" description="Netflix, Gym, Amazon Prime, software." name="expense_subscriptions" type="currency" prefix="₹" value={f.expense_subscriptions} onChange={onChange} />
         </Row>
-        <Row>
+        <Row full>
             <InputField label="Discretionary" description="Shopping, hobbies, movies, recreational activities." name="expense_discretionary" type="currency" prefix="₹" value={f.expense_discretionary} onChange={onChange} />
         </Row>
 
-        <p style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', color: '#94A3B8', letterSpacing: '0.5px', marginBottom: '16px', marginTop: '32px' }}>Part B: Annual Expenses</p>
+        <div className="qn-subsection-label" style={{ marginTop: '32px' }}>Part B: Annual Expenses</div>
         <div style={{ padding: '12px 16px', backgroundColor: '#F0F9FF', borderRadius: '8px', border: '1px solid #BAE6FD', marginBottom: '20px', fontSize: '12px', color: '#0369A1', lineHeight: 1.6 }}>
             <strong>Why do we ask for these?</strong> Yearly obligations take a hidden cut from your monthly income. We prorate these to reveal your <i>true</i> monthly surplus and pad your emergency fund.
         </div>
@@ -363,8 +476,12 @@ const Step5 = ({ formData: f, onChange }) => (
             <InputField label="Gold / Commodities" name="inv_gold_commodities" type="currency" prefix="₹" value={f.inv_gold_commodities} onChange={onChange} info="Physical gold, Sovereign Gold Bonds, Gold ETFs, or commodity investments" />
             <InputField label="Real Estate Value" name="inv_real_estate" type="currency" prefix="₹" value={f.inv_real_estate} onChange={onChange} info="Current market value of all property owned (excluding primary residence loan)" />
         </Row>
-        <Row>
+        <Row full>
             <InputField label="Crypto / Alternatives" name="inv_crypto_alt" type="currency" prefix="₹" value={f.inv_crypto_alt} onChange={onChange} info="Cryptocurrency, REITs, InvITs, angel investments, P2P lending, etc." />
+        </Row>
+        <div className="qn-subsection-label" style={{ marginTop: '16px' }}>Recurring Investments</div>
+        <Row full>
+            <InputField label="Monthly SIP Amount" name="inv_monthly_sip" type="currency" prefix="₹" value={f.inv_monthly_sip} onChange={onChange} info="Total monthly SIP or recurring investment amount across all schemes (mutual funds, stocks, etc.)" />
         </Row>
     </>
 );
@@ -397,13 +514,9 @@ const Step6 = ({ formData: f, onChange, setFormData }) => {
     return (
         <>
             {/* Loans Section */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <p style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: '#94A3B8', letterSpacing: '0.5px', margin: 0 }}>Active Loans</p>
-                <button type="button" onClick={addLoan} style={{
-                    display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '6px',
-                    border: '1px solid #E2E8F0', backgroundColor: '#F8FAFC', fontSize: '12px', fontWeight: 600,
-                    color: '#1E293B', cursor: 'pointer'
-                }}>
+            <div className="qn-subsection-label" style={{ marginBottom: '24px' }}>
+                <span>Active Loans</span>
+                <button type="button" onClick={addLoan} className="qn-btn-add">
                     <Plus size={14} /> Add Loan
                 </button>
             </div>
@@ -415,95 +528,79 @@ const Step6 = ({ formData: f, onChange, setFormData }) => {
             )}
 
             {loans.map((loan, idx) => (
-                <div key={idx} style={{
-                    border: '1px solid #E2E8F0', borderRadius: '8px', padding: '16px',
-                    marginBottom: '16px', backgroundColor: '#FAFBFC', position: 'relative'
-                }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                        <span style={{ fontSize: '13px', fontWeight: 600, color: '#1E293B' }}>Loan {idx + 1}</span>
-                        <button type="button" onClick={() => removeLoan(idx)} style={{
-                            display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '4px',
-                            border: '1px solid #FCA5A5', backgroundColor: '#FEF2F2', fontSize: '11px', fontWeight: 600,
-                            color: '#DC2626', cursor: 'pointer'
-                        }}>
+                <div key={idx} className="qn-loan-card">
+                    <div className="qn-loan-card-header">
+                        <span className="qn-loan-card-title">Loan {idx + 1}</span>
+                        <button type="button" onClick={() => removeLoan(idx)} className="qn-btn-remove">
                             <Trash2 size={12} /> Remove
                         </button>
                     </div>
-                    <div style={{ marginBottom: '12px' }}>
-                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#1E293B', marginBottom: '6px' }}>Loan Type</label>
-                        <select value={loan.type || ''} onChange={e => updateLoan(idx, 'type', e.target.value)} style={{
-                            width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #E2E8F0',
-                            fontSize: '14px', color: '#1E293B', backgroundColor: 'white', outline: 'none'
-                        }}>
-                            <option value="" disabled>Select</option>
-                            {['Home Loan', 'Car Loan', 'Personal Loan', 'Education Loan', 'Gold Loan', 'Other'].map(opt =>
-                                <option key={opt} value={opt}>{opt}</option>
-                            )}
-                        </select>
+                    <div className="qn-form-grid full">
+                        <div className="qn-field">
+                            <label>Loan Type</label>
+                            <select value={loan.type || ''} onChange={e => updateLoan(idx, 'type', e.target.value)}>
+                                <option value="" disabled>Select</option>
+                                {['Home Loan', 'Car Loan', 'Personal Loan', 'Education Loan', 'Gold Loan', 'Other'].map(opt =>
+                                    <option key={opt} value={opt}>{opt}</option>
+                                )}
+                            </select>
+                        </div>
                     </div>
                     <Row>
-                        <div style={{ flex: 1, marginBottom: '12px' }}>
-                            <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#1E293B', marginBottom: '6px' }}>Outstanding Amount</label>
-                            <div style={{ position: 'relative' }}>
-                                <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8', fontSize: '14px' }}>₹</span>
-                                <input type="number" value={loan.outstanding || ''} onChange={e => updateLoan(idx, 'outstanding', e.target.value)} style={{
-                                    width: '100%', padding: '10px 12px 10px 30px', borderRadius: '8px', border: '1px solid #E2E8F0',
-                                    fontSize: '14px', color: '#1E293B', outline: 'none', boxSizing: 'border-box'
-                                }} />
+                        <div className="qn-field">
+                            <label>Outstanding Amount</label>
+                            <div className="qn-rupee-wrap">
+                                <span>₹</span>
+                                <input type="number" value={loan.outstanding || ''} onChange={e => updateLoan(idx, 'outstanding', e.target.value)} />
                             </div>
                         </div>
-                        <div style={{ flex: 1, marginBottom: '12px' }}>
-                            <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#1E293B', marginBottom: '6px' }}>Interest Rate</label>
-                            <div style={{ position: 'relative' }}>
-                                <input type="number" value={loan.interestRate || ''} onChange={e => updateLoan(idx, 'interestRate', e.target.value)} style={{
-                                    width: '100%', padding: '10px 36px 10px 12px', borderRadius: '8px', border: '1px solid #E2E8F0',
-                                    fontSize: '14px', color: '#1E293B', outline: 'none', boxSizing: 'border-box'
-                                }} />
-                                <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8', fontSize: '14px' }}>%</span>
+                        <div className="qn-field">
+                            <label>Interest Rate</label>
+                            <div className="qn-pct-wrap">
+                                <input type="number" value={loan.interestRate || ''} onChange={e => updateLoan(idx, 'interestRate', e.target.value)} />
+                                <span>%</span>
                             </div>
                         </div>
                     </Row>
                     <Row>
-                        <div style={{ flex: 1, marginBottom: '12px' }}>
-                            <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#1E293B', marginBottom: '6px' }}>Monthly EMI</label>
-                            <div style={{ position: 'relative' }}>
-                                <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8', fontSize: '14px' }}>₹</span>
-                                <input type="number" value={loan.emi || ''} onChange={e => updateLoan(idx, 'emi', e.target.value)} style={{
-                                    width: '100%', padding: '10px 12px 10px 30px', borderRadius: '8px', border: '1px solid #E2E8F0',
-                                    fontSize: '14px', color: '#1E293B', outline: 'none', boxSizing: 'border-box'
-                                }} />
+                        <div className="qn-field">
+                            <label>Monthly EMI</label>
+                            <div className="qn-rupee-wrap">
+                                <span>₹</span>
+                                <input type="number" value={loan.emi || ''} onChange={e => updateLoan(idx, 'emi', e.target.value)} />
                             </div>
                         </div>
-                        <div style={{ flex: 1, marginBottom: '12px' }}>
-                            <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#1E293B', marginBottom: '6px' }}>Remaining Tenure (months)</label>
-                            <input type="number" value={loan.tenure || ''} onChange={e => updateLoan(idx, 'tenure', e.target.value)} style={{
-                                width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #E2E8F0',
-                                fontSize: '14px', color: '#1E293B', outline: 'none', boxSizing: 'border-box'
-                            }} />
+                        <div className="qn-field">
+                            <label>Remaining Tenure (months)</label>
+                            <input type="number" value={loan.tenure || ''} onChange={e => updateLoan(idx, 'tenure', e.target.value)} min="0" />
                         </div>
                     </Row>
                 </div>
             ))}
 
             {/* Credit Card Outstanding */}
-            <p style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: '#94A3B8', letterSpacing: '0.5px', marginBottom: '12px', marginTop: '8px' }}>Credit Card</p>
-            <InputField label="Credit Card Outstanding" name="credit_card_outstanding" type="currency" prefix="₹" value={f.credit_card_outstanding} onChange={onChange} info="Total unpaid credit card balance" />
+            <div className="qn-subsection-label">Credit Card</div>
+            <Row full>
+                <InputField label="Credit Card Outstanding" name="credit_card_outstanding" type="currency" prefix="₹" value={f.credit_card_outstanding} onChange={onChange} info="Total unpaid credit card balance" />
+            </Row>
 
             {/* Credit Score */}
-            <p style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: '#94A3B8', letterSpacing: '0.5px', marginBottom: '12px', marginTop: '8px' }}>Credit Score</p>
-            <InputField label="Credit Score" name="credit_score" type="number" value={f.credit_score} onChange={onChange} placeholder="e.g. 750" info="Check on CIBIL, Experian, etc." />
+            <div className="qn-subsection-label">Credit Score</div>
+            <Row full>
+                <InputField label="Credit Score" name="credit_score" type="number" value={f.credit_score} onChange={onChange} placeholder="e.g. 750" info="Check on CIBIL, Experian, etc." />
+            </Row>
         </>
     );
 };
 
 const Step7 = ({ formData: f, onChange }) => (
     <>
-        <p style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: '#94A3B8', letterSpacing: '0.5px', marginBottom: '12px' }}>Health Insurance</p>
+        <div className="qn-subsection-label">Health Insurance</div>
         <Row>
-            <InputField label="Health Cover Amount" name="health_cover" type="currency" prefix="₹" value={f.health_cover} onChange={onChange} info="Sum insured — the maximum the insurer will pay. Ideal: ₹10-25L for a family." />
+            <InputField label="Health Cover Amount" name="health_cover" type="currency" prefix="₹" value={f.health_cover} onChange={onChange} info="Sum insured - the maximum the insurer will pay. Ideal: ₹10-25L for a family." />
             <InputField label="Annual Premium" name="health_premium" type="currency" prefix="₹" value={f.health_premium} onChange={onChange} info="Yearly amount you pay to keep the policy active. Also eligible for 80D tax deduction." />
         </Row>
-        <p style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: '#94A3B8', letterSpacing: '0.5px', marginBottom: '12px', marginTop: '12px' }}>Life Insurance</p>
+        <div className="qn-subsection-label" style={{ marginTop: '32px' }}>Life Insurance</div>
         <Row>
             <InputField label="Term Cover Amount" name="life_cover" type="currency" prefix="₹" value={f.life_cover} onChange={onChange} info="Term insurance pays a lump sum to your nominee if you die during the policy term. Ideal: 10-15x your annual income." />
             <InputField label="Annual Premium" name="life_premium" type="currency" prefix="₹" value={f.life_premium} onChange={onChange} info="Yearly cost of your term/life policy. Term plans are the most cost-effective option." />
@@ -536,16 +633,15 @@ const Step9 = ({ formData: f, onChange }) => (
 
 const Step10 = ({ formData: f, onChange }) => {
     const questions = [
-        { label: 'I tend to delay financial decisions', name: 'beh_delay_decisions' },
-        { label: 'I prefer guaranteed returns over higher risk', name: 'beh_prefer_guaranteed' },
-        { label: 'I change investments based on market news', name: 'beh_follow_market_news' },
-        { label: 'I sometimes spend impulsively', name: 'beh_spend_impulsively' },
-        { label: 'I review my finances at least monthly', name: 'beh_review_monthly' },
-        { label: 'I actively avoid taking on debt', name: 'beh_avoid_debt' },
-        { label: 'I hold onto losing investments hoping they recover', name: 'beh_hold_losing' },
-        { label: 'I feel anxious making large financial decisions', name: 'beh_anxious_decisions' },
-        { label: 'I prefer investing in brands I personally use', name: 'beh_familiar_brands' },
-        { label: 'I compare my financial progress with peers', name: 'beh_compare_peers' }
+        { label: 'I review my finances at least once a month', name: 'beh_review_monthly' },
+        { label: 'I tend to delay important financial decisions', name: 'beh_delay_decisions' },
+        { label: 'I sometimes spend impulsively and regret it later', name: 'beh_spend_impulsively' },
+        { label: 'I actively avoid taking on unnecessary debt', name: 'beh_avoid_debt' },
+        { label: 'When markets fall, I stay calm and don\'t change my investments', name: 'beh_market_reaction' },
+        { label: 'When I receive unexpected money, I invest or save most of it', name: 'beh_windfall_behaviour' },
+        { label: 'I hold onto losing investments hoping they will recover', name: 'beh_hold_losing' },
+        { label: 'I understand what I\'m invested in and why', name: 'beh_product_understanding' },
+        { label: 'I compare my financial progress with friends or peers', name: 'beh_compare_peers' }
     ];
     const scaleLabels = ['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree'];
     return <>
@@ -563,28 +659,19 @@ const Step10 = ({ formData: f, onChange }) => {
         {questions.map((q, i) => {
             const current = f[q.name] ? String(f[q.name]) : '';
             return (
-                <div key={i} style={{ marginBottom: '24px' }}>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#1E293B', marginBottom: '10px' }}>
-                        {q.label} <span style={{ color: '#EF4444' }}>*</span>
-                    </label>
-                    <div style={{ display: 'flex', gap: '0', borderRadius: '8px', overflow: 'hidden', border: '1px solid #E2E8F0' }}>
+                <div key={i} className="qn-scale-question" style={{ marginBottom: '24px' }}>
+                    <p>{q.label} <span className="qn-required">*</span></p>
+                    <div className="qn-scale-options">
                         {scaleLabels.map((lbl, j) => {
                             const val = String(j + 1);
                             const selected = current === val;
                             return (
                                 <button key={val} type="button"
+                                    className={`qn-scale-btn ${selected ? 'selected' : ''}`}
                                     onClick={() => onChange({ target: { name: q.name, value: val } })}
-                                    style={{
-                                        flex: 1, padding: '10px 4px', border: 'none', cursor: 'pointer',
-                                        backgroundColor: selected ? '#1E293B' : '#fff',
-                                        color: selected ? '#fff' : '#475569',
-                                        fontSize: '11px', fontWeight: 600, textAlign: 'center',
-                                        borderRight: j < 4 ? '1px solid #E2E8F0' : 'none',
-                                        transition: 'all 0.15s ease'
-                                    }}
                                 >
-                                    <div style={{ fontSize: '14px', fontWeight: 700, marginBottom: '2px' }}>{val}</div>
-                                    <div style={{ fontSize: '9px', fontWeight: 500, opacity: 0.85 }}>{lbl}</div>
+                                    <span className="num">{val}</span>
+                                    <span className="lbl">{lbl}</span>
                                 </button>
                             );
                         })}

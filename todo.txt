@@ -34,5 +34,36 @@ In the overview section, based on the financial behaviour score of the user we w
 A small change the outside range tagged cards in each section should have a red border. 
 
 08-03-2026
-Keep toggle for inflation adjustment
-Custom allocation and risk options
+Goal Planner
+In the goal planner we already take into account inflation but now we want a toggle for it whether use wants to take into account inflation for a particular goal or not. Inflation amount would be 6% user cant change that
+
+For each goal there would be one more option in risk , custom where user can enter its own allocation and the returns for each equity commodity and debt, this will not beaffected by the current strategy
+  
+Add budget planner
+
+action plan tasks should have stages of completion (pending, completed, partial completed)
+ACtually increase the score after completiong of tasks
+Change money signs and name of the platform
+
+10-03-2026
+Change "Want to update quessionaire?" Section to something eye catching. Keep the edit questions option somewhere else.
+Change the definition of Generation - 2, it is not defined by age but by family status and wealth/ survival needs (can ask questions for this)
+Give priority in the following order: 1. Health Insurance 2. Term Insurance 3. Emergency Funds 4. Other Insurance 5. Others (investments, etc.)
+
+Make the "Current Net Worth" box green/ red bordered based on +/-ve networth.
+Highlight "True Investable Amount"
+Remove bonus/ other incomes from monthly surplus
+Represent "Assets" Section properly
+ 
+ 14-03-2026
+ Representing Income and Expenses as actual balance sheet so that user can add all in one place 
+ After use edits the questionnare and changes the data , store the previous version
+
+Compound interest calculator
+Interest Rate calculator
+Loan EMI Calculator
+SIP calculator
+
+Website Names
+Goal Akaar
+Goly

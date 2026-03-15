@@ -1,158 +1,78 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import {
-    LayoutGrid,
-    TrendingUp,
-    Landmark,
-    ShieldCheck,
-    Receipt,
-    FileText,
-    ClipboardList,
-    Target,
-    LogOut
-} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { LogOut } from 'lucide-react';
 
-function Sidebar({ collapsed, mobileOpen }) {
-    const { logout } = useAuth();
+function Sidebar({ mobileOpen, onCloseMobile }) {
+    const { user, logout } = useAuth();
     const location = useLocation();
 
     const navItems = [
-        { name: 'Overview', path: '/dashboard', icon: LayoutGrid },
-        { name: 'Investments', path: '/investments', icon: TrendingUp },
-        { name: 'Liabilities', path: '/liabilities', icon: Landmark },
-        { name: 'Insurance', path: '/insurance', icon: ShieldCheck },
-        { name: 'Tax', path: '/tax', icon: Receipt },
-        { name: 'Will & Estate', path: '/estate', icon: FileText },
-        { name: 'Action Plan', path: '/reports', icon: ClipboardList },
+        { name: 'Overview', path: '/dashboard' },
+        { name: 'Investments', path: '/investments' },
+        { name: 'Liabilities', path: '/liabilities' },
+        { name: 'Insurance', path: '/insurance' },
+        { name: 'Tax', path: '/tax' },
+        { name: 'Will & Estate', path: '/estate' },
+        { name: 'Action Plan', path: '/reports' },
     ];
 
     const toolItems = [
-        { name: 'Goal Planner', path: '/goal-planner', icon: Target },
+        { name: 'Goal Planner', path: '/goal-planner' },
     ];
 
-    const width = collapsed ? 64 : 200;
+    // Get initials for avatar
+    const getInitials = (name) => {
+        if (!name) return 'U';
+        return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+    };
 
     return (
-        <aside className={`app-sidebar${mobileOpen ? ' mobile-open' : ''}`} style={{
-            width: `${width}px`,
-            minWidth: `${width}px`,
-            backgroundColor: '#FFFFFF',
-            borderRight: '1px solid #E8ECF1',
-            height: '100vh',
-            display: 'flex',
-            flexDirection: 'column',
-            position: 'fixed',
-            zIndex: 10,
-            fontFamily: "'Inter', sans-serif",
-            overflow: 'hidden'
-        }}>
-            {/* Brand */}
-            <div style={{
-                padding: collapsed ? '20px 16px' : '20px 20px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                justifyContent: collapsed ? 'center' : 'flex-start'
-            }}>
-                <div style={{
-                    width: '30px', height: '30px',
-                    backgroundColor: '#1E293B',
-                    borderRadius: '8px',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: 'white', fontWeight: 700, fontSize: '11px',
-                    flexShrink: 0
-                }}>FH</div>
-                {!collapsed && <span style={{ fontWeight: 700, fontSize: '15px', color: '#1E293B', whiteSpace: 'nowrap' }}>FinHealth</span>}
+        <div className={`sidebar${mobileOpen ? ' mobile-open' : ''}`}>
+            <div className="sidebar-brand">
+                <div className="sidebar-brand-name">FinHealth<span>.</span></div>
+                <div className="sidebar-brand-sub">Wealth Analytics</div>
             </div>
 
-            {/* Navigation */}
-            <nav style={{ flex: 1, padding: '8px 0', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                {navItems.map((item) => {
-                    const isActive = location.pathname === item.path;
-                    const Icon = item.icon;
-                    return (
-                        <NavLink
-                            key={item.name}
-                            to={item.path}
-                            title={collapsed ? item.name : undefined}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '10px',
-                                padding: collapsed ? '9px 0' : '9px 20px',
-                                justifyContent: collapsed ? 'center' : 'flex-start',
-                                fontSize: '13px',
-                                color: isActive ? '#1E293B' : '#64748B',
-                                fontWeight: isActive ? 600 : 400,
-                                borderLeft: isActive ? '3px solid #3B82F6' : '3px solid transparent',
-                                backgroundColor: isActive ? '#EFF6FF' : 'transparent',
-                                textDecoration: 'none',
-                                transition: 'all 0.12s ease',
-                                whiteSpace: 'nowrap'
-                            }}
-                        >
-                            <Icon size={17} strokeWidth={isActive ? 2.2 : 1.8} style={{ flexShrink: 0 }} />
-                            {!collapsed && item.name}
-                        </NavLink>
-                    );
-                })}
+            <nav style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                {navItems.map((item) => (
+                    <NavLink
+                        key={item.name}
+                        to={item.path}
+                        className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+                        onClick={onCloseMobile}
+                    >
+                        {item.name}
+                    </NavLink>
+                ))}
 
-                {/* Tools Section Separator */}
-                <div style={{ margin: '12px 0 4px', borderTop: '1px solid #E8ECF1' }}>
-                    {!collapsed && (
-                        <div style={{ padding: '10px 20px 4px', fontSize: '10px', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tools</div>
-                    )}
-                </div>
+                <div className="nav-section-label">Tools</div>
 
-                {toolItems.map((item) => {
-                    const isActive = location.pathname === item.path;
-                    const Icon = item.icon;
-                    return (
-                        <NavLink
-                            key={item.name}
-                            to={item.path}
-                            title={collapsed ? item.name : undefined}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '10px',
-                                padding: collapsed ? '9px 0' : '9px 20px',
-                                justifyContent: collapsed ? 'center' : 'flex-start',
-                                fontSize: '13px',
-                                color: isActive ? '#1E293B' : '#64748B',
-                                fontWeight: isActive ? 600 : 400,
-                                borderLeft: isActive ? '3px solid #3B82F6' : '3px solid transparent',
-                                backgroundColor: isActive ? '#EFF6FF' : 'transparent',
-                                textDecoration: 'none',
-                                transition: 'all 0.12s ease',
-                                whiteSpace: 'nowrap'
-                            }}
-                        >
-                            <Icon size={17} strokeWidth={isActive ? 2.2 : 1.8} style={{ flexShrink: 0 }} />
-                            {!collapsed && item.name}
-                        </NavLink>
-                    );
-                })}
+                {toolItems.map((item) => (
+                    <NavLink
+                        key={item.name}
+                        to={item.path}
+                        className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+                        onClick={onCloseMobile}
+                    >
+                        {item.name}
+                    </NavLink>
+                ))}
             </nav>
 
-            {/* Logout */}
-            <div style={{ padding: collapsed ? '16px 0' : '16px 20px', borderTop: '1px solid #E8ECF1', display: 'flex', justifyContent: collapsed ? 'center' : 'flex-start' }}>
-                <button
-                    onClick={logout}
-                    title="Logout"
-                    style={{
-                        display: 'flex', alignItems: 'center', gap: '10px',
-                        color: '#64748B', fontSize: '13px', fontWeight: 400,
-                        background: 'none', border: 'none', cursor: 'pointer',
-                        padding: '6px 0', justifyContent: collapsed ? 'center' : 'flex-start'
-                    }}
-                >
-                    <LogOut size={17} strokeWidth={1.8} style={{ flexShrink: 0 }} />
-                    {!collapsed && 'Logout'}
-                </button>
+            <div className="sidebar-user">
+                <div className="sidebar-avatar">{getInitials(user?.full_name)}</div>
+                <div className="sidebar-user-info">
+                    <p>{user?.full_name || 'User'}</p>
+                    <p>Member</p>
+                </div>
             </div>
-        </aside>
+
+            <button className="sidebar-signout" onClick={logout}>
+                <LogOut size={13} strokeWidth={1.5} />
+                Sign out
+            </button>
+        </div>
     );
 }
 

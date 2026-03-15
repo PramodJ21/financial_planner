@@ -53,31 +53,41 @@ function Tax() {
     ];
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            {/* Top cards */}
-            <div className="stat-row">
-                <div className="card" style={{ flex: 1, padding: '20px' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>Potential Tax Savings</div>
-                    <div style={{ fontSize: '28px', fontWeight: 700, color: '#1E293B' }}>{fmt(tax.potentialSavings)}</div>
-                    <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '4px' }}>Through unutilized deduction limits</div>
+        <div className="page-content">
+            {/* Header */}
+            <div className="page-header" style={{ alignItems: 'flex-start' }}>
+                <div>
+                    <div className="page-title">Tax</div>
                 </div>
-                <div className="card" style={{ flex: 1, padding: '20px' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>Total Income</div>
-                    <div style={{ fontSize: '28px', fontWeight: 700, color: '#1E293B' }}>{fmt(tax.totalIncome)}</div>
+            </div>
+
+            {/* Top Cards */}
+            <div className="analysis-grid two-col">
+                <div className="analysis-item">
+                    <div className="analysis-item-header">
+                        <span className="analysis-item-title">Potential Tax Savings</span>
+                    </div>
+                    <div className="analysis-value">{fmtFull(tax.potentialSavings)}</div>
+                    <div className="analysis-sub">Through unutilized deduction limits</div>
+                </div>
+                <div className="analysis-item">
+                    <div className="analysis-item-header">
+                        <span className="analysis-item-title">Total Income</span>
+                    </div>
+                    <div className="analysis-value">{fmtFull(tax.totalIncome)}</div>
                 </div>
             </div>
 
             {/* Tax Overview */}
-            <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
-                <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', marginBottom: '20px', width: '100%', position: 'absolute', top: '-32px' }}></h2>
-            </div>
             <div>
-                <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', marginBottom: '16px' }}>Tax Overview</h2>
-                <div className="tax-overview-row">
-                    {/* Left: Income Overview */}
-                    <div className="card tax-sidebar-card" style={{ padding: '24px', borderRadius: '8px 0 0 8px', borderRight: '1px solid #E8ECF1' }}>
-                        <div style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '16px' }}>Income Overview</div>
-                        <div style={{ height: '180px', position: 'relative' }}>
+                <div className="act-label" style={{ marginBottom: '24px' }}>Overview</div>
+                <h2 className="section-heading">Tax Overview</h2>
+
+                <div style={{ display: 'flex', marginTop: '24px', alignItems: 'flex-start' }}>
+                    {/* Left: Chart */}
+                    <div style={{ width: '30%', paddingRight: '40px', borderRight: '0.5px solid var(--ink-ghost)' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--ink-soft)', marginBottom: '24px' }}>Income Overview</div>
+                        <div style={{ height: '220px', position: 'relative' }}>
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
                                     <Pie data={(() => {
@@ -87,12 +97,12 @@ function Tax() {
                                             { name: 'Additional Income', value: (tax.bonusIncome || 0) + (tax.otherIncome || 0) }
                                         ].filter(d => d.value > 0);
                                         return incData.length > 0 ? incData : [{ name: 'No Income', value: 1 }];
-                                    })()} innerRadius={55} outerRadius={80} paddingAngle={2} dataKey="value">
+                                    })()} innerRadius={65} outerRadius={90} paddingAngle={2} dataKey="value" stroke="none">
                                         {(() => {
                                             const COLOR_MAP = {
-                                                'Salary Income': '#A855F7',
-                                                'Business Income': '#6EE7B7',
-                                                'Additional Income': '#FCD34D'
+                                                'Salary Income': '#6B4C9A',
+                                                'Business Income': '#CBD5E1',
+                                                'Additional Income': '#D97757'
                                             };
                                             const incData = [
                                                 { name: 'Salary Income', value: tax.salaryIncome || 0 },
@@ -105,57 +115,41 @@ function Tax() {
                                             ));
                                         })()}
                                     </Pie>
-                                    <RechartsTooltip formatter={(val) => fmtFull(val)} contentStyle={{ fontSize: '11px', padding: '4px 8px' }} />
+                                    <RechartsTooltip formatter={(val) => fmtFull(val)} contentStyle={{ fontSize: '11px', padding: '4px 8px', borderRadius: '4px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
                                 </PieChart>
                             </ResponsiveContainer>
-                            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
-                                <div style={{ fontSize: '10px', color: '#94A3B8' }}>Total Income</div>
-                                <div style={{ fontSize: '14px', fontWeight: 700, color: '#1E293B' }}>{fmtFull(tax.totalIncome)}</div>
-                            </div>
                         </div>
-                        {/* Legend */}
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', marginTop: '16px' }}>
+                        <div className="donut-legend" style={{ marginTop: '20px' }}>
                             {[
-                                { label: 'Salary Income', value: tax.salaryIncome || 0, color: '#A855F7' },
-                                { label: 'Business Income', value: tax.businessIncome || 0, color: '#6EE7B7' },
-                                { label: 'Additional Income', value: (tax.bonusIncome || 0) + (tax.otherIncome || 0), color: '#FCD34D' }
+                                { label: 'Salary Income', value: tax.salaryIncome || 0, color: '#6B4C9A' },
+                                { label: 'Business Income', value: tax.businessIncome || 0, color: '#CBD5E1' },
+                                { label: 'Additional Income', value: (tax.bonusIncome || 0) + (tax.otherIncome || 0), color: '#D97757' }
                             ].map(item => (
-                                <div key={item.label} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#64748B' }}>
-                                        <div style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: item.color }}></div>
-                                        {item.label}
+                                <div key={item.label} className="legend-item" style={{ width: '100%', display: 'flex', justifyContent: 'space-between' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <div className="legend-dot" style={{ backgroundColor: item.color }}></div>
+                                        <span>{item.label}</span>
                                     </div>
-                                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#1E293B', paddingLeft: '12px' }}>{fmtFull(item.value)}</div>
+                                    <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{fmtFull(item.value)}</span>
                                 </div>
                             ))}
                         </div>
                     </div>
 
-                    {/* Right: Tax Comparison Table */}
-                    <div className="card" style={{ flex: 1, padding: '0', borderRadius: '0 8px 8px 0' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    {/* Right: Table */}
+                    <div style={{ width: '70%', paddingLeft: '40px' }}>
+                        <table className="liab-table">
                             <thead>
                                 <tr>
-                                    <th style={{ padding: '16px 16px 12px', fontSize: '14px', fontWeight: 700, color: '#1E293B', textAlign: 'left' }}>Tax Comparison</th>
-                                    <th style={{ padding: '16px 16px 12px', fontSize: '14px', fontWeight: 600, color: '#1E293B', textAlign: 'left' }}>
-                                        Old Regime
-                                    </th>
-                                    <th style={{ padding: '8px 16px 12px', textAlign: 'left', verticalAlign: 'bottom' }}>
+                                    <th>Tax Comparison</th>
+                                    <th style={{ textAlign: 'right' }}>Old Regime</th>
+                                    <th style={{ textAlign: 'right' }}>
                                         {tax.recommended === 'New Regime' && (
-                                            <div style={{ fontSize: '9px', fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.5px', backgroundColor: '#ECFDF5', display: 'inline-block', padding: '2px 8px', borderRadius: '4px', marginBottom: '4px' }}>Ideal</div>
+                                            <div style={{ fontSize: '8px', fontWeight: 700, color: '#3B8662', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Ideal</div>
                                         )}
-                                        <div>
-                                            <span style={{ fontSize: '14px', fontWeight: 600, color: '#1E293B' }}>New Regime</span>
-                                            {tax.recommended === 'New Regime' && <span style={{ fontSize: '11px', color: '#94A3B8', marginLeft: '4px' }}>(opted)</span>}
-                                        </div>
-                                        {tax.recommended === 'Old Regime' && (
-                                            <span style={{ fontSize: '11px', color: '#94A3B8' }}></span>
-                                        )}
+                                        <div>New Regime <span style={{ color: 'var(--ink-ghost)', fontWeight: 400 }}>(opted)</span></div>
                                     </th>
                                 </tr>
-                                {tax.recommended === 'Old Regime' && (
-                                    <tr><td colSpan={3} style={{ padding: 0 }}></td></tr>
-                                )}
                             </thead>
                             <tbody>
                                 {[
@@ -164,21 +158,21 @@ function Tax() {
                                     { label: 'Standard Deduction', old: tax.oldRegime.standardDeduction, new_: tax.newRegime.standardDeduction },
                                     { label: 'Deductions', old: tax.oldRegime.deductions, new_: tax.newRegime.deductions },
                                 ].map((row, i) => (
-                                    <tr key={i} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                                        <td style={{ padding: '14px 16px', fontSize: '13px', color: '#64748B' }}>{row.label}</td>
-                                        <td style={{ padding: '14px 16px', fontSize: '13px', color: '#1E293B' }}>{fmtFull(row.old)}</td>
-                                        <td style={{ padding: '14px 16px', fontSize: '13px', color: '#1E293B' }}>{fmtFull(row.new_)}</td>
+                                    <tr key={i}>
+                                        <td><span className="asset-name" style={{ fontWeight: 400 }}>{row.label}</span></td>
+                                        <td style={{ textAlign: 'right' }}>{fmtFull(row.old)}</td>
+                                        <td style={{ textAlign: 'right' }}>{fmtFull(row.new_)}</td>
                                     </tr>
                                 ))}
-                                <tr style={{ backgroundColor: '#F0FDF9' }}>
-                                    <td style={{ padding: '14px 16px', fontSize: '13px', fontWeight: 700, color: '#1E293B' }}>Taxable Income</td>
-                                    <td style={{ padding: '14px 16px', fontSize: '15px', fontWeight: 700, color: '#1E293B' }}>{fmtFull(tax.oldRegime.taxableIncome)}</td>
-                                    <td style={{ padding: '14px 16px', fontSize: '15px', fontWeight: 700, color: '#1E293B' }}>{fmtFull(tax.newRegime.taxableIncome)}</td>
+                                <tr>
+                                    <td style={{ paddingTop: '24px' }}><span className="asset-name">Taxable Income</span></td>
+                                    <td style={{ textAlign: 'right', paddingTop: '24px', fontWeight: 600, color: 'var(--ink)' }}>{fmtFull(tax.oldRegime.taxableIncome)}</td>
+                                    <td style={{ textAlign: 'right', paddingTop: '24px', fontWeight: 600, color: 'var(--ink)' }}>{fmtFull(tax.newRegime.taxableIncome)}</td>
                                 </tr>
-                                <tr style={{ backgroundColor: '#F0FDF9' }}>
-                                    <td style={{ padding: '14px 16px', fontSize: '13px', fontWeight: 700, color: '#1E293B' }}>Tax Liability</td>
-                                    <td style={{ padding: '14px 16px', fontSize: '15px', fontWeight: 700, color: '#1E293B' }}>{fmtFull(tax.oldRegime.taxLiability)}</td>
-                                    <td style={{ padding: '14px 16px', fontSize: '15px', fontWeight: 700, color: '#1E293B' }}>{fmtFull(tax.newRegime.taxLiability)}</td>
+                                <tr>
+                                    <td><span className="asset-name">Tax Liability</span></td>
+                                    <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--ink)' }}>{fmtFull(tax.oldRegime.taxLiability)}</td>
+                                    <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--ink)' }}>{fmtFull(tax.newRegime.taxLiability)}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -186,121 +180,137 @@ function Tax() {
                 </div>
             </div>
 
-            {/* Recommendation */}
-            <div className="card" style={{ padding: '24px' }}>
-                <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', marginBottom: '16px' }}>Our Recommendation</h2>
-                <div className="stat-row">
-                    <div style={{ flex: 1, border: `2px solid ${tax.recommended === 'New Regime' ? '#1E293B' : '#E8ECF1'}`, borderRadius: '12px', padding: '20px', position: 'relative' }}>
-                        {tax.recommended === 'New Regime' && <span style={{ position: 'absolute', top: '-10px', right: '12px', backgroundColor: '#1E293B', color: 'white', fontSize: '10px', fontWeight: 700, padding: '2px 10px', borderRadius: '8px' }}>Recommended</span>}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                            <span style={{ fontWeight: 600, color: '#1E293B' }}>New Regime</span>
-                        </div>
-                        <div style={{ fontSize: '24px', fontWeight: 700, color: '#1E293B', marginBottom: '4px' }}>{fmtFull(tax.newRegime.taxLiability)}</div>
-                        <div style={{ fontSize: '12px', color: '#64748B' }}>Effective Rate: {tax.newRegime.effectiveRate}%</div>
-                        <div style={{ fontSize: '12px', color: '#64748B' }}>After standard deduction of {fmtFull(tax.newRegime.standardDeduction)}</div>
+            {/* Recommendation block */}
+            <div style={{ marginTop: '48px', paddingTop: '48px', borderTop: '0.5px solid var(--ink-ghost)' }}>
+                <div className="act-label" style={{ marginBottom: '24px' }}>Our Recommendation</div>
+                <div className="analysis-grid two-col" style={{ borderTop: 'none' }}>
+                    <div className={`tax-rec-box ${tax.recommended === 'New Regime' ? 'recommended' : ''}`} style={{ paddingLeft: 0 }}>
+                        {tax.recommended === 'New Regime' && <span className="tax-rec-tag">Recommended</span>}
+                        <div className="analysis-item-title" style={{ color: 'var(--ink)', fontSize: '14px' }}>New Regime</div>
+                        <div className="analysis-value" style={{ marginTop: '16px' }}>{fmtFull(tax.newRegime.taxLiability)}</div>
+                        <div className="analysis-sub" style={{ marginTop: '12px' }}>Effective Rate: {tax.newRegime.effectiveRate}%</div>
+                        <div className="analysis-sub" style={{ marginTop: '4px' }}>After standard deduction of {fmtFull(tax.newRegime.standardDeduction)}</div>
                     </div>
-                    <div style={{ flex: 1, border: `2px solid ${tax.recommended === 'Old Regime' ? '#1E293B' : '#E8ECF1'}`, borderRadius: '12px', padding: '20px', position: 'relative' }}>
-                        {tax.recommended === 'Old Regime' && <span style={{ position: 'absolute', top: '-10px', right: '12px', backgroundColor: '#1E293B', color: 'white', fontSize: '10px', fontWeight: 700, padding: '2px 10px', borderRadius: '8px' }}>Recommended</span>}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                            <span style={{ fontWeight: 600, color: '#1E293B' }}>Old Regime</span>
-                        </div>
-                        <div style={{ fontSize: '24px', fontWeight: 700, color: '#1E293B', marginBottom: '4px' }}>{fmtFull(tax.oldRegime.taxLiability)}</div>
-                        <div style={{ fontSize: '12px', color: '#64748B' }}>Effective Rate: {tax.oldRegime.effectiveRate}%</div>
-                        <div style={{ fontSize: '12px', color: '#64748B' }}>Max Deductions: {fmtFull(tax.oldRegime.deductions)}</div>
+                    <div className={`tax-rec-box ${tax.recommended === 'Old Regime' ? 'recommended' : ''}`} style={{ borderRight: 'none', paddingLeft: '40px' }}>
+                        {tax.recommended === 'Old Regime' && <span className="tax-rec-tag">Recommended</span>}
+                        <div className="analysis-item-title" style={{ color: 'var(--ink)', fontSize: '14px' }}>Old Regime</div>
+                        <div className="analysis-value" style={{ marginTop: '16px' }}>{fmtFull(tax.oldRegime.taxLiability)}</div>
+                        <div className="analysis-sub" style={{ marginTop: '12px' }}>Effective Rate: {tax.oldRegime.effectiveRate}%</div>
+                        <div className="analysis-sub" style={{ marginTop: '4px' }}>Max Deductions: {fmtFull(tax.oldRegime.deductions)}</div>
                     </div>
+                </div>
+
+                <div className="understanding" style={{ marginTop: '40px' }}>
+                    <div className="understanding-title">How this is calculated</div>
+                    <ul className="understanding-list">
+                        <li>Old Regime applies standard tax slabs but allows deductions under sections 80C, 80D, HRA, home loan interest, etc.</li>
+                        <li>New Regime has lower tax slabs but eliminates most deductions. Best for those with low deductible investments.</li>
+                        <li>Recommended regime is whichever results in lower total tax liability. The system compares both and suggests the optimal one.</li>
+                        <li>Cess (4% Health & Education) is applied on top of your base tax amount under both regimes.</li>
+                        <li>Effective Tax Rate = Total tax payable ÷ Total income × 100. Lower is better.</li>
+                    </ul>
                 </div>
             </div>
-            <SectionNote lines={[
-                'Old Regime applies standard tax slabs but allows deductions under sections 80C, 80D, HRA, home loan interest, etc.',
-                'New Regime has lower tax slabs but eliminates most deductions. Best for those with low deductible investments.',
-                'Recommended regime is whichever results in lower total tax liability. The system compares both and suggests the optimal one.',
-                'Cess (4% Health & Education) is applied on top of your base tax amount under both regimes.',
-                'Effective Tax Rate = Total tax payable ÷ Total income × 100. Lower is better.'
-            ]} />
 
-            {/* Tax Planning + Advance */}
-            <div className="stat-row">
-                <div className="card" style={{ flex: 1, padding: '24px' }}>
-                    <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#1E293B', marginBottom: '16px' }}>Tax Planning</h3>
-                    <div style={{ height: '200px' }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={barData}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                                <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748B' }} axisLine={false} tickLine={false} />
-                                <YAxis tick={{ fontSize: 12, fill: '#64748B' }} axisLine={false} tickLine={false} tickFormatter={v => fmt(v)} />
-                                <RechartsTooltip formatter={(val) => fmtFull(val)} contentStyle={{ fontSize: '11px', padding: '4px 8px' }} />
-                                <Bar dataKey="value" fill="#1E293B" radius={[4, 4, 0, 0]} barSize={40} />
-                            </BarChart>
-                        </ResponsiveContainer>
+            {/* Tax Planning & Advance */}
+            <div style={{ marginTop: '48px' }}>
+                <div className="act-label" style={{ marginBottom: '24px' }}>Planning</div>
+                <div style={{ display: 'flex' }}>
+                    {/* Left: Planning Chart */}
+                    <div style={{ width: '40%', paddingRight: '40px', borderRight: '0.5px solid var(--ink-ghost)' }}>
+                        <h2 className="section-heading">Tax Planning</h2>
+                        <div style={{ height: '240px', marginTop: '32px' }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={barData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--ink-soft)', fontFamily: 'Outfit' }} axisLine={false} tickLine={false} dy={10} />
+                                    <YAxis tick={{ fontSize: 11, fill: 'var(--ink-soft)', fontFamily: 'Outfit' }} axisLine={false} tickLine={false} tickFormatter={v => fmt(v)} />
+                                    <RechartsTooltip formatter={(val) => fmtFull(val)} contentStyle={{ fontSize: '11px', padding: '8px 12px', borderRadius: '4px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} cursor={{ fill: 'transparent' }} />
+                                    <Bar dataKey="value" fill="#3D3B38" radius={[2, 2, 0, 0]} barSize={48} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
                     </div>
-                </div>
 
-                <div className="card" style={{ flex: 1, padding: '24px' }}>
-                    <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#1E293B', marginBottom: '4px' }}>Advance & Surcharge</h3>
-                    <p style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '16px' }}>Employee contribution to NPS</p>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                        <thead>
-                            <tr style={{ borderBottom: '1px solid #E8ECF1' }}>
-                                {['', 'Tax Slab (Old)', 'Limit Area', 'Suggested Amount'].map(h => (
-                                    <th key={h} style={{ padding: '8px 10px', fontSize: '11px', fontWeight: 600, color: '#64748B', textAlign: h === '' ? 'left' : 'right', textTransform: 'uppercase' }}>{h}</th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
-                                <td style={{ padding: '10px', fontSize: '13px', color: '#1E293B' }}>NPS Contribution</td>
-                                <td style={{ padding: '10px', fontSize: '13px', textAlign: 'right', color: '#1E293B' }}>{fmtFull(tax.nps.maxDeduction.oldRegime)}</td>
-                                <td style={{ padding: '10px', fontSize: '13px', textAlign: 'right', color: '#1E293B' }}>{fmtFull(tax.nps.currentValue)}</td>
-                                <td style={{ padding: '10px', fontSize: '13px', textAlign: 'right', fontWeight: 600, color: '#1E293B' }}>{fmtFull(tax.nps.suggested)}</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    {/* Right: Advance Table */}
+                    <div style={{ width: '60%', paddingLeft: '40px' }}>
+                        <h2 className="section-heading">Advance & Surcharge</h2>
+                        <div style={{ fontSize: '12px', color: 'var(--ink-soft)', marginTop: '8px', marginBottom: '24px' }}>Employee contribution to NPS</div>
+
+                        <table className="liab-table">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th style={{ textAlign: 'right' }}>Tax Slab (Old)</th>
+                                    <th style={{ textAlign: 'right' }}>Limit Area</th>
+                                    <th style={{ textAlign: 'right' }}>Suggested Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span className="asset-name" style={{ fontWeight: 400 }}>NPS Contribution</span></td>
+                                    <td style={{ textAlign: 'right' }}>{fmtFull(tax.nps.maxDeduction.oldRegime)}</td>
+                                    <td style={{ textAlign: 'right' }}>{fmtFull(tax.nps.currentValue)}</td>
+                                    <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--ink)' }}>{fmtFull(tax.nps.suggested)}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
             {/* Deduction Utilization */}
-            <div className="card" style={{ padding: '24px' }}>
-                <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', marginBottom: '16px' }}>Deduction Utilization</h2>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                        <tr style={{ borderBottom: '1px solid #E8ECF1' }}>
-                            {['Deduction', 'Section', 'Limit', 'Used', 'Gap'].map(h => (
-                                <th key={h} style={{ padding: '10px 12px', fontSize: '11px', fontWeight: 600, color: '#64748B', textAlign: h === 'Deduction' ? 'left' : 'right', textTransform: 'uppercase' }}>{h}</th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {(tax.deductionUtilization || []).map((d, i) => (
-                            <tr key={i} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                                <td style={{ padding: '14px 12px', fontSize: '13px', fontWeight: 500, color: '#1E293B' }}>{d.name}</td>
-                                <td style={{ padding: '14px 12px', fontSize: '13px', color: '#64748B', textAlign: 'right' }}>{d.section}</td>
-                                <td style={{ padding: '14px 12px', fontSize: '13px', textAlign: 'right', color: '#1E293B' }}>{fmtFull(d.limit)}</td>
-                                <td style={{ padding: '14px 12px', fontSize: '13px', textAlign: 'right', color: '#1E293B' }}>{fmtFull(d.used)}</td>
-                                <td style={{ padding: '14px 12px', fontSize: '13px', textAlign: 'right', fontWeight: 600, color: '#1E293B' }}>{fmtFull(d.gap)}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-                <SectionNote lines={[
-                    '80C (\u20b91.5L limit): PPF, ELSS, LIC, tuition fees, home loan principal. Most common tax-saving instrument.',
-                    '80D (\u20b925K self + \u20b925K parents): Health insurance premiums. \u20b950K if parents are senior citizens.',
-                    '80CCD(1B) (\u20b950K extra): Additional NPS contribution above 80C limit. Only in Old Regime.',
-                    'Section 24 (\u20b92L): Home loan interest deduction for self-occupied property. Old Regime only.',
-                    'HRA: Exempt based on min of (actual HRA, 50%/40% of basic, rent minus 10% of basic). Old Regime only.',
-                    'Gap = Limit minus Used. Investing the gap amount in eligible instruments can reduce your tax liability.'
-                ]} />
-            </div>
+            <div style={{ marginTop: '48px', paddingTop: '48px', borderTop: '0.5px solid var(--ink-ghost)' }}>
+                <div className="act-label" style={{ marginBottom: '24px' }}>Deductions</div>
+                <h2 className="section-heading">Deduction Utilization</h2>
 
-            {/* Actions */}
-            {tax.potentialSavings > 0 && (
-                <div style={{ backgroundColor: '#F8FAFC', border: '1px solid #E8ECF1', borderRadius: '8px', padding: '16px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                    <AlertCircle size={18} color="#64748B" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    <div style={{ fontSize: '13px', color: '#1E293B' }}>
-                        <span style={{ fontWeight: 600 }}>Actions for the User: </span>
-                        <span style={{ color: '#64748B' }}>Switching to the {tax.recommended.toLowerCase()} could save you {fmtFull(tax.potentialSavings)} annually. Consider maximizing your deduction utilization to bring your effective tax rate down further.</span>
-                    </div>
+                <div className="table-scroll-wrapper" style={{ marginTop: '24px' }}>
+                    <table className="liab-table">
+                        <thead>
+                            <tr>
+                                <th>Deduction</th>
+                                <th>Section</th>
+                                <th style={{ textAlign: 'right' }}>Limit</th>
+                                <th style={{ textAlign: 'right' }}>Used</th>
+                                <th style={{ textAlign: 'right' }}>Gap</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {(tax.deductionUtilization || []).map((d, i) => (
+                                <tr key={i}>
+                                    <td><span className="asset-name">{d.name}</span></td>
+                                    <td style={{ color: 'var(--ink-soft)' }}>{d.section}</td>
+                                    <td style={{ textAlign: 'right' }}>{fmtFull(d.limit)}</td>
+                                    <td style={{ textAlign: 'right' }}>{fmtFull(d.used)}</td>
+                                    <td style={{ textAlign: 'right', fontWeight: 600, color: '#D97757' }}>{fmtFull(d.gap)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
-            )}
+
+                <div className="understanding" style={{ marginTop: '40px' }}>
+                    <div className="understanding-title">How this is calculated</div>
+                    <ul className="understanding-list">
+                        <li>80C (\u20b91.5L limit): PPF, ELSS, LIC, tuition fees, home loan principal. Most common tax-saving instrument.</li>
+                        <li>80D (\u20b925K self + \u20b925K parents): Health insurance premiums. \u20b950K if parents are senior citizens.</li>
+                        <li>80CCD(1B) (\u20b950K extra): Additional NPS contribution above 80C limit. Only in Old Regime.</li>
+                        <li>Section 24 (\u20b92L): Home loan interest deduction for self-occupied property. Old Regime only.</li>
+                        <li>HRA: Exempt based on min of (actual HRA, 50%/40% of basic, rent minus 10% of basic). Old Regime only.</li>
+                        <li>Gap = Limit minus Used. Investing the gap amount in eligible instruments can reduce your tax liability.</li>
+                    </ul>
+                </div>
+
+                {/* Actions */}
+                {tax.potentialSavings > 0 && (
+                    <div style={{ marginTop: '40px', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                        <AlertCircle size={16} color="var(--ink-soft)" style={{ marginTop: '2px', flexShrink: 0 }} />
+                        <div style={{ fontSize: '13px', color: 'var(--ink-soft)', lineHeight: 1.6 }}>
+                            <span style={{ fontWeight: 600, color: 'var(--ink)' }}>Actions for the User: </span>
+                            Switching to the {tax.recommended.toLowerCase()} could save you {fmtFull(tax.potentialSavings)} annually. Consider maximising your deduction utilisation to bring your effective tax rate down further.
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

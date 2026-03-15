@@ -426,7 +426,10 @@ function computeSurplus(p) {
     const expenses = computeExpenses(p);
     const liabilities = computeLiabilities(p);
     const emi = liabilities.totalEmi || 0;
-    const monthlyIncome = income.total / 12;
+
+    // Use strictly monthly income (ignoring bonus and other incomes)
+    const monthlyIncome = Number(p.monthly_take_home) || ((income.salaried + income.business) / 12);
+
     // We use effectiveMonthly here (Monthly + Prorated Annual) so that true investable surplus is accurate
     const monthly = monthlyIncome - expenses.effectiveMonthly - emi;
     return { monthly, quarterly: monthly * 3 };
@@ -441,8 +444,11 @@ function computeCashflow(p) {
     const sip = Number(p.inv_monthly_sip) || 0;
     const insurancePremium = Number(p.expense_annual_insurance) || ((Number(p.health_premium) || 0) + (Number(p.life_premium) || 0));
 
-    const grossIncome3m = income.total / 4; // 3 months
+    // Use strictly monthly income (ignoring bonus and other incomes)
+    const monthlyIncome = Number(p.monthly_take_home) || ((income.salaried + income.business) / 12);
+    const grossIncome3m = monthlyIncome * 3;
     const bonus3m = (income.bonus || 0) / 4;
+
     // Use true monthly expenses for cashflow projection, and annuals are projected separately
     const expenses3m = expenses.totalMonthly * 3;
     const emi3m = emi * 3;
@@ -452,7 +458,8 @@ function computeCashflow(p) {
     const taxEstimate = computeTax(p);
     const tax3m = Math.min(taxEstimate.newRegime.taxLiability, taxEstimate.oldRegime.taxLiability) / 4;
 
-    const surplus = grossIncome3m + bonus3m - expenses3m - emi3m - sip3m - insurance3m - otherAnnual3m - tax3m;
+    // Do not add bonus3m to surplus
+    const surplus = grossIncome3m - expenses3m - emi3m - sip3m - insurance3m - otherAnnual3m - tax3m;
 
     return {
         items: [
@@ -477,64 +484,185 @@ function computeFBS(p) {
     const liabilities = computeLiabilities(p);
     const income = computeIncome(p);
     const tax = computeTax(p);
+    const monthlyIncome = Number(p.monthly_take_home) || ((income.salaried + income.business) / 12);
 
-    let breakdown = {
-        assetDiversity: 0,
-        investmentRegularity: 0,
-        emergencyFund: 0,
-        insurance: 0,
-        liabilities: 0,
-        tax: 0,
-        behavior: 0
-    };
+    // ─── TIER 1: FOUNDATION - 40 pts ───
 
-    // 1. Asset allocation diversity (20 pts)
+    // Emergency Fund - 15 pts
+    const emRatio = emergency.emergencyFunds.ideal ? emergency.emergencyFunds.actual / emergency.emergencyFunds.ideal : 0;
+    let emergencyFund = 1;
+    if (emRatio >= 2.0) emergencyFund = 15;
+    else if (emRatio >= 1.0) emergencyFund = 12;
+    else if (emRatio >= 0.75) emergencyFund = 9;
+    else if (emRatio >= 0.5) emergencyFund = 6;
+    else if (emRatio >= 0.25) emergencyFund = 3;
+
+    // Insurance Coverage - 15 pts (health 8 + life 7)
+    let healthPts = 2;
+    if (insurance.healthCover >= insurance.idealHealth) healthPts = 8;
+    else if (insurance.idealHealth > 0 && insurance.healthCover >= insurance.idealHealth * 0.5) healthPts = 5;
+
+    let lifePts = 1;
+    if (insurance.idealLife === 0) lifePts = 7; // No dependants = automatic full
+    else if (insurance.lifeCover >= insurance.idealLife) lifePts = 7;
+    else if (insurance.lifeCover >= insurance.idealLife * 0.5) lifePts = 4;
+
+    const insuranceScore = healthPts + lifePts;
+
+    // Liability Management - 10 pts
+    const emiRatio = monthlyIncome > 0 ? liabilities.totalEmi / monthlyIncome : 0;
+    let liabilitiesScore = 2;
+    if (!liabilities.hasLiabilities) {
+        liabilitiesScore = 10;
+    } else if (liabilities.badLiability.outstanding === 0 && emiRatio <= 0.4) {
+        liabilitiesScore = 10; // Only good debt, manageable EMI
+    } else if (liabilities.badLiability.outstanding === 0 && emiRatio > 0.4) {
+        liabilitiesScore = 4;  // Only good debt, high EMI
+    } else if (liabilities.goodLiability.outstanding > liabilities.badLiability.outstanding && emiRatio <= 0.4) {
+        liabilitiesScore = 7;
+    } else if (liabilities.goodLiability.outstanding > liabilities.badLiability.outstanding && emiRatio > 0.4) {
+        liabilitiesScore = 4;
+    } else if (emiRatio <= 0.2) {
+        liabilitiesScore = 4;  // Bad debt present, low EMI
+    }
+    // else stays at 2: bad debt + high EMI
+
+    // ─── TIER 2: BEHAVIOUR - 40 pts ───
+
+    // Consistency & Discipline - 15 pts
+    const monthlySip = Number(p.inv_monthly_sip) || assets.monthlySip || 0;
+    const sipRatio = income.total > 0 ? (monthlySip * 12 / income.total * 100) : 0;
+    let sipBase = 0;
+    if (sipRatio > 30) sipBase = 15;
+    else if (sipRatio >= 20) sipBase = 14;
+    else if (sipRatio >= 15) sipBase = 12;
+    else if (sipRatio >= 10) sipBase = 9;
+    else if (sipRatio >= 5) sipBase = 6;
+    else if (sipRatio > 0) sipBase = 2;
+
+    // Consistency multiplier (sip_consecutive_months)
+    let sipMultiplier = 1.0; // Default: no penalty if field missing
+    if (p.sip_consecutive_months !== undefined && p.sip_consecutive_months !== null) {
+        const months = Number(p.sip_consecutive_months) || 0;
+        if (months >= 6) sipMultiplier = 1.0;
+        else if (months >= 3) sipMultiplier = 0.9;
+        else sipMultiplier = 0.8;
+    }
+    const investmentRegularity = Math.round(sipBase * sipMultiplier);
+
+    // Goal Clarity - 15 pts
+    let goalClarity = 0;
+    // TODO: If p.goals is not populated, score 0
+    if (Array.isArray(p.goals) && p.goals.length > 0) {
+        const timedGoals = p.goals.filter(g => Number(g.years) > 0);
+        if (timedGoals.length >= 3) goalClarity = 15;
+        else if (timedGoals.length === 2) goalClarity = 10;
+        else if (timedGoals.length === 1) goalClarity = 6;
+        else goalClarity = 3; // Goals exist but none timed
+    }
+
+    // Behavioural Tendencies - 10 pts
+    // Positive questions (higher = better): take value as-is, default to 1 (worst)
+    const bReview = Number(p.beh_review_monthly) || 1;
+    const bAvoidDebt = Number(p.beh_avoid_debt) || 1;
+    const bMarketReaction = Number(p.beh_market_reaction) || 1;
+    const bWindfall = Number(p.beh_windfall_behaviour) || 1;
+    const bProductUnderstanding = Number(p.beh_product_understanding) || 1;
+
+    // Inverted questions (higher = worse): apply 6 - value, default to 5 (worst → inverted to 1)
+    const bDelay = 6 - (Number(p.beh_delay_decisions) || 5);
+    const bImpulse = 6 - (Number(p.beh_spend_impulsively) || 5);
+    const bLossAversion = 6 - (Number(p.beh_hold_losing) || 5);       // DB: beh_hold_losing
+    const bPeerComparison = 6 - (Number(p.beh_compare_peers) || 5);   // DB: beh_compare_peers
+
+    const behavRawTotal = bReview + bAvoidDebt + bMarketReaction + bWindfall + bProductUnderstanding
+        + bDelay + bImpulse + bLossAversion + bPeerComparison;
+    const behavioralTendencies = Math.round((behavRawTotal / 45) * 10);
+
+    // ─── TIER 3: AWARENESS - 20 pts ───
+
+    // Portfolio Understanding - 10 pts
+    const puVal = Number(p.beh_product_understanding) || 0;
+    let portfolioUnderstanding = 6; // neutral default if missing
+    if (puVal === 5) portfolioUnderstanding = 10;
+    else if (puVal === 4) portfolioUnderstanding = 8;
+    else if (puVal === 3) portfolioUnderstanding = 6;
+    else if (puVal === 2) portfolioUnderstanding = 3;
+    else if (puVal === 1) portfolioUnderstanding = 1;
+
+    // Tax & Regime Literacy - 5 pts
+    const optedRegime = p.tax_regime || 'New Regime';
+    const has80cUsed = (Number(p.tax_80c_used) || 0) > 0;
+    const hasNps = (Number(p.tax_nps_80ccd) || 0) > 0;
+    const hasHra = (Number(p.tax_hra) || 0) > 0;
+    const hasHomeLoan = (Number(p.tax_home_loan_interest) || 0) > 0;
+    const has80d = (Number(p.tax_80d) || 0) > 0;
+    const hasAnyDeduction = has80cUsed || hasNps || hasHra || hasHomeLoan || has80d;
+
+    let taxScore = 0;
+    if (tax.recommended === optedRegime && hasAnyDeduction) taxScore = 5;
+    else if (tax.recommended === optedRegime) taxScore = 3;
+    else if (tax.potentialSavings <= 5000) taxScore = 2;
+    // else 0: regime mismatch with significant savings left on the table
+
+    // Asset Diversity - 5 pts
     const alloc = assets.allocation;
     const maxAlloc = Math.max(alloc.equity, alloc.debt, alloc.commodity, alloc.realEstate, alloc.altInvestments);
-    if (maxAlloc < 50) breakdown.assetDiversity = 20;
-    else if (maxAlloc < 70) breakdown.assetDiversity = 12;
-    else if (maxAlloc < 85) breakdown.assetDiversity = 6;
-    else breakdown.assetDiversity = 2;
+    let assetDiversity = 0;
+    if (maxAlloc < 50) assetDiversity = 5;
+    else if (maxAlloc < 70) assetDiversity = 3;
+    else if (maxAlloc < 85) assetDiversity = 1;
 
-    // 2. Investment regularity (15 pts)
-    const sipRatio = income.total ? (assets.monthlySip * 12 / income.total * 100) : 0;
-    if (sipRatio >= 20) breakdown.investmentRegularity = 15;
-    else if (sipRatio >= 10) breakdown.investmentRegularity = 10;
-    else if (sipRatio >= 5) breakdown.investmentRegularity = 5;
-    else breakdown.investmentRegularity = 1;
+    // ─── FRAGILITY PENALTY - up to −15 ───
+    const zeroEmergency = emergencyFund <= 1;
+    const zeroInsurance = insuranceScore <= 2;
+    const highBadDebt = income.total > 0 && liabilities.badLiability.outstanding > income.total * 0.3;
 
-    // 3. Emergency fund adequacy (15 pts)
-    const emRatio = emergency.emergencyFunds.ideal ? emergency.emergencyFunds.actual / emergency.emergencyFunds.ideal : 0;
-    if (emRatio >= 2) breakdown.emergencyFund = 15;
-    else if (emRatio >= 1) breakdown.emergencyFund = 12;
-    else if (emRatio >= 0.5) breakdown.emergencyFund = 6;
-    else breakdown.emergencyFund = 2;
+    let penalty = 0;
+    let flags = [];
+    if (zeroEmergency && zeroInsurance && highBadDebt) {
+        penalty = 15; flags = ['critical_triple_gap'];
+    } else if (zeroEmergency && zeroInsurance) {
+        penalty = 8; flags = ['no_emergency_no_insurance'];
+    } else if (zeroEmergency && highBadDebt) {
+        penalty = 6; flags = ['no_emergency_high_debt'];
+    } else if (zeroInsurance && highBadDebt) {
+        penalty = 5; flags = ['no_insurance_high_debt'];
+    }
 
-    // 4. Insurance coverage (15 pts)
-    const healthOk = insurance.healthCover >= insurance.idealHealth;
-    const lifeOk = insurance.lifeCover >= insurance.idealLife || insurance.idealLife === 0;
-    if (healthOk && lifeOk) breakdown.insurance = 15;
-    else if (healthOk || lifeOk) breakdown.insurance = 8;
-    else breakdown.insurance = 2;
+    // ─── TOTALS ───
+    const foundation = emergencyFund + insuranceScore + liabilitiesScore;
+    const behaviour = investmentRegularity + goalClarity + behavioralTendencies;
+    const awareness = portfolioUnderstanding + taxScore + assetDiversity;
+    const rawTotal = foundation + behaviour + awareness;
+    const totalScore = Math.min(100, Math.max(0, rawTotal - penalty));
 
-    // 5. Liability management (10 pts)
-    if (!liabilities.hasLiabilities) breakdown.liabilities = 10; // Correction: max is 10
-    else if (liabilities.goodLiability.outstanding > liabilities.badLiability.outstanding) breakdown.liabilities = 7;
-    else breakdown.liabilities = 3;
+    const breakdown = {
+        emergencyFund,
+        insurance: insuranceScore,
+        liabilities: liabilitiesScore,
+        investmentRegularity,
+        goalClarity,
+        behavioralTendencies,
+        behavior: behavioralTendencies, // DEPRECATED: kept for backward compat with generateActionPlan
+        portfolioUnderstanding,
+        tax: taxScore,
+        assetDiversity,
+    };
 
-    // 6. Tax efficiency (10 pts)
-    if (tax.recommended === (p.tax_regime || 'New Regime')) breakdown.tax = 10;
-    else breakdown.tax = 4;
-
-    // 7. Behavioral score (15 pts)
-    const bReview = Number(p.beh_review_monthly) || 3;
-    const bDelay = Number(p.beh_delay_decisions) || 3;
-    const bImpulse = Number(p.beh_spend_impulsively) || 3;
-    const behavScore = (bReview * 3 + (6 - bDelay) * 2 + (6 - bImpulse) * 2) / 35 * 15;
-    breakdown.behavior = Math.round(behavScore);
-
-    const totalScore = Math.min(100, Math.max(0, Object.values(breakdown).reduce((sum, val) => sum + val, 0)));
-    return { total: totalScore, breakdown };
+    return {
+        total: totalScore,
+        breakdown,
+        subScores: {
+            foundation,
+            behaviour,
+            awareness,
+        },
+        fragility: {
+            penalty,
+            flags,
+        }
+    };
 }
 
 // ============ MONEY SIGN ============
@@ -636,20 +764,19 @@ function generateActionPlan(p) {
     const liabilities = computeLiabilities(p);
     const tax = computeTax(p);
     const age = getAge(p.date_of_birth);
-    const lifeStage = getLifeStage(p.date_of_birth);
     const fbs = computeFBS(p);
     const missingFBS = {
         emergencyFund: 15 - fbs.breakdown.emergencyFund,
         insurance: 15 - fbs.breakdown.insurance,
         liabilities: 10 - fbs.breakdown.liabilities,
-        tax: 10 - fbs.breakdown.tax,
+        tax: 5 - fbs.breakdown.tax,
         investmentRegularity: 15 - fbs.breakdown.investmentRegularity,
-        assetDiversity: 20 - fbs.breakdown.assetDiversity,
-        behavior: 15 - fbs.breakdown.behavior
+        goalClarity: 15 - (fbs.breakdown.goalClarity || 0),
+        assetDiversity: 5 - fbs.breakdown.assetDiversity,
+        behavioralTendencies: 10 - fbs.breakdown.behavioralTendencies,
     };
 
     const actions = [];
-    let priority = 1;
     const fmtINR = (v) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(v || 0);
 
     // ── 1. EMERGENCY FUND ──
@@ -666,13 +793,19 @@ function generateActionPlan(p) {
             status: 'pending',
             urgency: 'critical',
             fbsImpact: missingFBS.emergencyFund > 0 ? missingFBS.emergencyFund : 0,
-            priority: priority++
+            priority: 0
         });
-        missingFBS.emergencyFund = 0; // Clear it so we don't assign it again
+        missingFBS.emergencyFund = 0;
     }
 
-    // ── 2. INSURANCE ──
-    if (insurance.healthCover < insurance.idealHealth) {
+    // ── 2. INSURANCE (Bug Fix: split fbsImpact 55/45 proportionally) ──
+    const needsHealth = insurance.healthCover < insurance.idealHealth;
+    const needsLife = insurance.additionalCoverNeeded > 0;
+    const totalInsuranceImpact = missingFBS.insurance > 0 ? missingFBS.insurance : 0;
+    const healthImpact = needsHealth && needsLife ? Math.round(totalInsuranceImpact * 0.55) : totalInsuranceImpact;
+    const lifeImpact = needsHealth && needsLife ? totalInsuranceImpact - healthImpact : totalInsuranceImpact;
+
+    if (needsHealth) {
         const gap = insurance.idealHealth - insurance.healthCover;
         actions.push({
             category: 'Insurance',
@@ -681,13 +814,12 @@ function generateActionPlan(p) {
             suggestedAmount: Math.round(gap),
             status: 'pending',
             urgency: 'high',
-            fbsImpact: missingFBS.insurance > 0 ? missingFBS.insurance : 0,
-            priority: priority++
+            fbsImpact: healthImpact,
+            priority: 0
         });
-        missingFBS.insurance = 0;
     }
 
-    if (insurance.additionalCoverNeeded > 0) {
+    if (needsLife) {
         actions.push({
             category: 'Insurance',
             title: 'Increase Term Life Insurance Cover',
@@ -695,11 +827,13 @@ function generateActionPlan(p) {
             suggestedAmount: Math.round(insurance.additionalCoverNeeded),
             status: 'pending',
             urgency: 'high',
-            fbsImpact: missingFBS.insurance > 0 ? missingFBS.insurance : 0, // In case Health was fine but Life is missing
-            priority: priority++
+            fbsImpact: lifeImpact,
+            priority: 0
         });
-        missingFBS.insurance = 0;
     }
+
+    // Zero out insurance impact only after both tasks processed
+    if (needsHealth || needsLife) missingFBS.insurance = 0;
 
     // ── 3. DEBT MANAGEMENT ──
     if (liabilities.badLiability.outstanding > 0) {
@@ -712,12 +846,12 @@ function generateActionPlan(p) {
             status: 'pending',
             urgency: liabilities.badLiability.outstanding > income.total * 0.5 ? 'critical' : 'high',
             fbsImpact: missingFBS.liabilities > 0 ? missingFBS.liabilities : 0,
-            priority: priority++
+            priority: 0
         });
         missingFBS.liabilities = 0;
     }
 
-    // ── 4. TAX OPTIMISATION ──
+    // ── 4. TAX OPTIMISATION (Bug Fix: guard with potentialSavings > 0) ──
     const optedRegime = p.tax_regime || 'New Regime';
     if (tax.recommended !== optedRegime && tax.potentialSavings > 0) {
         actions.push({
@@ -728,7 +862,7 @@ function generateActionPlan(p) {
             status: 'pending',
             urgency: tax.potentialSavings > 20000 ? 'high' : 'medium',
             fbsImpact: missingFBS.tax > 0 ? missingFBS.tax : 0,
-            priority: priority++
+            priority: 0
         });
         missingFBS.tax = 0;
     }
@@ -744,7 +878,7 @@ function generateActionPlan(p) {
                 status: 'pending',
                 urgency: 'medium',
                 fbsImpact: missingFBS.tax > 0 ? missingFBS.tax : 0,
-                priority: priority++
+                priority: 0
             });
             missingFBS.tax = 0;
         });
@@ -755,7 +889,7 @@ function generateActionPlan(p) {
     const fdBalance = Number(p.fd_balance) || 0;
     const idleCash = savingsBalance + fdBalance;
     const monthlyExpenses = (computeExpenses(p)).total / 12;
-    const emergencyReserve = monthlyExpenses * 6; // 6 months as emergency
+    const emergencyReserve = monthlyExpenses * 6;
     const excessSavings = idleCash - emergencyReserve;
 
     if (excessSavings > 10000 && assets.total > 0) {
@@ -769,7 +903,7 @@ function generateActionPlan(p) {
                 status: 'pending',
                 urgency: savingsPct > 60 ? 'high' : 'medium',
                 fbsImpact: missingFBS.assetDiversity > 0 ? missingFBS.assetDiversity : 0,
-                priority: priority++
+                priority: 0
             });
             missingFBS.assetDiversity = 0;
         }
@@ -779,7 +913,6 @@ function generateActionPlan(p) {
     const investable = Math.max(0, surplus.monthly * 0.6);
     const totalPortfolio = (assets.total || 0) - (assets.realEstate || 0);
 
-    // Age-based ideal allocation
     let idealEquity, idealDebt, idealGold;
     if (age < 30) {
         idealEquity = 80; idealDebt = 10; idealGold = 10;
@@ -791,12 +924,10 @@ function generateActionPlan(p) {
         idealEquity = 40; idealDebt = 45; idealGold = 15;
     }
 
-    // Compute current allocation percentages (excluding real estate)
     const equityActual = totalPortfolio > 0 ? Math.round((assets.equity || 0) / totalPortfolio * 100) : 0;
     const debtActual = totalPortfolio > 0 ? Math.round((assets.debt || 0) / totalPortfolio * 100) : 0;
     const goldActual = totalPortfolio > 0 ? Math.round((assets.commodity || 0) / totalPortfolio * 100) : 0;
 
-    // Equity rebalancing
     const equityGap = idealEquity - equityActual;
     if (Math.abs(equityGap) >= 10 && totalPortfolio > 0) {
         const direction = equityGap > 0 ? 'Increase' : 'Reduce';
@@ -804,19 +935,18 @@ function generateActionPlan(p) {
         actions.push({
             category: 'Asset Reallocation',
             title: `${direction} Equity Allocation`,
-            description: `Your equity allocation is currently ${equityActual}% against a recommended range of ${idealEquity}% for your age group. ${direction} your equity exposure by approximately ${fmtINR(amt)} to align with the ideal allocation. This may involve rebalancing from ${equityGap > 0 ? 'debt or commodity' : 'equity'} into ${equityGap > 0 ? 'equity' : 'debt or commodity'} instruments.`,
+            description: `Your equity allocation is currently ${equityActual}% against a recommended range of ${idealEquity}% for your age group. ${direction} your equity exposure by approximately ${fmtINR(amt)} to align with the ideal allocation.`,
             suggestedAmount: amt,
             currentPercent: equityActual,
             idealPercent: idealEquity,
             status: 'pending',
             urgency: Math.abs(equityGap) >= 20 ? 'high' : 'medium',
             fbsImpact: missingFBS.assetDiversity > 0 ? missingFBS.assetDiversity : 0,
-            priority: priority++
+            priority: 0
         });
         missingFBS.assetDiversity = 0;
     }
 
-    // Debt rebalancing
     const debtGap = idealDebt - debtActual;
     if (Math.abs(debtGap) >= 10 && totalPortfolio > 0) {
         const direction = debtGap > 0 ? 'Increase' : 'Reduce';
@@ -830,11 +960,10 @@ function generateActionPlan(p) {
             idealPercent: idealDebt,
             status: 'pending',
             urgency: 'medium',
-            priority: priority++
+            priority: 0
         });
     }
 
-    // Commodity (gold) rebalancing
     const goldGap = idealGold - goldActual;
     if (Math.abs(goldGap) >= 5 && totalPortfolio > 0) {
         const direction = goldGap > 0 ? 'Increase' : 'Reduce';
@@ -848,7 +977,7 @@ function generateActionPlan(p) {
             idealPercent: idealGold,
             status: 'pending',
             urgency: 'low',
-            priority: priority++
+            priority: 0
         });
     }
 
@@ -867,12 +996,100 @@ function generateActionPlan(p) {
             status: 'pending',
             urgency: 'medium',
             fbsImpact: missingFBS.investmentRegularity > 0 ? missingFBS.investmentRegularity : 0,
-            priority: priority++
+            priority: 0
         });
         missingFBS.investmentRegularity = 0;
     }
 
-    // ── 6. ESTATE PLANNING ──
+    // Fallback: Investment Regularity task when no surplus but score is below max
+    if (missingFBS.investmentRegularity > 0) {
+        actions.push({
+            category: 'Asset Reallocation',
+            title: 'Start a Monthly SIP',
+            description: 'You are not investing regularly yet. Even starting with a small monthly SIP of ₹500–₹5,000 in a diversified mutual fund significantly improves your financial health score. Consistency matters more than amount - aim to invest at least 10–15% of your income monthly.',
+            suggestedAmount: 5000,
+            monthlyContribution: 5000,
+            status: 'pending',
+            urgency: 'high',
+            fbsImpact: missingFBS.investmentRegularity,
+            priority: 0
+        });
+        missingFBS.investmentRegularity = 0;
+    }
+
+    // Asset Diversity task when score is below max and no reallocation tasks covered it
+    if (missingFBS.assetDiversity > 0) {
+        actions.push({
+            category: 'Asset Reallocation',
+            title: 'Diversify Your Portfolio',
+            description: 'Your investment portfolio is too concentrated in a single asset class, or you haven\'t started investing yet. Spread your investments across equity, debt, and commodity instruments to reduce risk and improve returns. A well-diversified portfolio is a cornerstone of financial health.',
+            suggestedAmount: 0,
+            status: 'pending',
+            urgency: 'medium',
+            fbsImpact: missingFBS.assetDiversity,
+            priority: 0
+        });
+        missingFBS.assetDiversity = 0;
+    }
+
+    // Portfolio Understanding task (Awareness tier)
+    if (fbs.breakdown.portfolioUnderstanding < 10) {
+        const puMissing = 10 - fbs.breakdown.portfolioUnderstanding;
+        actions.push({
+            category: 'Financial Habits',
+            title: 'Understand Your Investments Better',
+            description: 'Take time to understand what you are invested in and why. Read about the asset classes in your portfolio, understand the risks, and ensure each investment aligns with your goals. A deeper understanding helps you make better financial decisions and avoid panic-selling.',
+            suggestedAmount: 0,
+            status: 'pending',
+            urgency: 'medium',
+            fbsImpact: puMissing,
+            priority: 0
+        });
+    }
+
+    // Tax Awareness task (when no regime-switch task was generated but tax score is below max)
+    if (missingFBS.tax > 0) {
+        actions.push({
+            category: 'Tax Planning',
+            title: 'Optimise Your Tax Strategy',
+            description: 'Review your current tax regime and explore available deductions. Utilise sections like 80C (PPF, ELSS), 80D (health insurance), and NPS contributions to reduce your taxable income. Even under the New Regime, understanding your tax position improves your financial literacy score.',
+            suggestedAmount: 0,
+            status: 'pending',
+            urgency: 'low',
+            fbsImpact: missingFBS.tax,
+            priority: 0
+        });
+        missingFBS.tax = 0;
+    }
+
+    // ── 7. GOAL CLARITY (NEW) ──
+    if (missingFBS.goalClarity > 0) {
+        const hasGoals = Array.isArray(p.goals) && p.goals.length > 0;
+        const hasTimedGoals = hasGoals && p.goals.some(g => Number(g.years) > 0);
+        let goalTitle, goalDesc;
+        if (!hasGoals) {
+            goalTitle = 'Set Up Your Financial Goals';
+            goalDesc = 'You haven\'t defined any financial goals yet. Visit the Goal Planner to add your goals - whether it\'s buying a home, building a retirement corpus, or planning for education. Goals with clear timelines dramatically improve your financial score.';
+        } else if (!hasTimedGoals) {
+            goalTitle = 'Add Timelines to Your Goals';
+            goalDesc = 'You have financial goals but none have specific timelines. Visit the Goal Planner and add target years to each goal. Timed goals enable precise SIP calculations and help you track progress.';
+        } else {
+            goalTitle = 'Add More Financial Goals';
+            goalDesc = 'Adding more timed financial goals improves your goal clarity score. Consider diversifying your goals across short-term, medium-term, and long-term horizons in the Goal Planner.';
+        }
+        actions.push({
+            category: 'Goal Clarity',
+            title: goalTitle,
+            description: goalDesc,
+            suggestedAmount: 0,
+            status: 'pending',
+            urgency: !hasGoals ? 'high' : 'medium',
+            fbsImpact: missingFBS.goalClarity,
+            priority: 0
+        });
+    }
+
+    // ── 8. ESTATE PLANNING ──
     if (p.has_will !== 'Yes') {
         actions.push({
             category: 'Estate Planning',
@@ -881,7 +1098,7 @@ function generateActionPlan(p) {
             suggestedAmount: 0,
             status: 'pending',
             urgency: 'medium',
-            priority: priority++
+            priority: 0
         });
     }
 
@@ -889,15 +1106,15 @@ function generateActionPlan(p) {
         actions.push({
             category: 'Estate Planning',
             title: 'Update Nominees Across All Accounts',
-            description: 'Ensure nominees are set for all financial accounts — bank accounts, demat accounts, mutual funds, insurance policies, PF, and NPS. Missing nominees can cause significant delays in claim settlement.',
+            description: 'Ensure nominees are set for all financial accounts - bank accounts, demat accounts, mutual funds, insurance policies, PF, and NPS. Missing nominees can cause significant delays in claim settlement.',
             suggestedAmount: 0,
             status: 'pending',
             urgency: 'medium',
-            priority: priority++
+            priority: 0
         });
     }
 
-    // ── 7. CREDIT SCORE ──
+    // ── 9. CREDIT SCORE ──
     if (liabilities.creditScore > 0 && liabilities.creditScore < 750) {
         actions.push({
             category: 'Credit Health',
@@ -906,12 +1123,12 @@ function generateActionPlan(p) {
             suggestedAmount: 0,
             status: 'pending',
             urgency: liabilities.creditScore < 650 ? 'high' : 'medium',
-            priority: priority++
+            priority: 0
         });
     }
 
-    // ── 8. BEHAVIORAL ADJUSTMENTS ──
-    if (missingFBS.behavior > 0) {
+    // ── 10. BEHAVIORAL ADJUSTMENTS ──
+    if (missingFBS.behavioralTendencies > 0) {
         actions.push({
             category: 'Financial Habits',
             title: 'Improve Financial Habits',
@@ -919,12 +1136,182 @@ function generateActionPlan(p) {
             suggestedAmount: 0,
             status: 'pending',
             urgency: 'medium',
-            fbsImpact: missingFBS.behavior,
-            priority: priority++
+            fbsImpact: missingFBS.behavioralTendencies,
+            priority: 0
         });
     }
 
-    return actions;
+    // Apply dependency-based sequencing
+    return sequenceActionPlan(actions, fbs.fragility, liabilities, income);
+}
+
+// ============ ACTION PLAN SEQUENCER ============
+function sequenceActionPlan(tasks, fragility, liabilities, income) {
+    // Dependency level map (default levels)
+    const levelMap = {
+        'Emergency Fund': 2,
+        'Insurance': 2,
+        'Debt Management': 2,
+        'Financial Habits': 3,
+        'Goal Clarity': 3,
+        'Asset Reallocation': 3,
+        'Tax Planning': 4,
+        'Estate Planning': 5,
+        'Credit Health': 5,
+    };
+
+    // Assign default levels
+    tasks.forEach(t => {
+        t._level = levelMap[t.category] || 4;
+    });
+
+    // Fragility promotions to level 1
+    const flag = fragility.flags.length > 0 ? fragility.flags[0] : null;
+
+    if (flag === 'critical_triple_gap') {
+        tasks.forEach(t => {
+            if (t.category === 'Emergency Fund') t._level = 1.1;
+            else if (t.category === 'Debt Management') t._level = 1.2;
+            else if (t.category === 'Insurance') t._level = 1.3;
+        });
+    } else if (flag === 'no_emergency_high_debt') {
+        // Check bad debt interest rate to determine order
+        const avgRate = liabilities.badLiability.avgInterestRate || 0;
+        if (avgRate > 15) {
+            tasks.forEach(t => {
+                if (t.category === 'Debt Management') t._level = 1.1;
+                else if (t.category === 'Emergency Fund') t._level = 1.2;
+            });
+        } else {
+            tasks.forEach(t => {
+                if (t.category === 'Emergency Fund') t._level = 1.1;
+                else if (t.category === 'Debt Management') t._level = 1.2;
+            });
+        }
+    } else if (flag === 'no_emergency_no_insurance') {
+        tasks.forEach(t => {
+            if (t.category === 'Emergency Fund') t._level = 1.1;
+            else if (t.category === 'Insurance') t._level = 1.2;
+        });
+    } else if (flag === 'no_insurance_high_debt') {
+        tasks.forEach(t => {
+            if (t.category === 'Insurance') t._level = 1.1;
+            else if (t.category === 'Debt Management') t._level = 1.2;
+        });
+    }
+
+    // Sort: level ascending, then fbsImpact descending within same level
+    tasks.sort((a, b) => {
+        if (a._level !== b._level) return a._level - b._level;
+        return (b.fbsImpact || 0) - (a.fbsImpact || 0);
+    });
+
+    // Assign clean sequential priority numbers and remove temp field
+    tasks.forEach((t, i) => {
+        t.priority = i + 1;
+        delete t._level;
+    });
+
+    return tasks;
+}
+
+// ============ GENERATION ============
+function computeGeneration(p) {
+    const q1 = Number(p.gen_q1) || 3;
+    const q2 = Number(p.gen_q2) || 3;
+    const q3 = Number(p.gen_q3) || 3;
+    const q4 = Number(p.gen_q4) || 3;
+    const q5 = Number(p.gen_q5) || 3;
+    const q6Score = Number(p.gen_q6) || 1; // 1-5 scored on the frontend
+    const q7 = Number(p.gen_q7) || 3;
+    const q8 = Number(p.gen_q8) || 3;
+    const q9 = Number(p.gen_q9) || 3;
+    const q10 = Number(p.gen_q10) || 3;
+
+    // Averages for confidence check
+    const blockA = (q1 + q2 + q3) / 3;
+    const blockB = (q4 + q5 + q6Score) / 3;
+    const blockC = (q7 + q8) / 2;
+    const blockD = (q9 + q10) / 2;
+
+    let confidence = 'High';
+    let confReason = '';
+
+    if (Math.abs(q1 - blockA) > 2 || Math.abs(q2 - blockA) > 2 || Math.abs(q3 - blockA) > 2) {
+        confidence = 'Low'; confReason = 'Inconsistent answers regarding childhood financial environment.';
+    } else if (Math.abs(q4 - blockB) > 2 || Math.abs(q5 - blockB) > 2 || Math.abs(q6Score - blockB) > 2) {
+        confidence = 'Low'; confReason = 'Inconsistent answers regarding direct parental support.';
+    } else if (Math.abs(q7 - blockC) > 2 || Math.abs(q8 - blockC) > 2) {
+        confidence = 'Low'; confReason = 'Inconsistent answers regarding grandparental wealth.';
+    } else if (Math.abs(q9 - blockD) > 2 || Math.abs(q10 - blockD) > 2) {
+        confidence = 'Low'; confReason = 'Inconsistent answers regarding your current safety net.';
+    }
+
+    // Step 1 & 2: Weighted Score
+    let score = (q1 * 1.5) + (q2 * 1.0) + (q3 * 1.2) + (q4 * 1.2) + (q5 * 1.5) +
+        (q6Score * 1.0) + (q7 * 1.3) + (q8 * 1.3) + (q9 * 1.0) + (q10 * 1.2);
+
+    const overrides = [];
+    if (q7 === 1 && q8 === 1) {
+        score -= 3;
+        overrides.push("Score adjusted downwards due to historical familial hardship.");
+    }
+
+    // Step 3: Base Classification
+    let genLevel = 2;
+    let label = 'Inheritor of Stability';
+    let summary = 'You grew up financially secure with educational advantages and modest inherited assets. Your family provides a meaningful safety net, allowing you to take calculated financial risks without fear of complete ruin.';
+
+    if (score <= 20) {
+        genLevel = 0; label = 'Ground Breaker';
+        summary = 'You are the first in your family to achieve financial stability. You built your foundation entirely from scratch with no inheritance or safety net to fall back on. Your financial achievements are entirely self-driven.';
+    } else if (score <= 30) {
+        genLevel = 1; label = 'Foundation Builder';
+        summary = 'Your parents created modest stability but passed down little wealth. You started adulthood with minimal advantages. You are building the foundation that future generations of your family will rely on.';
+    } else if (score <= 40) {
+        genLevel = 2; label = 'Inheritor of Stability';
+        summary = 'You grew up financially secure with educational advantages and modest inherited assets. Your family provides a meaningful safety net, allowing you to take calculated financial risks without fear of complete ruin.';
+    } else if (score <= 52) {
+        genLevel = 3; label = 'Established Class';
+        summary = 'Wealth exists across three generations in your family. You have significant advantages, likely including real estate, investments, and a very strong safety net that virtually guarantees financial stability.';
+    } else {
+        genLevel = 4; label = 'Generational Elite';
+        summary = 'Your family wealth has been sustained across four or more generations. You likely benefit from trusts, family businesses, and compounding assets. Financial anxiety regarding basic needs is largely absent from your life.';
+    }
+
+    // Step 4: Override Rules
+    if (q5 === 5 && q8 === 5 && genLevel < 3) {
+        genLevel = 3; label = 'Established Class';
+        summary = 'Wealth exists across three generations in your family. You have significant advantages, likely including real estate, investments, and a very strong safety net that virtually guarantees financial stability.';
+        overrides.push("Elevated to G3 due to significant historical and current wealth transfer.");
+    }
+
+    if (q1 === 1 && q9 === 1 && genLevel > 1) {
+        genLevel = 1; label = 'Foundation Builder';
+        summary = 'Your parents created modest stability but passed down little wealth. You started adulthood with minimal advantages. You are building the foundation that future generations of your family will rely on.';
+        overrides.push("Capped at G1 due to lack of childhood financial security and current safety net.");
+    }
+
+    if (q6Score >= 4 && q10 === 5) {
+        if (genLevel === 0) { genLevel = 1; label = 'Foundation Builder'; }
+        else if (genLevel === 1) { genLevel = 2; label = 'Inheritor of Stability'; }
+        else if (genLevel === 2) { genLevel = 3; label = 'Established Class'; }
+        else if (genLevel === 3) { genLevel = 4; label = 'Generational Elite'; }
+        overrides.push("Bumped up one generation level due to substantial active financial support and asset transfer.");
+    }
+
+    const categoryText = genLevel === 4 ? 'Generation 4+' : `Generation ${genLevel}`;
+
+    return {
+        categoryText,
+        label,
+        score: score.toFixed(1),
+        maxScore: 62,
+        confidence,
+        confReason,
+        summary,
+        overrides
+    };
 }
 
 // ============ FULL DASHBOARD ============
@@ -949,10 +1336,7 @@ function computeFullDashboard(p, user) {
     const actionPlan = generateActionPlan(p);
     const allocationIdeals = getAssetAllocationIdeals(age, assets.total, moneySign, assets.realEstate);
 
-    // Determine generation (simplified)
-    let generation = 'Generation 2';
-    if (age < 25) generation = 'Generation 1';
-    else if (age > 45) generation = 'Generation 3';
+    const generation = computeGeneration(p);
 
     return {
         user: { id: user.id, fullName: user.full_name, email: user.email },
@@ -960,6 +1344,9 @@ function computeFullDashboard(p, user) {
             generation,
             lifeStage,
             fbs: fbsObj.total,
+            fbsBreakdown: fbsObj.breakdown,
+            fbsSubScores: fbsObj.subScores,
+            fbsFragility: fbsObj.fragility,
             moneySign,
             biases,
             netWorth,
@@ -1017,5 +1404,5 @@ module.exports = {
     computeEmergency, computeNetWorth, computeSurplus,
     computeCashflow, computeFBS, computeMoneySign,
     computeBiases, computeFinancialRatios, computeWillEstate,
-    generateActionPlan, getAssetAllocationIdeals, getLifeStage, getAge
+    generateActionPlan, sequenceActionPlan, getAssetAllocationIdeals, getLifeStage, getAge
 };

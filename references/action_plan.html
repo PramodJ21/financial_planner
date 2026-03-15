@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --paper:#F7F4EF;
+  --ink:#1C1A17;
+  --ink-soft:#6B6760;
+  --ink-ghost:#C4BFB8;
+  --accent:#C4703A;
+  --green:#2D5A3D;
+  --red:#8B2626;
+}
+body{background:var(--paper);color:var(--ink);font-family:'Outfit',sans-serif;font-size:14px;line-height:1.5;padding:0;min-height:100vh;font-variant-numeric:lining-nums;}
+.layout{display:grid;grid-template-columns:210px 1fr;min-height:100vh;}
+
+/* SIDEBAR */
+.sidebar{border-right:0.5px solid var(--ink-ghost);padding:32px 24px;display:flex;flex-direction:column;gap:2px;position:sticky;top:0;height:100vh;overflow-y:auto;}
+.sidebar-brand{margin-bottom:28px;}
+.sidebar-brand-name{font-family:'Playfair Display',serif;font-size:20px;font-weight:400;color:var(--ink);}
+.sidebar-brand-name span{color:var(--accent);}
+.sidebar-brand-sub{font-size:10px;letter-spacing:0.14em;color:var(--ink-ghost);text-transform:uppercase;margin-top:3px;}
+.nav-section-label{font-size:10px;letter-spacing:0.12em;color:var(--ink-ghost);text-transform:uppercase;margin-top:24px;margin-bottom:6px;font-weight:500;}
+.nav-item{font-size:13px;font-weight:400;color:var(--ink-soft);padding:8px 0;cursor:pointer;border-bottom:0.5px solid transparent;transition:color 0.2s;}
+.nav-item.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:500;}
+.nav-item:hover{color:var(--ink);}
+.sidebar-user{margin-top:auto;padding-top:20px;border-top:0.5px solid var(--ink-ghost);display:flex;align-items:center;gap:10px;}
+.sidebar-avatar{width:28px;height:28px;border-radius:50%;background:var(--ink);color:var(--paper);font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:500;}
+.sidebar-user-info p:first-child{font-size:13px;color:var(--ink);font-weight:500;}
+.sidebar-user-info p:last-child{font-size:11px;color:var(--ink-ghost);}
+.sidebar-signout{font-size:11px;color:var(--ink-soft);margin-top:10px;cursor:pointer;display:flex;align-items:center;gap:6px;padding:6px 0;}
+.sidebar-signout:hover{color:var(--ink);}
+
+/* MAIN */
+.main{padding:48px 64px;display:flex;flex-direction:column;gap:60px;}
+
+/* PAGE HEADER */
+.page-header{padding-bottom:32px;border-bottom:0.5px solid var(--ink-ghost);display:flex;align-items:flex-start;justify-content:space-between;}
+.page-title{font-family:'Playfair Display',serif;font-size:40px;font-weight:400;color:var(--ink);line-height:1.1;margin-bottom:6px;}
+.page-sub{font-size:12px;color:var(--ink-soft);font-weight:300;}
+.btn-ghost{font-family:'Outfit',sans-serif;font-size:11px;font-weight:500;color:var(--ink-soft);border:0.5px solid var(--ink-ghost);background:none;padding:9px 16px;cursor:pointer;letter-spacing:0.04em;display:flex;align-items:center;gap:7px;}
+.btn-ghost:hover{color:var(--ink);border-color:var(--ink);}
+
+/* PROGRESS KPIs */
+.progress-kpis{display:grid;grid-template-columns:1fr 1fr;gap:0;}
+.pkpi{padding:28px 40px;border-right:0.5px solid var(--ink-ghost);}
+.pkpi:last-child{border-right:none;}
+.pkpi-label{font-size:10px;letter-spacing:0.14em;color:#4a4642;text-transform:uppercase;font-weight:600;margin-bottom:12px;}
+.pkpi-value{font-family:'Playfair Display',serif;font-size:40px;font-weight:400;color:var(--ink);line-height:1;font-variant-numeric:lining-nums;margin-bottom:10px;}
+.pkpi-bar{height:3px;background:var(--ink-ghost);width:100%;margin-bottom:8px;}
+.pkpi-bar-fill{height:100%;background:var(--ink);width:0%;}
+.pkpi-note{font-size:12px;color:var(--ink-soft);font-weight:300;}
+
+/* SECTION GROUP */
+.action-group{display:flex;flex-direction:column;gap:0;}
+.group-header{display:flex;align-items:center;justify-content:space-between;padding-bottom:14px;border-bottom:0.5px solid var(--ink);}
+.group-title{font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--ink);font-weight:700;}
+.group-count{font-size:11px;color:var(--ink-soft);font-weight:300;}
+
+/* ACTION ITEM */
+.action-item{display:grid;grid-template-columns:20px 1fr auto 20px;align-items:center;gap:16px;padding:20px 0;border-bottom:0.5px solid var(--ink-ghost);border-left:2px solid var(--ink-ghost);padding-left:18px;margin-left:0;}
+.action-item:last-child{border-bottom:none;}
+.action-checkbox{width:16px;height:16px;border:0.5px solid var(--ink-ghost);flex-shrink:0;cursor:pointer;appearance:none;background:none;}
+.action-checkbox:checked{background:var(--ink);border-color:var(--ink);}
+.action-meta{font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-soft);font-weight:500;margin-bottom:4px;}
+.action-title{font-size:14px;font-weight:500;color:var(--ink);display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.fbs-tag{font-size:10px;font-weight:500;color:var(--green);border:0.5px solid var(--green);padding:2px 8px;white-space:nowrap;}
+.action-amount{font-family:'Playfair Display',serif;font-size:16px;font-weight:400;color:var(--ink);font-variant-numeric:lining-nums;white-space:nowrap;}
+.action-chevron{color:var(--ink-ghost);font-size:12px;cursor:pointer;}
+
+/* COMPLETED ITEM */
+.action-item.completed{opacity:0.45;}
+.action-item.completed .action-title{text-decoration:line-through;text-decoration-color:var(--ink-ghost);}
+.action-item.completed .action-checkbox{background:var(--ink);border-color:var(--ink);position:relative;}
+.action-item.completed{border-left-color:var(--green);}
+.action-item.completed .action-amount{color:var(--ink-soft);}
+
+/* DISCLAIMER */
+.disclaimer{padding:20px 0;border-top:0.5px solid var(--ink-ghost);}
+.disclaimer p{font-size:12px;color:var(--ink-soft);font-weight:300;line-height:1.7;}
+.disclaimer strong{font-weight:500;color:var(--ink);}
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-name">FinHealth<span>.</span></div>
+      <div class="sidebar-brand-sub">Wealth Analytics</div>
+    </div>
+    <div class="nav-item">Overview</div>
+    <div class="nav-item">Investments</div>
+    <div class="nav-item">Liabilities</div>
+    <div class="nav-item">Insurance</div>
+    <div class="nav-item">Tax</div>
+    <div class="nav-item">Will &amp; Estate</div>
+    <div class="nav-item active">Action Plan</div>
+    <div class="nav-section-label">Tools</div>
+    <div class="nav-item">Goal Planner</div>
+    <div class="sidebar-user">
+      <div class="sidebar-avatar">PJ</div>
+      <div class="sidebar-user-info">
+        <p>Pramod Joshi</p>
+        <p>Member</p>
+      </div>
+    </div>
+    <div class="sidebar-signout">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Sign out
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- PAGE HEADER -->
+    <div class="page-header">
+      <div>
+        <div class="page-title">Financial Action Plan</div>
+        <div class="page-sub">Personalised recommendations · 13 March 2026</div>
+      </div>
+      <button class="btn-ghost">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download Report
+      </button>
+    </div>
+
+    <!-- PROGRESS KPIs -->
+    <div style="border-top:0.5px solid var(--ink-ghost);border-bottom:0.5px solid var(--ink-ghost);">
+      <div class="progress-kpis">
+        <div class="pkpi">
+          <div class="pkpi-label">Progress</div>
+          <div class="pkpi-value">27%</div>
+          <div class="pkpi-bar"><div class="pkpi-bar-fill" style="width:27%"></div></div>
+          <div class="pkpi-note">3 of 11 completed</div>
+        </div>
+        <div class="pkpi">
+          <div class="pkpi-label">Total Action Items</div>
+          <div class="pkpi-value">11</div>
+          <div class="pkpi-note">8 pending</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- IMMEDIATE ACTION REQUIRED -->
+    <div class="action-group">
+      <div class="group-header">
+        <span class="group-title">Immediate Action Required</span>
+        <span class="group-count">1 item</span>
+      </div>
+      <div class="action-item completed">
+        <input type="checkbox" class="action-checkbox" checked>
+        <div>
+          <div class="action-meta">Emergency Fund</div>
+          <div class="action-title">Build Emergency Fund <span class="fbs-tag">+13 FBS Points</span></div>
+        </div>
+        <div class="action-amount">₹9,20,000</div>
+        <div class="action-chevron">⌄</div>
+      </div>
+    </div>
+
+    <!-- HIGH PRIORITY -->
+    <div class="action-group">
+      <div class="group-header">
+        <span class="group-title">High Priority</span>
+        <span class="group-count">4 items</span>
+      </div>
+      <div class="action-item">
+        <input type="checkbox" class="action-checkbox">
+        <div>
+          <div class="action-meta">Insurance</div>
+          <div class="action-title">Increase Health Insurance Coverage <span class="fbs-tag">+13 FBS Points</span></div>
+        </div>
+        <div class="action-amount">₹22,50,000</div>
+        <div class="action-chevron">⌄</div>
+      </div>
+      <div class="action-item">
+        <input type="checkbox" class="action-checkbox">
+        <div>
+          <div class="action-meta">Insurance</div>
+          <div class="action-title">Increase Term Life Insurance Cover</div>
+        </div>
+        <div class="action-amount">₹4,90,00,000</div>
+        <div class="action-chevron">⌄</div>
+      </div>
+      <div class="action-item completed">
+        <input type="checkbox" class="action-checkbox" checked>
+        <div>
+          <div class="action-meta">Debt Management</div>
+          <div class="action-title">Reduce Bad Liabilities <span class="fbs-tag">+3 FBS Points</span></div>
+        </div>
+        <div class="action-amount">₹5,00,000</div>
+        <div class="action-chevron">⌄</div>
+      </div>
+      <div class="action-item">
+        <input type="checkbox" class="action-checkbox">
+        <div>
+          <div class="action-meta">Asset Reallocation</div>
+          <div class="action-title">Increase Equity Allocation <span class="fbs-tag">+8 FBS Points</span></div>
+        </div>
+        <div class="action-amount">₹36,50,000</div>
+        <div class="action-chevron">⌄</div>
+      </div>
+    </div>
+
+    <!-- RECOMMENDED -->
+    <div class="action-group">
+      <div class="group-header">
+        <span class="group-title">Recommended</span>
+        <span class="group-count">5 items</span>
+      </div>
+      <div class="action-item">
+        <input type="checkbox" class="action-checkbox">
+        <div>
+          <div class="action-meta">Asset Reallocation</div>
+          <div class="action-title">Reduce Debt Allocation</div>
+        </div>
+        <div class="action-amount">₹51,10,000</div>
+        <div class="action-chevron">⌄</div>
+      </div>
+      <div class="action-item">
+        <input type="checkbox" class="action-checkbox">
+        <div>
+          <div class="action-meta">Asset Reallocation</div>
+          <div class="action-title">Set Up Monthly Investment Plan <span class="fbs-tag">+5 FBS Points</span></div>
+        </div>
+        <div class="action-amount">₹1,56,279</div>
+        <div class="action-chevron">⌄</div>
+      </div>
+      <div class="action-item completed">
+        <input type="checkbox" class="action-checkbox" checked>
+        <div>
+          <div class="action-meta">Estate Planning</div>
+          <div class="action-title">Create or Update Your Will</div>
+        </div>
+        <div class="action-amount"></div>
+        <div class="action-chevron">⌄</div>
+      </div>
+      <div class="action-item">
+        <input type="checkbox" class="action-checkbox">
+        <div>
+          <div class="action-meta">Estate Planning</div>
+          <div class="action-title">Update Nominees Across All Accounts</div>
+        </div>
+        <div class="action-amount"></div>
+        <div class="action-chevron">⌄</div>
+      </div>
+      <div class="action-item">
+        <input type="checkbox" class="action-checkbox">
+        <div>
+          <div class="action-meta">Financial Habits</div>
+          <div class="action-title">Improve Financial Habits <span class="fbs-tag">+6 FBS Points</span></div>
+        </div>
+        <div class="action-amount"></div>
+        <div class="action-chevron">⌄</div>
+      </div>
+    </div>
+
+    <!-- GOOD TO HAVE -->
+    <div class="action-group">
+      <div class="group-header">
+        <span class="group-title">Good to Have</span>
+        <span class="group-count">1 item</span>
+      </div>
+      <div class="action-item">
+        <input type="checkbox" class="action-checkbox">
+        <div>
+          <div class="action-meta">Asset Reallocation</div>
+          <div class="action-title">Increase Commodity / Gold Allocation</div>
+        </div>
+        <div class="action-amount">₹14,60,000</div>
+        <div class="action-chevron">⌄</div>
+      </div>
+    </div>
+
+    <!-- DISCLAIMER -->
+    <div class="disclaimer">
+      <p><strong>Disclaimer:</strong> This action plan is generated based on the financial data you have provided and is for informational purposes only. It does not constitute financial, investment, tax, or legal advice. Please consult a qualified financial advisor, tax consultant, or legal professional before making any financial decisions.</p>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

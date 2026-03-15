@@ -1,0 +1,62 @@
+CSS Architecture & UI Overhaul Plan
+Goal Description
+The objective is to completely overhaul the visual design of the FinHealth Dashboard to match the provided static HTML reference files (overview.html and goal_planner.html). This requires replacing the current CSS architecture with a new, highly-polished, premium aesthetic based on the provided designs. The new design uses a warm "paper and ink" theme with elegant serif headings and clean sans-serif body text, utilizing strict global variables and typography rules.
+
+User Review Required
+IMPORTANT
+
+The new design tightly couples the layout to a fixed sidebar (210px) and a specific HTML structure. We will need to refactor the React components (Layout.jsx, Sidebar.jsx, Header.jsx) to perfectly align with this structure.
+The current implementation of Dashboard.jsx and GoalPlanner.jsx will be heavily refactored to use the new CSS classes instead of the old card, dashboard-grid, etc.
+Do you want to preserve the existing mobile responsiveness logic (currently in index.css via @media (max-width: 768px)), or adapt it to the new design? The static HTML files do not contain explicit mobile breakpoints. I plan to adapt the existing mobile logic to the new CSS classes to ensure it remains usable on small screens. Please confirm if this is acceptable.
+Proposed Changes
+Global CSS Architecture (frontend/src/index.css)
+We will completely rewrite index.css to implement the new design system.
+
+1. Core Variables (The "Paper & Ink" Theme)
+css
+:root {
+  --paper: #F7F4EF;
+  --ink: #1C1A17;
+  --ink-soft: #6B6760;
+  --ink-ghost: #C4BFB8;
+  --accent: #C4703A;
+  --green: #2D5A3D;
+  --red: #8B2626;
+}
+2. Typography
+Primary Font: Outfit, sans-serif (Weights: 300, 400, 500, 600)
+Heading Font: Playfair Display, serif (Weights: 400, 500)
+Base styling: 14px size, 1.5 line height, lining-nums explicitly enabled for all metrics/scores/tables.
+3. Layout Structure
+.layout: display: grid; grid-template-columns: 210px 1fr; min-height: 100vh;
+.sidebar: Sticky, 100vh, custom scrollbar.
+.main: padding: 48px 64px; display: flex; flex-direction: column; gap: 64px;
+4. Reusable UI Components
+We will extract the recurring patterns from the HTML into generic utility classes in index.css:
+
+Section Headers: .act-label (10px uppercase), .section-heading (24px Playfair)
+KPI Grids: .kpis-grid, .kpi, .kpi-label, .kpi-value
+Tables: .asset-table, .cashflow-table, .goals-table (clean lines, uppercase headers, 14px padding)
+Tabs: .tabs, .tab (with .active state)
+Badges: .status-badge, .type-badge, .priority-badge
+Buttons: .btn-ghost, .btn-primary, .banner-btn (minimalist, Outfit font)
+React Component Refactoring
+[MODIFY] Layout & Navigation
+Layout.jsx: Change wrapper class from app-main-content to .main. Ensure the div.layout wraps the Sidebar and main content.
+Sidebar.jsx: Rewrite to match the elegant, vertically-dense sidebar design. Use .sidebar-brand, .sidebar-brand-sub, .nav-section-label, and .nav-item. Update user profile section to .sidebar-user.
+Header.jsx: The new design uses page-specific headers or simple banners instead of a persistent top navbar. We may deprecate or heavily simplify Header.jsx.
+[MODIFY] Core Pages
+We will update the ClassNames in these pages to use the new CSS framework:
+
+Dashboard.jsx: Implement the new Score Bar (.score-bar-wrap), KPI grid (.kpis-grid), Asset Table (.asset-table), and Cashflow Table (.cashflow-table) styling exactly as in overview.html.
+GoalPlanner.jsx: Implement .page-header, .budget-row, .strategy-cards, .goals-table, and the detailed goal views (.goal-kpis, .alloc-bar-wrap, .breakdown-table) exactly as in goal_planner.html.
+Investments.jsx, Liabilities.jsx, Insurance.jsx, Tax.jsx, Estate.jsx, Reports.jsx: Rewrite their layout structures to use the new .split-grid, .double-grid, .kpis-grid, and .asset-table classes to match the design language.
+[MODIFY] Auth & Onboarding
+Welcome.jsx, Login.jsx, Register.jsx: Apply the paper/ink color scheme, Playfair Display headers, and clean input styling.
+Questionnaire.jsx: Overhaul the 10-step wizard. Use the new .btn-primary and .btn-ghost styles. Update form inputs to fit the elegant aesthetic (e.g., thin bottom borders instead of full boxes, if appropriate).
+Verification Plan
+Manual Verification
+Visual Accuracy: Run the frontend locally (npm run dev) and compare each major page (Dashboard, Goal Planner) side-by-side with the reference HTML files to ensure pixel-perfect matching of typography, spacing, and colors.
+Component rendering: Verify that dynamic data (like charts and tables in Dashboard/GoalPlanner) renders correctly within the new CSS structures.
+Responsiveness: Test the layout on a resized browser window to ensure the mobile fallback logic works decently with the new classes.
+Auth Flow: Click through Welcome -> Login -> Questionnaire to ensure the new styling didn't break functionality or readability.

@@ -38,7 +38,7 @@ async function migrateLoanColumns() {
             );
         }
 
-        // 4. Drop old columns (optional — keeping for safety; uncomment to drop)
+        // 4. Drop old columns (optional - keeping for safety; uncomment to drop)
         // await client.query(`ALTER TABLE financial_profiles DROP COLUMN IF EXISTS loan_type`);
         // await client.query(`ALTER TABLE financial_profiles DROP COLUMN IF EXISTS loan_outstanding`);
         // await client.query(`ALTER TABLE financial_profiles DROP COLUMN IF EXISTS loan_interest_rate`);

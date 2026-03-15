@@ -1,0 +1,273 @@
+Context: I am revamping the Financial Behaviour Score (FBS) system in calculations.js. This file contains both computeFBS(p) and generateActionPlan(p). Do not change any function signatures or return shapes that existing consumers depend on - only extend them. Read the entire computeFBS and generateActionPlan functions fully before making any changes.
+
+PART 1 - Pre-Task Analysis
+Before writing any code, identify and confirm the following from the existing calculations.js:
+
+The exact variable names on the p object used by both functions
+Which helper functions (computeAssets, computeIncome, computeEmergency, computeInsurance, computeLiabilities, computeTax) feed into p and what they return
+How missingFBS is currently zeroed after each task in generateActionPlan
+The current priority++ counter pattern and where it lives
+Which tasks currently have no fbsImpact assigned
+
+
+PART 2 - Database Changes Required
+Before touching calculations.js, confirm that the following fields exist on the profile object. If they do not exist, flag them as missing and do not use them in scoring:
+
+p.monthly_sip - the user's monthly SIP / recurring investment amount in ₹ (should come from the investments step of the questionnaire)
+p.sip_consecutive_months - how many consecutive months the user has been investing (can be absent, default to no penalty if missing)
+p.beh_windfall_behaviour - new behavioural question, integer 1–5
+p.beh_market_reaction - new behavioural question, integer 1–5
+p.beh_product_understanding - new behavioural question, integer 1–5
+p.goals - array of goal objects fetched from the user_goals table for this user. Each goal has: id, name, target, years, priority_weight. This must be joined into the profile query before computeFBS is called.
+
+
+PART 3 - Rewrite computeFBS(p)
+Replace the internal logic of computeFBS(p) entirely. The function name, parameter, and base return shape do not change. Add subScores and fragility to the return object alongside the existing breakdown.
+Scoring Architecture - 100 points across 3 tiers
+TIER 1: FOUNDATION - 40 pts
+Categories: Emergency Fund (15) + Insurance (15) + Liability Management (10)
+TIER 2: BEHAVIOUR - 40 pts
+Categories: Consistency & Discipline (15) + Goal Clarity (15) + Behavioural Tendencies (10)
+TIER 3: AWARENESS - 20 pts
+Categories: Portfolio Understanding (10) + Tax & Regime Literacy (5) + Asset Diversity (5)
+FRAGILITY PENALTY - up to −15 pts subtracted from total after all categories are summed
+
+FOUNDATION - 40 pts
+Emergency Fund - 15 pts
+Compute emRatio = actual / ideal from the existing computeEmergency helper. Score as follows:
+
+emRatio ≥ 2.0 → 15
+emRatio ≥ 1.0 → 12
+emRatio ≥ 0.75 → 9
+emRatio ≥ 0.5 → 6
+emRatio ≥ 0.25 → 3
+emRatio < 0.25 → 1
+
+Insurance Coverage - 15 pts
+Split into health (8 pts) and life (7 pts), scored independently using coverage ratios from computeInsurance.
+Health scoring (8 pts):
+
+Coverage ≥ ideal → 8
+Coverage ≥ 50% of ideal → 5
+Coverage < 50% → 2
+
+Life scoring (7 pts):
+
+idealLife = 0 (no dependants) → automatic 7, life insurance not required
+Coverage ≥ ideal → 7
+Coverage ≥ 50% of ideal → 4
+Coverage < 50% → 1
+
+Final insurance score = healthPts + lifePts.
+Liability Management - 10 pts
+Use computeLiabilities to get good debt, bad debt, and EMI figures. Compute emiRatio = totalMonthlyEMI / monthlyIncome.
+
+No liabilities at all → 10
+Only good debt AND emiRatio ≤ 40% → 10
+Only good debt AND emiRatio > 40% → 4
+Good debt outstanding > bad debt outstanding AND emiRatio ≤ 40% → 7
+Good debt outstanding > bad debt outstanding AND emiRatio > 40% → 4
+Bad debt present, emiRatio ≤ 20% → 4
+Bad debt present, emiRatio > 20% → 2
+
+
+BEHAVIOUR - 40 pts
+Consistency & Discipline - 15 pts
+Use p.monthly_sip and income.total to compute annual SIP as a percentage of annual income. Score the base points as follows:
+
+sipRatio > 30% → 15
+sipRatio 20–30% → 14
+sipRatio 15–20% → 12
+sipRatio 10–15% → 9
+sipRatio 5–10% → 6
+sipRatio > 0% but < 5% → 2
+sipRatio = 0% → 0
+
+Then apply a consistency multiplier using p.sip_consecutive_months if the field exists on p:
+
+6 or more consecutive months → multiply by 1.0
+3 to 5 months → multiply by 0.9
+Fewer than 3 months → multiply by 0.8
+Field does not exist on p → multiply by 1.0, do not penalise
+
+Final score = Math.round(basePoints × multiplier).
+Goal Clarity - 15 pts
+Read from p.goals (array from user_goals table). A goal is considered "timed" if years > 0.
+
+No goals at all → 0
+Goals exist but none have years > 0 → 3
+1 timed goal → 6
+2 timed goals → 10
+3 or more timed goals → 15
+
+If p.goals is not available on the profile object, score 0 and leave a TODO comment.
+Behavioural Tendencies - 10 pts
+Use all 9 behavioural questions. Default any missing field to its worst-case value, not neutral - positive questions default to 1, inverted questions default to 5.
+Positive questions (higher = better), take value as-is:
+
+beh_review_monthly (existing)
+beh_avoid_debt (existing)
+beh_market_reaction (new)
+beh_windfall_behaviour (new)
+beh_product_understanding (new)
+
+Inverted questions (higher = worse), apply as 6 - value:
+
+beh_delay_decisions (existing)
+beh_spend_impulsively (existing)
+beh_loss_aversion (existing, currently called beh_hold_losing or similar - confirm exact field name)
+beh_peer_comparison (existing)
+
+Sum all 9 normalised values. Max possible = 45. Scale to 10 pts:
+behavioralTendencies = Math.round((rawTotal / 45) * 10)
+
+AWARENESS - 20 pts
+Portfolio Understanding - 10 pts
+Read directly from p.beh_product_understanding. Map as follows:
+
+5 → 10
+4 → 8
+3 → 6
+2 → 3
+1 → 1
+Missing → 6 (neutral default, this is an awareness score not a behaviour penalty)
+
+Tax & Regime Literacy - 5 pts
+Use computeTax to get tax.recommended and tax.potentialSavings. Use p.tax_regime for the user's chosen regime. Check whether the user has explored deductions using the existing 80C, NPS, HRA fields on p.
+
+Regime matches recommended AND at least one deduction field is non-zero → 5
+Regime matches recommended only → 3
+Regime does not match AND potentialSavings ≤ 5000 → 2
+Regime does not match AND potentialSavings > 5000 → 0
+
+Asset Diversity - 5 pts
+Use the same maxAlloc logic from the existing function (maximum single asset class percentage). Compress to 5 pts:
+
+maxAlloc < 50% → 5
+maxAlloc < 70% → 3
+maxAlloc < 85% → 1
+maxAlloc ≥ 85% → 0
+
+
+FRAGILITY PENALTY
+After summing all category scores, compute the penalty and subtract from the total.
+Define:
+
+zeroEmergency = emergencyFund score ≤ 1
+zeroInsurance = insurance score ≤ 2
+highBadDebt = bad debt outstanding > 30% of annual income
+
+Apply the first matching condition only:
+
+All three true → penalty = 15, flag = critical_triple_gap
+zeroEmergency + zeroInsurance → penalty = 8, flag = no_emergency_no_insurance
+zeroEmergency + highBadDebt → penalty = 6, flag = no_emergency_high_debt
+zeroInsurance + highBadDebt → penalty = 5, flag = no_insurance_high_debt
+None match → penalty = 0, flags = []
+
+totalScore = Math.min(100, Math.max(0, sumOfAllCategories - penalty))
+
+Updated Return Shape
+Extend the existing return object. Do not remove any existing keys from breakdown - rename behavior to behavioralTendencies only if no existing consumer references breakdown.behavior directly. If consumers exist, keep both keys temporarily and add a deprecation comment.
+return {
+  total: totalScore,
+  breakdown: {
+    emergencyFund,           // 0–15  FOUNDATION
+    insurance,               // 0–15  FOUNDATION
+    liabilities,             // 0–10  FOUNDATION
+    investmentRegularity,    // 0–15  BEHAVIOUR (renamed from investmentRegularity, logic replaced)
+    goalClarity,             // 0–15  BEHAVIOUR (NEW)
+    behavioralTendencies,    // 0–10  BEHAVIOUR (replaces behavior)
+    portfolioUnderstanding,  // 0–10  AWARENESS (NEW)
+    tax,                     // 0–5   AWARENESS (demoted from 10)
+    assetDiversity,          // 0–5   AWARENESS (demoted from 20)
+  },
+  subScores: {
+    foundation,   // emergencyFund + insurance + liabilities
+    behaviour,    // investmentRegularity + goalClarity + behavioralTendencies
+    awareness,    // portfolioUnderstanding + tax + assetDiversity
+  },
+  fragility: {
+    penalty,      // number
+    flags,        // string[]
+  }
+}
+
+PART 4 - Fix Bugs in generateActionPlan
+Fix these specific bugs without changing the overall structure of the function:
+Bug 1 - Insurance fbsImpact split
+Currently when both health and life insurance tasks are generated, the second task gets fbsImpact: 0 because missingFBS.insurance was zeroed after the first task. Fix by splitting proportionally before pushing either task: health task gets 55% of missingFBS.insurance rounded, life task gets 45%. Zero missingFBS.insurance only after both tasks are pushed.
+Bug 2 - Tax task fires with zero savings
+Guard the tax regime mismatch task with: only generate the task if tax.potentialSavings > 0. If savings is zero, skip the task entirely.
+Bug 3 - Add Goal Clarity task
+Add a new conditional block for the goalClarity category. If missingFBS.goalClarity > 0, generate a task with:
+
+category: 'Goal Clarity'
+If p.goals exists and has items but none are timed: title should direct user to add timelines in the Goal Planner
+If p.goals is empty or missing: title should direct user to visit the Goal Planner and add their financial goals
+urgency: 'high' if no goals exist, 'medium' if goals exist but untimed
+fbsImpact: missingFBS.goalClarity
+priority: 0 (will be reassigned by the sequencing engine)
+
+
+PART 5 - Add sequenceActionPlan Function
+Add a new function sequenceActionPlan(tasks, fragility, liabilities, income) to calculations.js immediately after generateActionPlan. This function takes the unordered tasks array and returns it with correct sequential priority numbers assigned.
+Dependency level map:
+
+Emergency Fund → level 2
+Insurance → level 2
+Debt Management → level 2
+Financial Habits → level 3
+Goal Clarity → level 3
+Asset Reallocation → level 3
+Tax Planning → level 4
+Estate Planning → level 5
+Credit Health → level 5
+
+Fragility promotions to level 1:
+If flag is critical_triple_gap: promote Emergency Fund to level 1a, Debt Management to level 1b, Insurance to level 1c in that order.
+If flag is no_emergency_high_debt: check liabilities.badLiability.avgInterestRate. If rate > 15%, promote Debt Management to level 1a and Emergency Fund to level 1b. If rate ≤ 15%, promote Emergency Fund to level 1a and Debt Management to level 1b.
+If flag is no_emergency_no_insurance: promote Emergency Fund to level 1a, Insurance to level 1b.
+If flag is no_insurance_high_debt: promote Insurance to level 1a, Debt Management to level 1b.
+Sorting logic:
+
+Sort by level ascending
+Within the same level, sort by fbsImpact descending
+Assign clean sequential priority numbers starting from 1
+Remove the temporary _level field before returning
+
+At the end of generateActionPlan, replace the existing priority++ pattern with a call to sequenceActionPlan, passing the completed tasks array, the fragility object from computeFBS, the liabilities object, and the income object.
+
+PART 6 - Questionnaire Changes
+In the questionnaire file, make the following changes:
+Step 5 - Investments: Add a single new input field for monthly_sip - the user's total monthly SIP or recurring investment amount in ₹. This is separate from the existing asset balance fields which capture current holdings.
+Step 10 - Financial Behaviour: The existing 10 questions should be replaced with exactly these 9 questions, all on a 1–5 scale (Strongly Disagree to Strongly Agree). Map each to its field name exactly:
+
+"I review my finances at least once a month" → beh_review_monthly
+"I tend to delay important financial decisions" → beh_delay_decisions
+"I sometimes spend impulsively and regret it later" → beh_spend_impulsively
+"I actively avoid taking on unnecessary debt" → beh_avoid_debt
+"When markets fall, I stay calm and don't change my investments" → beh_market_reaction
+"When I receive unexpected money, I invest or save most of it" → beh_windfall_behaviour
+"I hold onto losing investments hoping they will recover" → beh_loss_aversion
+"I understand what I'm invested in and why" → beh_product_understanding
+"I compare my financial progress with friends or peers" → beh_peer_comparison
+
+After the final questionnaire step: Add a redirect or prompt that directs the user to the Goal Planner to set up their financial goals before viewing their action plan. Do not add a goals step inside the questionnaire itself - the Goal Planner is the single source of truth for goals.
+
+PART 7 - Profile Query Update
+In the query or function that assembles the p object before passing it to computeFBS, add a join or separate fetch to populate p.goals from the user_goals table filtered by the current user's ID. Each goal object in the array should include at minimum: id, name, target, years, priority_weight.
+
+Definition of Done
+
+All 9 scoring categories compute correctly and sum to 100 before penalty
+subScores.foundation + subScores.behaviour + subScores.awareness equals the pre-penalty total
+Fragility penalty applies correctly for all 4 flag combinations and never fires more than one flag
+A user with bad debt interest rate > 15% and no emergency fund gets Debt Management sequenced before Emergency Fund
+Both insurance tasks carry non-zero fbsImpact when both health and life gaps exist
+Tax task is never generated when potentialSavings is 0
+A user with no goals gets a Goal Clarity task in their action plan pointing to the Goal Planner
+Priority numbers reflect dependency levels, not code order
+No existing consumer of computeFBS or generateActionPlan breaks
+
+I have already started the servers of both backend and frontend so dont start directly go the local site, and create a new user abc123@gmail.com and start testing

@@ -4,21 +4,16 @@ import {
     ComposedChart, Bar, Line, XAxis, YAxis, Tooltip as RechartsTooltip,
     ResponsiveContainer, CartesianGrid, Legend, Cell
 } from 'recharts';
-import { Plus, Trash2, Target, TrendingUp, AlertTriangle, Edit2, Download, UploadCloud, FileText } from 'lucide-react';
+import { Plus, Trash2, Target, TrendingUp, AlertTriangle, Edit2, Download, UploadCloud, FileText, Info } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-
-// ═══════════════════════════════════════════════════
-// CONSTANTS
-// ═══════════════════════════════════════════════════
-
-const INFLATION_RATE = 0.06;
-
-const RISK_LABELS = ['Very Conservative', 'Conservative', 'Moderate', 'Aggressive', 'Very Aggressive'];
-const RISK_COLORS = ['#64748B', '#3B82F6', '#10B981', '#F59E0B', '#EF4444'];
-
-const GOAL_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#F97316'];
+import {
+    INFLATION_RATE, ASSET_RETURNS, RISK_LABELS, RISK_COLORS, GOAL_COLORS,
+    calcSIP, inflationAdjusted, getGoalAllocation, getBlendedReturn,
+    generateYearlyData, generateMonthlyData, corpusAtMonth, computeGoalResult
+} from '../utils/goalCalculations';
+import { computeAllStrategies } from '../utils/budgetStrategies';
 
 // ═══════════════════════════════════════════════════
 // FORMATTING
@@ -34,134 +29,6 @@ const fmt = (val) => {
 
 const fmtFull = (val) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val || 0);
 
-// ═══════════════════════════════════════════════════
-// ALLOCATION ENGINE
-// ═══════════════════════════════════════════════════
-
-// Time horizon base allocations (60% weight)
-function getTimeBase(years) {
-    if (years <= 2) return { equity: 5, debt: 85, commodity: 10 };
-    if (years <= 5) return { equity: 25, debt: 62, commodity: 13 };
-    if (years <= 10) return { equity: 50, debt: 37, commodity: 13 };
-    return { equity: 72, debt: 20, commodity: 8 };
-}
-
-// Risk level adjustments (40% weight) — riskLevel is 0-4 index
-function getRiskAdj(riskLevel) {
-    const adjustments = [
-        { equity: -20, debt: 17, commodity: 3 },   // Very Conservative
-        { equity: -10, debt: 8, commodity: 2 },     // Conservative
-        { equity: 0, debt: 0, commodity: 0 },       // Moderate
-        { equity: 10, debt: -8, commodity: -2 },    // Aggressive
-        { equity: 20, debt: -17, commodity: -3 },   // Very Aggressive
-    ];
-    return adjustments[riskLevel] || adjustments[2];
-}
-
-// Hard caps by time horizon
-function getHardCaps(years) {
-    if (years <= 2) return { equityMax: 10, debtMin: 70 };
-    if (years <= 5) return { equityMax: 40, debtMin: 45 };
-    if (years <= 10) return { equityMax: 65, debtMin: 25 };
-    return { equityMax: 85, debtMin: 10 };
-}
-
-// Per-asset expected returns by risk level
-const ASSET_RETURNS = [
-    { equity: 0.08, debt: 0.06, commodity: 0.045 },   // Very Conservative
-    { equity: 0.095, debt: 0.065, commodity: 0.055 },  // Conservative
-    { equity: 0.12, debt: 0.07, commodity: 0.07 },     // Moderate
-    { equity: 0.14, debt: 0.075, commodity: 0.08 },    // Aggressive
-    { equity: 0.16, debt: 0.08, commodity: 0.095 },    // Very Aggressive
-];
-
-// Main allocation function
-function getGoalAllocation(years, riskLevel) {
-    const base = getTimeBase(years);
-    const adj = getRiskAdj(riskLevel);
-    const caps = getHardCaps(years);
-
-    // Step 1: Blend — 60% time base + 40% risk adjustment
-    let equity = (base.equity * 0.6) + (adj.equity * 0.4);
-    let debt = (base.debt * 0.6) + (adj.debt * 0.4);
-    let commodity = (base.commodity * 0.6) + (adj.commodity * 0.4);
-
-    // Step 2: Apply hard caps
-    equity = Math.min(equity, caps.equityMax);
-    debt = Math.max(debt, caps.debtMin);
-    commodity = Math.max(5, Math.min(15, commodity));
-
-    // No asset can be negative or exceed 90%
-    equity = Math.max(0, Math.min(90, equity));
-    debt = Math.max(0, Math.min(90, debt));
-    commodity = Math.max(0, Math.min(90, commodity));
-
-    // Step 3: Normalize to 100%
-    const total = equity + debt + commodity;
-    if (total > 0) {
-        equity = Math.round(equity / total * 100);
-        debt = Math.round(debt / total * 100);
-        commodity = 100 - equity - debt; // ensure exact 100
-    }
-
-    return { equity, debt, commodity };
-}
-
-// Blended portfolio return
-function getBlendedReturn(allocation, riskLevel) {
-    const returns = ASSET_RETURNS[riskLevel] || ASSET_RETURNS[2];
-    return (allocation.equity / 100) * returns.equity
-        + (allocation.debt / 100) * returns.debt
-        + (allocation.commodity / 100) * returns.commodity;
-}
-
-// ═══════════════════════════════════════════════════
-// FINANCIAL CALCULATIONS
-// ═══════════════════════════════════════════════════
-
-function inflationAdjusted(target, years) {
-    return target * Math.pow(1 + INFLATION_RATE, years);
-}
-
-function calcSIP(target, years, annualReturn) {
-    if (years <= 0 || target <= 0) return 0;
-    const rm = annualReturn / 12;
-    const n = years * 12;
-    if (rm === 0) return target / n;
-    return target * rm / (Math.pow(1 + rm, n) - 1);
-}
-
-function corpusAtMonth(sip, months, annualReturn) {
-    if (months <= 0 || sip <= 0) return 0;
-    const rm = annualReturn / 12;
-    if (rm === 0) return sip * months;
-    return sip * (Math.pow(1 + rm, months) - 1) / rm;
-}
-
-// Generate per-year data for combo chart + yearly breakdown
-function generateYearlyData(sip, years, annualReturn) {
-    const data = [];
-    const rm = annualReturn / 12;
-    for (let y = 1; y <= years; y++) {
-        const months = y * 12;
-        const invested = Math.round(sip * 12 * y);
-        const corpus = Math.round(corpusAtMonth(sip, months, annualReturn));
-        const profit = Math.max(0, corpus - invested);
-        data.push({ year: y, invested, profit, total: corpus });
-    }
-    return data;
-}
-
-function generateMonthlyData(sip, months, annualReturn) {
-    const data = [];
-    for (let m = 1; m <= months; m++) {
-        const invested = Math.round(sip * m);
-        const corpus = Math.round(corpusAtMonth(sip, m, annualReturn));
-        const profit = Math.max(0, corpus - invested);
-        data.push({ month: m, invested, profit, total: corpus });
-    }
-    return data;
-}
 
 // ═══════════════════════════════════════════════════
 // COMPONENT
@@ -209,54 +76,25 @@ function GoalPlanner() {
         return () => clearTimeout(saveTimeoutRef.current);
     }, [goals, initialLoadDone]);
 
-    // Form state
     const [formName, setFormName] = useState('');
     const [formTarget, setFormTarget] = useState('');
     const [formYears, setFormYears] = useState('');
-    const [formRisk, setFormRisk] = useState(2); // 0-4 index, default Moderate
+    const [formRisk, setFormRisk] = useState(2); // 0-5 index
+    const [formIncludeInflation, setFormIncludeInflation] = useState(true);
+    const [formPriority, setFormPriority] = useState(3); // 1-5 priority weight
+    const [customEquityAlloc, setCustomEquityAlloc] = useState('70');
+    const [customDebtAlloc, setCustomDebtAlloc] = useState('25');
+    const [customCommodityAlloc, setCustomCommodityAlloc] = useState('5');
+    const [customEquityReturn, setCustomEquityReturn] = useState('12');
+    const [customDebtReturn, setCustomDebtReturn] = useState('7');
+    const [customCommodityReturn, setCustomCommodityReturn] = useState('7');
     const [editingId, setEditingId] = useState(null);
+    const [selectedStrategy, setSelectedStrategy] = useState(null);
 
     // ── Compute results for each goal ──
-    const goalResults = useMemo(() => {
-        return goals.map(g => {
-            const allocation = getGoalAllocation(g.years, g.riskLevel);
-            const blendedReturn = getBlendedReturn(allocation, g.riskLevel);
-            const inflatedTarget = inflationAdjusted(g.target, g.years);
-            const sip = calcSIP(inflatedTarget, g.years, blendedReturn);
-            const totalInvested = sip * g.years * 12;
-            const wealthGained = inflatedTarget - totalInvested;
-            const yearlyData = generateYearlyData(sip, g.years, blendedReturn);
-            const monthlyData = generateMonthlyData(sip, g.years * 12, blendedReturn);
-            const highSip = sip > 100000;
+    const goalResults = useMemo(() => goals.map(computeGoalResult), [goals]);
 
-            // Portfolio rationale
-            let rationale = '';
-            if (g.years <= 2) rationale = `Short-term goal — heavy debt allocation for stability, minimal equity exposure.`;
-            else if (g.years <= 5) rationale = `Medium-term goal — balanced mix with moderate equity for growth potential.`;
-            else if (g.years <= 10) rationale = `Long-term goal — equity-heavy allocation to leverage compounding returns.`;
-            else rationale = `Very long-term goal — maximising equity exposure for superior wealth creation.`;
-            rationale += ` ${RISK_LABELS[g.riskLevel]} risk profile applied.`;
-
-            return {
-                ...g,
-                allocation,
-                blendedReturn,
-                inflatedTarget,
-                sip,
-                totalInvested,
-                wealthGained,
-                yearlyData,
-                monthlyData,
-                highSip,
-                rationale,
-                equityReturn: ASSET_RETURNS[g.riskLevel].equity,
-                debtReturn: ASSET_RETURNS[g.riskLevel].debt,
-                commodityReturn: ASSET_RETURNS[g.riskLevel].commodity,
-            };
-        });
-    }, [goals]);
-
-    // ── Overall summary ──
+    // ── Overall summary (original, pre-strategy) ──
     const overallSummary = useMemo(() => {
         if (!goalResults.length) return null;
         return {
@@ -267,14 +105,73 @@ function GoalPlanner() {
         };
     }, [goalResults]);
 
+    // ── Budget strategy computation ──
+    const strategyResults = useMemo(() => {
+        const budgetNum = Number(budget);
+        if (!budgetNum || !overallSummary || overallSummary.totalSIP <= budgetNum) return null;
+        return computeAllStrategies(goals, budgetNum, goalResults);
+    }, [goals, budget, goalResults, overallSummary]);
+
+    // ── Display results (merged with active strategy) ──
+    const displayGoalResults = useMemo(() => {
+        if (!selectedStrategy || !strategyResults) return goalResults.map(g => ({ ...g, _original: null }));
+        const strategy = strategyResults.find(s => s.id === selectedStrategy);
+        if (!strategy) return goalResults.map(g => ({ ...g, _original: null }));
+
+        return goalResults.map(g => {
+            const mod = strategy.modifiedGoals.find(m => m.goalId === g.id);
+            if (!mod) return { ...g, _original: null };
+
+            // Build a modified goal object with the strategy's changes
+            const modifiedGoal = { ...g, ...mod.changes };
+            // Recompute full metrics with the modified values
+            const recomputed = computeGoalResult(modifiedGoal);
+            return { ...recomputed, _original: g, _mod: mod };
+        });
+    }, [goalResults, selectedStrategy, strategyResults]);
+
+    // ── Display summary (with strategy applied) ──
+    const displaySummary = useMemo(() => {
+        if (!displayGoalResults.length) return null;
+        return {
+            totalSIP: displayGoalResults.reduce((s, g) => s + g.sip, 0),
+            totalInvested: displayGoalResults.reduce((s, g) => s + g.totalInvested, 0),
+            totalCorpus: displayGoalResults.reduce((s, g) => s + g.inflatedTarget, 0),
+            totalProfit: displayGoalResults.reduce((s, g) => s + g.wealthGained, 0),
+        };
+    }, [displayGoalResults]);
+
+    // Budget status
+    const budgetStatus = useMemo(() => {
+        const budgetNum = Number(budget);
+        if (!budgetNum || !overallSummary) return 'none';
+        if (overallSummary.totalSIP <= budgetNum) return 'within';
+        return 'deficit';
+    }, [budget, overallSummary]);
+
     // ── Handlers ──
     const addGoal = () => {
         if (!formName || !formTarget || !formYears) return;
+
+        // Validation for Custom Strategy
+        if (formRisk === 5) {
+            const total = Number(customEquityAlloc) + Number(customDebtAlloc) + Number(customCommodityAlloc);
+            if (total !== 100) return;
+        }
+
         const newGoal = {
-            id: editingId || Date.now(),
+            id: editingId || Date.now().toString(),
             name: formName,
             target: Number(formTarget), years: Number(formYears),
-            riskLevel: formRisk
+            riskLevel: formRisk,
+            includeInflation: formIncludeInflation,
+            priorityWeight: formPriority,
+            customEquityAlloc: formRisk === 5 ? Number(customEquityAlloc) : null,
+            customDebtAlloc: formRisk === 5 ? Number(customDebtAlloc) : null,
+            customCommodityAlloc: formRisk === 5 ? Number(customCommodityAlloc) : null,
+            customEquityReturn: formRisk === 5 ? Number(customEquityReturn) : null,
+            customDebtReturn: formRisk === 5 ? Number(customDebtReturn) : null,
+            customCommodityReturn: formRisk === 5 ? Number(customCommodityReturn) : null
         };
         if (editingId) {
             setGoals(goals.map(g => g.id === editingId ? newGoal : g));
@@ -286,15 +183,29 @@ function GoalPlanner() {
 
     const resetForm = () => {
         setFormName(''); setFormTarget('');
-        setFormYears(''); setFormRisk(2); setEditingId(null); setShowForm(false);
+        setFormYears(''); setFormRisk(2); setFormIncludeInflation(true);
+        setFormPriority(3);
+        setCustomEquityAlloc('70'); setCustomDebtAlloc('25'); setCustomCommodityAlloc('5');
+        setCustomEquityReturn('12'); setCustomDebtReturn('7'); setCustomCommodityReturn('7');
+        setEditingId(null); setShowForm(false);
     };
 
     const editGoal = (goal) => {
         setFormName(goal.name); setFormTarget(goal.target.toString());
         setFormYears(goal.years.toString()); setFormRisk(goal.riskLevel);
+        setFormIncludeInflation(goal.includeInflation ?? true);
+        setFormPriority(goal.priorityWeight || 3);
+        if (goal.riskLevel === 5) {
+            setCustomEquityAlloc(goal.customEquityAlloc?.toString() || '');
+            setCustomDebtAlloc(goal.customDebtAlloc?.toString() || '');
+            setCustomCommodityAlloc(goal.customCommodityAlloc?.toString() || '');
+            setCustomEquityReturn(goal.customEquityReturn?.toString() || '');
+            setCustomDebtReturn(goal.customDebtReturn?.toString() || '');
+            setCustomCommodityReturn(goal.customCommodityReturn?.toString() || '');
+        }
         setEditingId(goal.id); setShowForm(true);
     };
-    const deleteGoal = (id) => setGoals(goals.filter(g => g.id !== id));
+    const deleteGoal = (id) => { setGoals(goals.filter(g => g.id !== id)); setSelectedStrategy(null); };
 
     // ── Excel Import / Export ──
     const fileInputRef = useRef(null);
@@ -322,7 +233,14 @@ function GoalPlanner() {
             "Goal Name": g.name,
             "Target Amount": g.target,
             "Time Horizon (Years)": g.years,
-            "Risk Level (0-4)": g.riskLevel
+            "Risk Level (0-5)": g.riskLevel,
+            "Include Inflation": g.includeInflation ? "Yes" : "No",
+            "Custom Equity %": g.riskLevel === 5 ? g.customEquityAlloc : "",
+            "Custom Debt %": g.riskLevel === 5 ? g.customDebtAlloc : "",
+            "Custom Commodity %": g.riskLevel === 5 ? g.customCommodityAlloc : "",
+            "Custom Equity Return %": g.riskLevel === 5 ? g.customEquityReturn : "",
+            "Custom Debt Return %": g.riskLevel === 5 ? g.customDebtReturn : "",
+            "Custom Commodity Return %": g.riskLevel === 5 ? g.customCommodityReturn : ""
         }));
 
         const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -368,11 +286,12 @@ function GoalPlanner() {
                     }
 
                     importedGoals.push({
-                        id: Date.now() + i, // Unique ID sequence
+                        id: (Date.now() + i).toString(), // Unique ID sequence as string
                         name: String(name).trim(),
                         target,
                         years,
-                        riskLevel: risk
+                        riskLevel: risk,
+                        includeInflation: row["Include Inflation"] === "No" ? false : true
                     });
                 });
 
@@ -479,22 +398,22 @@ function GoalPlanner() {
     };
 
     // ── Styles ──
-    const cardS = { backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px solid #E8ECF1', padding: '20px', marginBottom: '16px' };
-    const headerS = { fontSize: '16px', fontWeight: 700, color: '#1E293B', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' };
-    const thS = { padding: '10px 12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '2px solid #E8ECF1' };
-    const tdS = { padding: '10px 12px', fontSize: '13px', color: '#334155', borderBottom: '1px solid #F1F5F9' };
-    const inputS = { width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '14px', color: '#1E293B', outline: 'none', backgroundColor: '#FFFFFF' };
-    const btnPrimary = { display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#1E293B', color: '#FFFFFF', padding: '10px 20px', borderRadius: '8px', border: 'none', fontSize: '14px', fontWeight: 600, cursor: 'pointer' };
-    const labelS = { fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px', display: 'block' };
+    const cardS = { backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px solid #D8D3CB', padding: '20px', marginBottom: '16px' };
+    const headerS = { fontFamily: "'DM Serif Display', Georgia, serif", fontSize: '22px', fontWeight: 400, color: '#0D1B2A', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' };
+    const thS = { padding: '10px 12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#5C6B7A', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '2px solid #D8D3CB' };
+    const tdS = { padding: '10px 12px', fontSize: '13px', color: '#4A5A6A', borderBottom: '1px solid #E6EDF5' };
+    const inputS = { width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #D8D3CB', fontSize: '14px', color: '#0D1B2A', outline: 'none', backgroundColor: '#FFFFFF' };
+    const btnPrimary = { display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#111B2E', color: '#FFFFFF', padding: '10px 20px', borderRadius: '8px', border: 'none', fontSize: '14px', fontWeight: 600, cursor: 'pointer' };
+    const labelS = { fontSize: '13px', fontWeight: 600, color: '#4A5A6A', marginBottom: '6px', display: 'block' };
 
     // ── Custom tooltip ──
     const ChartTooltip = ({ active, payload, label }) => {
         if (!active || !payload?.length) return null;
         return (
-            <div style={{ backgroundColor: '#1E293B', borderRadius: '8px', padding: '10px 14px', color: '#FFFFFF', fontSize: '12px' }}>
+            <div style={{ backgroundColor: '#111B2E', borderRadius: '8px', padding: '10px 14px', color: '#FFFFFF', fontSize: '12px' }}>
                 <div style={{ fontWeight: 700, marginBottom: '4px' }}>Year {label}</div>
                 {payload.map((p, i) => (
-                    <div key={i} style={{ color: p.color || '#94A3B8' }}>
+                    <div key={i} style={{ color: p.color || '#D8D3CB' }}>
                         {p.name}: {fmt(p.value)}
                     </div>
                 ))}
@@ -503,366 +422,438 @@ function GoalPlanner() {
     };
 
     return (
-        <div style={{ padding: '24px', maxWidth: '1100px', margin: '0 auto', fontFamily: "'Inter', sans-serif" }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '56px', paddingBottom: '64px' }}>
             {/* ═══ Header ═══ */}
-            <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
-                <div>
-                    <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#1E293B', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <Target size={24} /> Goal-Based Investment Planner
-                    </h1>
-                    <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>Plan your financial goals with risk-appropriate asset allocations</p>
-                </div>
-
-                {/* Actions */}
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    <button onClick={downloadPDF} style={{ ...btnPrimary, backgroundColor: '#F8FAFC', color: '#64748B', border: '1px solid #E8ECF1', fontSize: '12px', padding: '8px 14px' }}>
-                        <FileText size={14} /> Export PDF
-                    </button>
-                    <button onClick={exportGoalsExcel} style={{ ...btnPrimary, backgroundColor: '#F8FAFC', color: '#64748B', border: '1px solid #E8ECF1', fontSize: '12px', padding: '8px 14px' }}>
-                        <Download size={14} /> Export Excel
-                    </button>
-                    <button onClick={() => fileInputRef.current?.click()} style={{ ...btnPrimary, backgroundColor: '#F8FAFC', color: '#334155', border: '1px solid #E8ECF1', fontSize: '12px', padding: '8px 14px' }}>
-                        <UploadCloud size={14} /> Import Excel
-                    </button>
-                    <button onClick={downloadSampleExcel} style={{ ...btnPrimary, backgroundColor: '#F8FAFC', color: '#64748B', border: '1px solid #E8ECF1', fontSize: '12px', padding: '8px 14px' }}>
-                        Sample Format
-                    </button>
-                    <input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleFileUpload}
-                        accept=".xlsx, .xls, .csv"
-                        style={{ display: 'none' }}
-                    />
+            <div className="page-header">
+                <div className="page-header-top">
+                    <div>
+                        <div className="page-super">Planning Tools</div>
+                        <div className="page-title">Goal-Based Investment Planner</div>
+                        <div className="page-desc">Plan your financial goals with risk-appropriate asset allocations</div>
+                    </div>
+                    <div className="page-actions">
+                        <button onClick={downloadPDF} className="btn-ghost">↑ Export PDF</button>
+                        <button onClick={exportGoalsExcel} className="btn-ghost">↓ Export Excel</button>
+                        <button onClick={() => fileInputRef.current?.click()} className="btn-ghost">↑ Import Excel</button>
+                        <button onClick={downloadSampleExcel} className="btn-ghost">Sample Format</button>
+                        <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".xlsx, .xls, .csv" style={{ display: 'none' }} />
+                    </div>
                 </div>
             </div>
 
-            {/* ═══ Monthly Budget (Dormant) ═══ */}
-            <div style={{ ...cardS, display: 'flex', alignItems: 'center', gap: '16px', padding: '14px 20px', flexWrap: 'wrap' }}>
-                <label style={{ fontSize: '14px', fontWeight: 600, color: '#334155', whiteSpace: 'nowrap' }}>Monthly Budget</label>
-                <input
-                    type="number" placeholder="Enter monthly budget (optional)"
-                    value={budget} onChange={(e) => setBudget(e.target.value)}
-                    style={{ ...inputS, maxWidth: '260px' }}
-                />
-                <span style={{ fontSize: '12px', color: '#94A3B8' }}>Budget planning coming soon</span>
+            {/* ═══ Monthly Budget ═══ */}
+            <div>
+                <div className="budget-row">
+                    <span className="budget-label">Monthly Budget</span>
+                    <input className="budget-input" type="number" placeholder="Enter monthly budget (optional)" value={budget} onChange={(e) => { setBudget(e.target.value); setSelectedStrategy(null); }} />
+                    {budgetStatus === 'none' && <span className="budget-deficit" style={{ color: 'var(--ink-soft)' }}>Enter a budget to get smart strategies</span>}
+                    {budgetStatus === 'within' && <span className="budget-deficit" style={{ color: 'var(--green)' }}>✓ Your goals fit within your budget</span>}
+                    {budgetStatus === 'deficit' && <span className="budget-deficit">⚠ Budget deficit: {fmt(overallSummary.totalSIP - Number(budget))}/mo - see strategies below</span>}
+                </div>
             </div>
+
+            {/* ═══ Strategy Cards ═══ */}
+            {strategyResults && (
+                <div className="strategy-section" id="strategySection">
+                    <div className="strategy-header">
+                        <span className="strategy-icon">◎</span>
+                        <div className="strategy-title">Budget Resolution Strategies</div>
+                    </div>
+                    <div className="strategy-desc">Your total SIP ({fmt(overallSummary?.totalSIP)}) exceeds your monthly budget ({fmt(Number(budget))}). Select a strategy to explore trade-offs.</div>
+
+                    <div className="strategy-cards">
+                        {strategyResults.map(s => {
+                            const isActive = selectedStrategy === s.id;
+                            return (
+                                <div key={s.id} onClick={() => setSelectedStrategy(isActive ? null : s.id)} className={`strategy-card ${isActive ? 'active' : ''}`}>
+                                    <div className="strategy-card-title">{s.name}</div>
+                                    <div className="strategy-card-desc">{s.description}</div>
+                                    {s.deficitResolved ? (
+                                        <div className="strategy-resolved">✓ Deficit Resolved</div>
+                                    ) : (
+                                        <div className="strategy-resolved" style={{ color: 'var(--red)' }}>Shortfall: {fmt(s.remainingShortfall)}/mo</div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                    {selectedStrategy && (() => {
+                        const active = strategyResults.find(s => s.id === selectedStrategy);
+                        return active ? (
+                            <div style={{ marginTop: '20px', padding: '12px 16px', backgroundColor: 'var(--paper)', borderLeft: '2px solid var(--ink)', fontSize: '13px', color: 'var(--ink-soft)' }}>
+                                <strong style={{ color: 'var(--ink)', fontWeight: 500 }}>Trade-off:</strong> {active.tradeoff}
+                            </div>
+                        ) : null;
+                    })()}
+                </div>
+            )}
 
             {/* ═══ Goal Form ═══ */}
             {showForm && (
-                <div style={cardS}>
-                    <div style={headerS}>{editingId ? '✏️ Edit Goal' : '➕ Add New Goal'}</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', alignItems: 'end' }}>
-                        {/* Name */}
+                <div style={{ border: '0.5px solid var(--ink-ghost)', padding: '24px 28px' }}>
+                    <div className="section-heading" style={{ marginBottom: '24px' }}>{editingId ? 'Edit Goal' : 'Add New Goal'}</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', alignItems: 'end' }}>
                         <div>
-                            <label style={labelS}>Goal Name</label>
-                            <input value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="e.g. Dream House" style={inputS} />
+                            <label className="act-label" style={{ display: 'block', marginBottom: '8px' }}>Goal Name</label>
+                            <input value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="e.g. Dream House" className="budget-input" style={{ width: '100%', border: '0.5px solid var(--ink-ghost)' }} />
                         </div>
-                        {/* Target */}
                         <div>
-                            <label style={labelS}>Target Amount (₹)</label>
-                            <input type="number" value={formTarget} onChange={(e) => setFormTarget(e.target.value)} placeholder="e.g. 10000000" style={inputS} />
+                            <label className="act-label" style={{ display: 'block', marginBottom: '8px' }}>Target Amount (₹)</label>
+                            <input type="number" value={formTarget} onChange={(e) => setFormTarget(e.target.value)} placeholder="e.g. 10000000" className="budget-input" style={{ width: '100%', border: '0.5px solid var(--ink-ghost)' }} />
                         </div>
-                        {/* Years */}
                         <div>
-                            <label style={labelS}>Time Horizon (Years)</label>
-                            <input type="number" min="1" max="40" value={formYears} onChange={(e) => setFormYears(e.target.value)} placeholder="e.g. 10" style={inputS} />
+                            <label className="act-label" style={{ display: 'block', marginBottom: '8px' }}>Time Horizon (Years)</label>
+                            <input type="number" min="1" max="40" value={formYears} onChange={(e) => setFormYears(e.target.value)} placeholder="e.g. 10" className="budget-input" style={{ width: '100%', border: '0.5px solid var(--ink-ghost)' }} />
                         </div>
                     </div>
 
-                    {/* Risk Level + Allocation Preview */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px', marginTop: '12px', alignItems: 'end' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: '16px', marginTop: '20px', alignItems: 'end' }}>
                         <div>
-                            <label style={labelS}>Risk Level</label>
-                            <select value={formRisk} onChange={(e) => setFormRisk(Number(e.target.value))} style={inputS}>
+                            <label className="act-label" style={{ display: 'block', marginBottom: '8px' }}>Risk Level Strategy</label>
+                            <select value={formRisk} onChange={(e) => setFormRisk(Number(e.target.value))} className="budget-input" style={{ width: '100%', border: '0.5px solid var(--ink-ghost)' }}>
                                 {RISK_LABELS.map((label, i) => <option key={i} value={i}>{label}</option>)}
                             </select>
                         </div>
-                        {formYears && (
-                            <div style={{ padding: '10px 12px', backgroundColor: '#F8FAFC', borderRadius: '8px', border: '1px solid #E8ECF1', fontSize: '12px', color: '#64748B' }}>
-                                {(() => {
-                                    const alloc = getGoalAllocation(Number(formYears) || 1, formRisk);
-                                    return (
-                                        <>
-                                            <span style={{ fontWeight: 600, color: '#334155', marginRight: '4px' }}>Allocation:</span>
-                                            Equity {alloc.equity}% · Debt {alloc.debt}% · Commodity {alloc.commodity}%
-                                        </>
-                                    );
-                                })()}
-                            </div>
-                        )}
+                        <div>
+                            <label className="act-label" style={{ display: 'block', marginBottom: '8px' }}>Priority</label>
+                            <select value={formPriority} onChange={(e) => setFormPriority(Number(e.target.value))} className="budget-input" style={{ width: '100%', border: '0.5px solid var(--ink-ghost)' }}>
+                                {[1, 2, 3, 4, 5].map(v => <option key={v} value={v}>{v} - {['Most Flexible', 'Flexible', 'Medium', 'Important', 'Must Protect'][v - 1]}</option>)}
+                            </select>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', height: '48px', gap: '10px' }}>
+                            <input type="checkbox" id="inflationToggle" checked={formIncludeInflation} onChange={(e) => setFormIncludeInflation(e.target.checked)} style={{ width: '16px', height: '16px', cursor: 'pointer', marginLeft: '12px' }} />
+                            <label htmlFor="inflationToggle" style={{ fontSize: '13px', fontWeight: 400, color: 'var(--ink)', cursor: 'pointer' }}>Include Inflation (6% p.a.)</label>
+                        </div>
                     </div>
 
-                    {/* Buttons */}
-                    <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-                        <button onClick={addGoal} style={btnPrimary}>
-                            {editingId ? 'Update Goal' : 'Add Goal'}
-                        </button>
-                        <button onClick={resetForm} style={{ ...btnPrimary, backgroundColor: '#F1F5F9', color: '#64748B' }}>Cancel</button>
+                    {formRisk === 5 && (
+                        <div style={{ marginTop: '24px', padding: '20px', border: '0.5px solid var(--ink-ghost)' }}>
+                            <div className="act-label">Custom Strategy Setup</div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                                <div>
+                                    <div style={{ fontSize: '11px', color: 'var(--ink-soft)', marginBottom: '12px', textTransform: 'uppercase' }}>Asset Allocation (%)</div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                                        <div>
+                                            <label className="act-label" style={{ marginBottom: '6px', display: 'block' }}>Equity</label>
+                                            <input type="number" value={customEquityAlloc} onChange={(e) => setCustomEquityAlloc(e.target.value)} className="budget-input" style={{ width: '100%', border: '0.5px solid var(--ink-ghost)', padding: '10px' }} placeholder="70" />
+                                        </div>
+                                        <div>
+                                            <label className="act-label" style={{ marginBottom: '6px', display: 'block' }}>Debt</label>
+                                            <input type="number" value={customDebtAlloc} onChange={(e) => setCustomDebtAlloc(e.target.value)} className="budget-input" style={{ width: '100%', border: '0.5px solid var(--ink-ghost)', padding: '10px' }} placeholder="25" />
+                                        </div>
+                                        <div>
+                                            <label className="act-label" style={{ marginBottom: '6px', display: 'block' }}>Commodity</label>
+                                            <input type="number" value={customCommodityAlloc} onChange={(e) => setCustomCommodityAlloc(e.target.value)} className="budget-input" style={{ width: '100%', border: '0.5px solid var(--ink-ghost)', padding: '10px' }} placeholder="5" />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: '11px', color: 'var(--ink-soft)', marginBottom: '12px', textTransform: 'uppercase' }}>Expected Returns (% p.a.)</div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                                        <div>
+                                            <label className="act-label" style={{ marginBottom: '6px', display: 'block' }}>Equity</label>
+                                            <input type="number" value={customEquityReturn} onChange={(e) => setCustomEquityReturn(e.target.value)} className="budget-input" style={{ width: '100%', border: '0.5px solid var(--ink-ghost)', padding: '10px' }} placeholder="12" />
+                                        </div>
+                                        <div>
+                                            <label className="act-label" style={{ marginBottom: '6px', display: 'block' }}>Debt</label>
+                                            <input type="number" value={customDebtReturn} onChange={(e) => setCustomDebtReturn(e.target.value)} className="budget-input" style={{ width: '100%', border: '0.5px solid var(--ink-ghost)', padding: '10px' }} placeholder="7" />
+                                        </div>
+                                        <div>
+                                            <label className="act-label" style={{ marginBottom: '6px', display: 'block' }}>Commodity</label>
+                                            <input type="number" value={customCommodityReturn} onChange={(e) => setCustomCommodityReturn(e.target.value)} className="budget-input" style={{ width: '100%', border: '0.5px solid var(--ink-ghost)', padding: '10px' }} placeholder="7" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {formYears && formRisk !== 5 && (
+                        <div style={{ marginTop: '16px', fontSize: '12px', color: 'var(--ink-soft)' }}>
+                            {(() => {
+                                const alloc = getGoalAllocation(Number(formYears) || 1, formRisk);
+                                return <><span style={{ color: 'var(--ink)', fontWeight: 500 }}>Auto-Allocation: </span>Equity {alloc.equity}% · Debt {alloc.debt}% · Commodity {alloc.commodity}%</>;
+                            })()}
+                        </div>
+                    )}
+
+                    <div style={{ display: 'flex', gap: '12px', marginTop: '24px', alignItems: 'center' }}>
+                        {(() => {
+                            const totalAlloc = Number(customEquityAlloc) + Number(customDebtAlloc) + Number(customCommodityAlloc);
+                            const isCustomInvalid = formRisk === 5 && totalAlloc !== 100;
+                            const isBasicInvalid = !formName || !formTarget || !formYears;
+                            const isDisabled = isCustomInvalid || isBasicInvalid;
+                            return (
+                                <>
+                                    <button onClick={addGoal} disabled={isDisabled} className="btn-primary" style={{ opacity: isDisabled ? 0.5 : 1 }}>
+                                        {editingId ? 'Update Goal' : 'Add Goal'}
+                                    </button>
+                                    <button onClick={resetForm} className="btn-ghost">Cancel</button>
+                                    {isCustomInvalid && <div style={{ fontSize: '12px', color: 'var(--red)' }}>⚠️ Total must be 100% (Current: {totalAlloc}%)</div>}
+                                </>
+                            );
+                        })()}
                     </div>
                 </div>
             )}
 
             {/* ═══ Goals Table ═══ */}
-            {goalResults.length > 0 && (
-                <div style={cardS}>
-                    <div style={{ ...headerS, justifyContent: 'space-between', flexWrap: 'wrap' }}>
-                        <span>📋 Your Goals</span>
+            {displayGoalResults.length > 0 && (
+                <div>
+                    <div className="goals-header">
+                        <div className="goals-title">
+                            Your Goals {selectedStrategy && <span style={{ fontSize: '12px', color: 'var(--ink-soft)', fontWeight: 300, marginLeft: '12px' }}>Strategy: {strategyResults?.find(s => s.id === selectedStrategy)?.name}</span>}
+                        </div>
                         {!showForm && (
-                            <button onClick={() => setShowForm(true)} style={{ ...btnPrimary, padding: '6px 14px', fontSize: '12px' }}>
-                                <Plus size={14} /> Add Goal
-                            </button>
+                            <button onClick={() => setShowForm(true)} className="btn-primary">+ Add Goal</button>
                         )}
                     </div>
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                                <tr>
-                                    <th style={thS}>Goal</th>
-                                    <th style={{ ...thS, textAlign: 'right' }}>Target</th>
-                                    <th style={{ ...thS, textAlign: 'right' }}>Inflation Adj.</th>
-                                    <th style={{ ...thS, textAlign: 'center' }}>Timeline</th>
-                                    <th style={{ ...thS, textAlign: 'center' }}>Risk</th>
-                                    <th style={{ ...thS, textAlign: 'center' }}>Allocation</th>
-                                    <th style={{ ...thS, textAlign: 'right' }}>Return</th>
-                                    <th style={{ ...thS, textAlign: 'right' }}>Monthly SIP</th>
-                                    <th style={{ ...thS, textAlign: 'center' }}>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {goalResults.map((g, i) => (
-                                    <tr key={g.id} style={{ backgroundColor: i % 2 === 0 ? '#FFFFFF' : '#FAFBFC' }}>
-                                        <td style={tdS}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <span style={{ fontWeight: 600 }}>{g.name}</span>
-                                            </div>
+                    <table className="goals-table">
+                        <thead>
+                            <tr>
+                                <th>Goal</th>
+                                <th>Priority</th>
+                                <th>Target</th>
+                                <th>Inflation Adj.</th>
+                                <th>Timeline</th>
+                                <th>Risk</th>
+                                <th>Allocation</th>
+                                <th>Return</th>
+                                <th>Monthly SIP</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {displayGoalResults.map((g, i) => {
+                                const orig = g._original;
+                                return (
+                                    <tr key={g.id}>
+                                        <td><span className="goal-name">{g.name}</span></td>
+                                        <td><span className="priority-badge">P{g.priorityWeight || 3}</span></td>
+                                        <td>
+                                            {orig && orig.target !== g.target ? (
+                                                <><span style={{ textDecoration: 'line-through', color: 'var(--ink-ghost)', fontSize: '11px' }}>{fmt(orig.target)}</span> <span style={{ color: 'var(--green)' }}>{fmt(g.target)}</span></>
+                                            ) : fmt(g.target)}
                                         </td>
-                                        <td style={{ ...tdS, textAlign: 'right' }}>{fmt(g.target)}</td>
-                                        <td style={{ ...tdS, textAlign: 'right', color: '#D97706' }}>{fmt(g.inflatedTarget)}</td>
-                                        <td style={{ ...tdS, textAlign: 'center' }}>{g.years}y</td>
-                                        <td style={{ ...tdS, textAlign: 'center' }}>
-                                            <span style={{ fontSize: '11px', fontWeight: 500, color: '#334155' }}>
-                                                {RISK_LABELS[g.riskLevel]}
+                                        <td>
+                                            {g.includeInflation ? (
+                                                <span className="inflation-adj">{fmt(g.inflatedTarget)}</span>
+                                            ) : (
+                                                <span style={{ fontSize: '11px', color: 'var(--ink-ghost)', display: 'block', lineHeight: '1.2' }}>{fmt(g.target)}<br />(No Inflation)</span>
+                                            )}
+                                        </td>
+                                        <td>
+                                            {orig && orig.years !== g.years ? (
+                                                <><span style={{ textDecoration: 'line-through', color: 'var(--ink-ghost)', fontSize: '11px' }}>{orig.years}y</span> <span style={{ color: 'var(--green)' }}>{g.years}y</span></>
+                                            ) : <>{g.years}y</>}
+                                        </td>
+                                        <td>
+                                            {orig && orig.riskLevel !== g.riskLevel ? (
+                                                <><div style={{ textDecoration: 'line-through', color: 'var(--ink-ghost)', fontSize: '10px' }}>{RISK_LABELS[orig.riskLevel]}</div><span style={{ color: 'var(--green)' }}>{RISK_LABELS[g.riskLevel]}</span></>
+                                            ) : RISK_LABELS[g.riskLevel]}
+                                        </td>
+                                        <td><span className="alloc-text">E:{g.allocation.equity}% · D:{g.allocation.debt}% · C:{g.allocation.commodity}%</span></td>
+                                        <td><span className="return-val">{(g.blendedReturn * 100).toFixed(1)}%</span></td>
+                                        <td>
+                                            <span className="sip-val">
+                                                {orig ? (
+                                                    <><span style={{ textDecoration: 'line-through', color: 'var(--ink-ghost)', fontSize: '11px' }}>{fmt(orig.sip)}</span> <span style={{ color: 'var(--green)' }}>{fmt(g.sip)}</span></>
+                                                ) : fmt(g.sip)}
                                             </span>
+                                            {g.highSip && <span style={{ color: 'var(--accent)', marginLeft: '4px' }}>⚠</span>}
                                         </td>
-                                        <td style={{ ...tdS, textAlign: 'center', fontSize: '11px', color: '#64748B' }}>
-                                            E:{g.allocation.equity}% · D:{g.allocation.debt}% · C:{g.allocation.commodity}%
-                                        </td>
-                                        <td style={{ ...tdS, textAlign: 'right', fontWeight: 600 }}>{(g.blendedReturn * 100).toFixed(1)}%</td>
-                                        <td style={{ ...tdS, textAlign: 'right', fontWeight: 600 }}>
-                                            {fmt(g.sip)}
-                                            {g.highSip && <AlertTriangle size={13} color="#EF4444" style={{ marginLeft: '4px', verticalAlign: 'middle' }} />}
-                                        </td>
-                                        <td style={{ ...tdS, textAlign: 'center' }}>
-                                            <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
-                                                <button onClick={() => editGoal(g)} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
-                                                    <Edit2 size={14} color="#64748B" />
-                                                </button>
-                                                <button onClick={() => deleteGoal(g.id)} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
-                                                    <Trash2 size={14} color="#EF4444" />
-                                                </button>
+                                        <td>
+                                            <div className="row-actions">
+                                                <button className="action-btn" onClick={() => editGoal(g)}>✎</button>
+                                                <button className="action-btn del" onClick={() => deleteGoal(g.id)}>✕</button>
                                             </div>
                                         </td>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                    {/* High SIP warning */}
-                    {goalResults.some(g => g.highSip) && (
-                        <div style={{ marginTop: '12px', padding: '10px 14px', backgroundColor: '#FEF2F2', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#DC2626' }}>
-                            <AlertTriangle size={16} />
-                            <span><strong>High SIP detected</strong> — Consider increasing the time horizon or reducing the goal amount for flagged goals.</span>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                    {displayGoalResults.some(g => g.highSip) && (
+                        <div style={{ marginTop: '16px', fontSize: '12px', color: 'var(--accent)' }}>
+                            ⚠ High SIP detected - Consider increasing the time horizon or reducing the goal amount.
                         </div>
                     )}
                 </div>
             )}
 
+            {/* ═══ Overall Summary ═══ */}
+            {displaySummary && displayGoalResults.length > 0 && (
+                <div>
+                    <div className="act-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>Overall Summary</span>
+                        {selectedStrategy && (
+                            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--green)', padding: '4px 10px', backgroundColor: 'rgba(26,122,80,0.1)', borderRadius: '20px' }}>
+                                Strategy Active: {strategyResults?.find(s => s.id === selectedStrategy)?.name}
+                            </span>
+                        )}
+                    </div>
+                    <div className="summary-kpis">
+                        {[
+                            { label: 'Total Monthly SIP', value: fmt(displaySummary.totalSIP), original: selectedStrategy && overallSummary ? fmt(overallSummary.totalSIP) : null },
+                            { label: 'Total Invested', value: fmt(displaySummary.totalInvested), original: selectedStrategy && overallSummary ? fmt(overallSummary.totalInvested) : null },
+                            { label: 'Total Profit Earned', value: fmt(displaySummary.totalProfit), original: selectedStrategy && overallSummary ? fmt(overallSummary.totalProfit) : null },
+                            { label: 'Total Corpus', value: fmt(displaySummary.totalCorpus), original: selectedStrategy && overallSummary ? fmt(overallSummary.totalCorpus) : null },
+                        ].map((m, i) => (
+                            <div key={i} className="skpi">
+                                <div className="skpi-label">{m.label}</div>
+                                {m.original ? (
+                                    <div className="skpi-value">
+                                        <span style={{ textDecoration: 'line-through', color: 'var(--ink-ghost)', fontSize: '14px', marginRight: '8px' }}>{m.original}</span>
+                                        <span style={{ color: 'var(--green)' }}>{m.value}</span>
+                                    </div>
+                                ) : (
+                                    <div className="skpi-value">{m.value}</div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                    <div className="summary-note">
+                        {selectedStrategy
+                            ? `Values shown reflect the "${strategyResults?.find(s => s.id === selectedStrategy)?.name}" strategy. Original values are shown crossed out.`
+                            : "Totals represent the sum of each goal's values at their respective end dates."
+                        }
+                    </div>
+                </div>
+            )}
+
             {/* ═══ Goal Detail Tabs ═══ */}
-            {goalResults.length > 0 && (() => {
-                const activeId = activeGoalTab || goalResults[0]?.id;
-                const g = goalResults.find(x => x.id === activeId) || goalResults[0];
+            {displayGoalResults.length > 0 && (() => {
+                const activeId = activeGoalTab || displayGoalResults[0]?.id;
+                const g = displayGoalResults.find(x => x.id === activeId) || displayGoalResults[0];
                 if (!g) return null;
                 return (
-                    <div style={cardS}>
-                        {/* Tab switcher */}
-                        <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #E8ECF1', marginBottom: '20px', overflowX: 'auto' }}>
-                            {goalResults.map(goal => {
+                    <div>
+                        <div className="act-label">Goal Detail</div>
+
+                        <div className="detail-tabs">
+                            {displayGoalResults.map(goal => {
                                 const isActive = goal.id === g.id;
                                 return (
-                                    <button key={goal.id} onClick={() => setActiveGoalTab(goal.id)} style={{
-                                        display: 'flex', alignItems: 'center', gap: '6px',
-                                        padding: '10px 18px', fontSize: '13px', fontWeight: isActive ? 600 : 400,
-                                        color: isActive ? '#1E293B' : '#94A3B8',
-                                        borderBottom: isActive ? '2px solid #1E293B' : '2px solid transparent',
-                                        background: 'none', border: 'none', borderBottomWidth: '2px', borderBottomStyle: 'solid',
-                                        cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s'
-                                    }}>
+                                    <div key={goal.id} onClick={() => setActiveGoalTab(goal.id)} className={`detail-tab ${isActive ? 'active' : ''}`}>
                                         {goal.name}
-                                    </button>
+                                    </div>
                                 );
                             })}
                         </div>
 
-                        {/* Header */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B' }}>{g.name}</span>
-                            </div>
-                            <span style={{ fontSize: '12px', color: '#94A3B8' }}>
-                                {g.years} years · {RISK_LABELS[g.riskLevel]} · {(g.blendedReturn * 100).toFixed(1)}% return
-                            </span>
-                        </div>
-
-                        {/* Metrics row */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px', marginBottom: '20px' }}>
-                            {[
-                                { label: 'Monthly SIP', value: fmt(g.sip) },
-                                { label: 'Total Invested', value: fmt(g.totalInvested) },
-                                { label: 'Estimated Corpus', value: fmt(g.inflatedTarget) },
-                                { label: 'Wealth Gained', value: fmt(g.wealthGained) },
-                                { label: 'Blended Return', value: (g.blendedReturn * 100).toFixed(1) + '% p.a.' },
-                            ].map((m, i) => (
-                                <div key={i} style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#F8FAFC', border: '1px solid #E8ECF1' }}>
-                                    <div style={{ fontSize: '10px', fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>{m.label}</div>
-                                    <div style={{ fontSize: '17px', fontWeight: 700, color: '#1E293B' }}>{m.value}</div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Allocation bar */}
-                        <div style={{ marginBottom: '16px' }}>
-                            <div style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', marginBottom: '6px' }}>Asset Allocation</div>
-                            <div style={{ display: 'flex', borderRadius: '6px', overflow: 'hidden', height: '22px' }}>
-                                <div style={{ width: `${g.allocation.equity}%`, backgroundColor: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: g.allocation.equity < 10 ? '8px' : '10px', fontWeight: 600 }}>
-                                    {g.allocation.equity && `Equity ${g.allocation.equity}%`}
-                                </div>
-                                <div style={{ width: `${g.allocation.debt}%`, backgroundColor: '#94A3B8', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: g.allocation.debt < 10 ? '8px' : '10px', fontWeight: 600 }}>
-                                    {g.allocation.debt && `Debt ${g.allocation.debt}%`}
-                                </div>
-                                <div style={{ width: `${g.allocation.commodity}%`, backgroundColor: '#CBD5E1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#334155', fontSize: g.allocation.commodity < 10 ? '8px' : '10px', fontWeight: 600 }}>
-                                    {g.allocation.commodity && `Commodity ${g.allocation.commodity}%`}
+                        <div>
+                            <div className="goal-detail-header">
+                                <div className="goal-detail-title">{g.name}</div>
+                                <div className="goal-detail-meta">
+                                    {g.years} years · {RISK_LABELS[g.riskLevel]} · {(g.blendedReturn * 100).toFixed(1)}% return
                                 </div>
                             </div>
-                            <div style={{ display: 'flex', gap: '16px', marginTop: '6px', fontSize: '11px', color: '#64748B', flexWrap: 'wrap' }}>
-                                <span>Equity {g.allocation.equity}% @ {(g.equityReturn * 100).toFixed(1)}%</span>
-                                <span>Debt {g.allocation.debt}% @ {(g.debtReturn * 100).toFixed(1)}%</span>
-                                <span>Commodity {g.allocation.commodity}% @ {(g.commodityReturn * 100).toFixed(1)}%</span>
+
+                            <div className="goal-kpis">
+                                {[
+                                    { label: 'Monthly SIP', value: fmt(g.sip) },
+                                    { label: 'Total Invested', value: fmt(g.totalInvested) },
+                                    { label: g.includeInflation ? 'Estimated Corpus (Adj.)' : 'Target Corpus (Base)', value: fmt(g.inflatedTarget) },
+                                    { label: 'Wealth Gained', value: fmt(g.wealthGained) },
+                                    { label: 'Blended Return', value: (g.blendedReturn * 100).toFixed(1) + '% p.a.' },
+                                ].map((m, i) => (
+                                    <div key={i} className="gkpi">
+                                        <div className="gkpi-label">{m.label}</div>
+                                        <div className="gkpi-value">{m.value}</div>
+                                    </div>
+                                ))}
                             </div>
-                        </div>
 
-                        {/* Rationale */}
-                        <div style={{ padding: '10px 14px', backgroundColor: '#F8FAFC', borderRadius: '8px', fontSize: '13px', color: '#64748B', marginBottom: '20px', borderLeft: '3px solid #CBD5E1' }}>
-                            {g.rationale}
-                        </div>
-
-                        {/* Combo Chart */}
-                        {g.yearlyData.length > 0 && (
-                            <div style={{ marginBottom: '20px' }}>
-                                <div style={{ fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '10px' }}>Growth Visualization</div>
-                                <ResponsiveContainer width="100%" height={300}>
-                                    <ComposedChart data={g.yearlyData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#E8ECF1" />
-                                        <XAxis dataKey="year" tick={{ fontSize: 11, fill: '#64748B' }} />
-                                        <YAxis tick={{ fontSize: 11, fill: '#64748B' }} tickFormatter={(v) => fmt(v)} />
-                                        <RechartsTooltip content={<ChartTooltip />} />
-                                        <Legend wrapperStyle={{ fontSize: '11px' }} />
-                                        <Bar dataKey="invested" name="Amount Invested" stackId="a" fill="#CBD5E1" radius={[0, 0, 0, 0]} />
-                                        <Bar dataKey="profit" name="Profit Earned" stackId="a" fill="#64748B" radius={[4, 4, 0, 0]} />
-                                        <Line type="monotone" dataKey="total" name="Total Corpus" stroke="#1E293B" strokeWidth={2} dot={{ r: 3, fill: '#1E293B' }} />
-                                    </ComposedChart>
-                                </ResponsiveContainer>
-                            </div>
-                        )}
-
-                        {/* Breakdown Table (Yearly / Monthly Tabs) */}
-                        {(g.yearlyData.length > 0 || g.monthlyData.length > 0) && (
-                            <div>
-                                <div style={{ display: 'flex', gap: '12px', borderBottom: '1px solid #E8ECF1', marginBottom: '10px' }}>
-                                    <button onClick={() => setActiveTableTab('yearly')} style={{
-                                        background: 'none', border: 'none', padding: '8px 12px', fontSize: '13px', fontWeight: activeTableTab === 'yearly' ? 600 : 400,
-                                        color: activeTableTab === 'yearly' ? '#1E293B' : '#94A3B8',
-                                        borderBottom: activeTableTab === 'yearly' ? '2px solid #1E293B' : '2px solid transparent',
-                                        cursor: 'pointer', transition: 'all 0.15s'
-                                    }}>Yearly Breakdown</button>
-                                    <button onClick={() => setActiveTableTab('monthly')} style={{
-                                        background: 'none', border: 'none', padding: '8px 12px', fontSize: '13px', fontWeight: activeTableTab === 'monthly' ? 600 : 400,
-                                        color: activeTableTab === 'monthly' ? '#1E293B' : '#94A3B8',
-                                        borderBottom: activeTableTab === 'monthly' ? '2px solid #1E293B' : '2px solid transparent',
-                                        cursor: 'pointer', transition: 'all 0.15s'
-                                    }}>Monthly Breakdown</button>
+                            <div className="alloc-section">
+                                <div className="act-label">Asset Allocation</div>
+                                <div className="alloc-bar-wrap">
+                                    <div className="alloc-segment" style={{ flex: g.allocation.equity || 0.1, background: '#1C1A17' }}>
+                                        {g.allocation.equity > 10 ? `Equity ${g.allocation.equity}%` : ''}
+                                    </div>
+                                    <div className="alloc-segment" style={{ flex: g.allocation.debt || 0.1, background: '#6B6760' }}>
+                                        {g.allocation.debt > 10 ? `Debt ${g.allocation.debt}%` : ''}
+                                    </div>
+                                    <div className="alloc-segment" style={{ flex: g.allocation.commodity || 0.1, background: '#C4BFB8', color: 'var(--ink-soft)' }}>
+                                        {g.allocation.commodity > 5 ? `${g.allocation.commodity}%` : ''}
+                                    </div>
                                 </div>
-                                <div style={{ overflowX: 'auto', maxHeight: '300px', overflowY: 'auto' }}>
-                                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                        <thead style={{ position: 'sticky', top: 0, backgroundColor: '#FFFFFF' }}>
+                                <div className="alloc-labels">
+                                    <div className="alloc-label-item"><span>Equity {g.allocation.equity}%</span> @ {(g.riskLevel === 5 ? g.customEquityReturn : g.equityReturn * 100).toFixed(1)}%</div>
+                                    <div className="alloc-label-item"><span>Debt {g.allocation.debt}%</span> @ {(g.riskLevel === 5 ? g.customDebtReturn : g.debtReturn * 100).toFixed(1)}%</div>
+                                    <div className="alloc-label-item"><span>Commodity {g.allocation.commodity}%</span> @ {(g.riskLevel === 5 ? g.customCommodityReturn : g.commodityReturn * 100).toFixed(1)}%</div>
+                                </div>
+                            </div>
+
+                            <div className="insight-box">
+                                <div className="insight-text">{g.rationale}</div>
+                            </div>
+
+                            {/* Combo Chart */}
+                            {g.yearlyData.length > 0 && (
+                                <div style={{ marginBottom: '36px' }}>
+                                    <div className="act-label">Growth Visualisation</div>
+                                    <div style={{ padding: '24px', border: '0.5px solid var(--ink-ghost)', height: '360px' }}>
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <ComposedChart data={g.yearlyData} margin={{ top: 5, right: 0, left: -20, bottom: 5 }}>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--ink-ghost)" opacity={0.5} />
+                                                <XAxis dataKey="year" tick={{ fontFamily: 'Outfit', fontSize: 11, fill: 'var(--ink-soft)' }} axisLine={false} tickLine={false} dy={10} />
+                                                <YAxis tick={{ fontFamily: 'Outfit', fontSize: 11, fill: 'var(--ink-soft)' }} axisLine={false} tickLine={false} tickFormatter={(v) => (v > 10000 ? (v / 100000).toFixed(1) + 'L' : v)} />
+                                                <RechartsTooltip content={<ChartTooltip />} />
+                                                <Bar dataKey="invested" name="Amount Invested" stackId="a" fill="#E8E3DA" />
+                                                <Bar dataKey="profit" name="Profit Earned" stackId="a" fill="#4A5568" />
+                                                <Line type="monotone" dataKey="total" name="Total Corpus" stroke="#C4703A" strokeWidth={2} dot={{ r: 3, fill: '#C4703A', strokeWidth: 0 }} />
+                                            </ComposedChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Breakdown Table */}
+                            {(g.yearlyData.length > 0 || g.monthlyData.length > 0) && (
+                                <div>
+                                    <div className="breakdown-tabs">
+                                        <div onClick={() => setActiveTableTab('yearly')} className={`breakdown-tab ${activeTableTab === 'yearly' ? 'active' : ''}`}>Yearly Breakdown</div>
+                                        <div onClick={() => setActiveTableTab('monthly')} className={`breakdown-tab ${activeTableTab === 'monthly' ? 'active' : ''}`}>Monthly Breakdown</div>
+                                    </div>
+                                    <table className="breakdown-table">
+                                        <thead>
                                             <tr>
-                                                <th style={thS}>{activeTableTab === 'yearly' ? 'Year' : 'Month'}</th>
-                                                <th style={{ ...thS, textAlign: 'right' }}>Cumulative Invested</th>
-                                                <th style={{ ...thS, textAlign: 'right' }}>Profit Earned</th>
-                                                <th style={{ ...thS, textAlign: 'right' }}>Total Corpus</th>
+                                                <th>{activeTableTab === 'yearly' ? 'Year' : 'Month'}</th>
+                                                <th>Cumulative Invested</th>
+                                                <th>Profit Earned</th>
+                                                <th>Total Corpus</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {(activeTableTab === 'yearly' ? g.yearlyData : g.monthlyData).map((row, ri) => (
-                                                <tr key={activeTableTab === 'yearly' ? row.year : row.month} style={{ backgroundColor: ri % 2 === 0 ? '#FFFFFF' : '#FAFBFC' }}>
-                                                    <td style={tdS}>{activeTableTab === 'yearly' ? `Year ${row.year}` : `Month ${row.month}`}</td>
-                                                    <td style={{ ...tdS, textAlign: 'right' }}>{fmt(row.invested)}</td>
-                                                    <td style={{ ...tdS, textAlign: 'right', fontWeight: 600 }}>{fmt(row.profit)}</td>
-                                                    <td style={{ ...tdS, textAlign: 'right', fontWeight: 700 }}>{fmt(row.total)}</td>
+                                                <tr key={activeTableTab === 'yearly' ? row.year : row.month}>
+                                                    <td>{activeTableTab === 'yearly' ? `Year ${row.year}` : `Month ${row.month}`}</td>
+                                                    <td>{fmt(row.invested)}</td>
+                                                    <td style={{ fontWeight: 500 }}>{fmt(row.profit)}</td>
+                                                    <td style={{ fontWeight: 500, color: 'var(--ink)' }}>{fmt(row.total)}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                     </table>
                                 </div>
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
                 );
             })()}
 
-            {/* ═══ Overall Summary ═══ */}
-            {overallSummary && goalResults.length > 0 && (
-                <div style={{ ...cardS, borderTop: '2px solid #1E293B' }}>
-                    <div style={headerS}>
-                        <TrendingUp size={16} />
-                        <span>Overall Summary</span>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
-                        {[
-                            { label: 'Total Monthly SIP', value: fmt(overallSummary.totalSIP) },
-                            { label: 'Total Amount Invested', value: fmt(overallSummary.totalInvested) },
-                            { label: 'Total Profit Earned', value: fmt(overallSummary.totalProfit) },
-                            { label: 'Total Corpus', value: fmt(overallSummary.totalCorpus) },
-                        ].map((m, i) => (
-                            <div key={i} style={{ padding: '14px', borderRadius: '8px', backgroundColor: '#F8FAFC', border: '1px solid #E8ECF1', textAlign: 'center' }}>
-                                <div style={{ fontSize: '10px', fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>{m.label}</div>
-                                <div style={{ fontSize: '20px', fontWeight: 700, color: '#1E293B' }}>{m.value}</div>
-                            </div>
-                        ))}
-                    </div>
-                    <div style={{ marginTop: '10px', fontSize: '11px', color: '#94A3B8', textAlign: 'center' }}>
-                        Totals represent the sum of each goal's values at their respective end dates.
-                    </div>
-                </div>
-            )}
-
             {/* ═══ Empty State ═══ */}
             {goals.length === 0 && !showForm && (
-                <div style={{ ...cardS, textAlign: 'center', padding: '60px 20px', color: '#94A3B8' }}>
-                    <Target size={40} strokeWidth={1.2} style={{ marginBottom: '12px', color: '#CBD5E1' }} />
-                    <div style={{ fontSize: '16px', fontWeight: 600, color: '#64748B', marginBottom: '8px' }}>No goals added yet</div>
-                    <div style={{ fontSize: '13px', marginBottom: '20px' }}>Start planning your financial future by adding your first goal.</div>
+                <div style={{ textAlign: 'center', padding: '60px 20px', border: '0.5px solid var(--ink-ghost)' }}>
+                    <div className="page-title" style={{ fontSize: '24px', marginBottom: '8px' }}>No goals added yet</div>
+                    <div className="page-desc" style={{ marginBottom: '24px' }}>Start planning your financial future by adding your first goal.</div>
 
                     <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
-                        <button onClick={() => setShowForm(true)} style={btnPrimary}>
-                            <Plus size={16} /> Add First Goal
-                        </button>
-                        <button onClick={() => fileInputRef.current?.click()} style={{ ...btnPrimary, backgroundColor: '#F8FAFC', color: '#334155', border: '1px solid #E8ECF1' }}>
-                            <UploadCloud size={16} /> Import from Excel
-                        </button>
+                        <button onClick={() => setShowForm(true)} className="btn-primary">+ Add First Goal</button>
+                        <button onClick={() => fileInputRef.current?.click()} className="btn-ghost">↑ Import from Excel</button>
                     </div>
-                    <div style={{ marginTop: '16px', fontSize: '12px' }}>
-                        Need an Excel template? <button onClick={downloadSampleExcel} style={{ background: 'none', border: 'none', color: '#3B82F6', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Download it here</button>.
+                    <div style={{ marginTop: '16px', fontSize: '13px', color: 'var(--ink-soft)' }}>
+                        Need an Excel template? <button onClick={downloadSampleExcel} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Download it here</button>.
                     </div>
                 </div>
             )}
