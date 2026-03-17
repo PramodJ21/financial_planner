@@ -3,14 +3,7 @@ import { fetchWithAuth } from '../api';
 import { Link } from 'react-router-dom';
 import { ShieldCheck, Users, Wallet, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
-const fmt = (val) => {
-    const n = Number(val) || 0;
-    if (n >= 10000000) return '₹' + (n / 10000000).toFixed(1) + 'Cr';
-    if (n >= 100000) return '₹' + (n / 100000).toFixed(1) + 'L';
-    if (n >= 1000) return '₹' + (n / 1000).toFixed(1) + 'K';
-    return '₹' + n.toLocaleString('en-IN');
-};
-const fmtFull = (val) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val || 0);
+import { fmt, fmtFull } from '../utils/formatCurrency';
 
 function Estate() {
     const [data, setData] = useState(null);

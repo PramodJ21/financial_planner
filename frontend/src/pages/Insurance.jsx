@@ -1,30 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { fetchWithAuth } from '../api';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, ShieldAlert } from 'lucide-react';
+import { ShieldAlert } from 'lucide-react';
+import { fmt, fmtFull } from '../utils/formatCurrency';
 
-const fmt = (val) => {
-    const n = Number(val) || 0;
-    if (n >= 10000000) return '₹' + (n / 10000000).toFixed(1) + 'Cr';
-    if (n >= 100000) return '₹' + (n / 100000).toFixed(1) + 'L';
-    if (n >= 1000) return '₹' + (n / 1000).toFixed(1) + 'K';
-    return '₹' + n.toLocaleString('en-IN');
-};
-const fmtFull = (val) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val || 0);
-
-const StatusBadge = ({ actual, min, max }) => {
-    const inRange = actual >= min && actual <= max;
-    return (
-        <span style={{
-            fontSize: '11px', fontWeight: 600, padding: '4px 10px', borderRadius: '4px',
-            backgroundColor: inRange ? '#EAF5EF' : '#FBECEC',
-            color: inRange ? '#1A7A50' : '#C04040'
-        }}>
-            {inRange ? 'On track' : 'Off track'}
-        </span>
-    );
-};
+/* IN5: Match Dashboard's Insurance donut colors */
+const LIFE_COLOR = '#1C1A17';
+const HEALTH_COLOR = '#C4703A';
 
 function Insurance() {
     const [data, setData] = useState(null);
@@ -34,12 +17,24 @@ function Insurance() {
         fetchWithAuth('/dashboard/full').then(res => { setData(res); setLoading(false); }).catch(() => setLoading(false));
     }, []);
 
-    if (loading) return <div>Loading...</div>;
-    if (!data) return <div>No data. <Link to="/questionnaire">Complete questionnaire</Link></div>;
+    /* IN7: Branded loading state */
+    if (loading) return (
+        <div className="page-loading">
+            <div className="page-loading-box"><span>FH</span></div>
+            <div className="page-loading-text">Loading your insurance data...</div>
+        </div>
+    );
+
+    /* IN7: Branded empty state */
+    if (!data) return (
+        <div className="page-empty">
+            <div className="page-empty-title">No insurance data available</div>
+            <Link to="/questionnaire" className="page-empty-link">Complete your questionnaire to get started</Link>
+        </div>
+    );
 
     const ins = data.insurance;
     const emergency = ins.emergency || {};
-    const COLORS_INS = ['#4F79B7', '#111B2E'];
 
     const pieData = [
         { name: 'Life Insurance', value: ins.lifeCover },
@@ -48,14 +43,55 @@ function Insurance() {
 
     const totalCover = pieData.reduce((acc, curr) => acc + curr.value, 0);
 
+    /* IN8: Build narrative from actual data */
+    const lifePctOfIdeal = ins.idealTermCover > 0 ? Math.round((ins.lifeCover / ins.idealTermCover) * 100) : 0;
+    const healthPctOfIdeal = ins.idealHealth > 0 ? Math.round((ins.healthCover / ins.idealHealth) * 100) : 0;
+
+    let narrative = '';
+    if (totalCover === 0) {
+        narrative = 'You currently have no insurance coverage on record. Insurance is a critical foundation — it protects your family and wealth from unexpected events.';
+    } else {
+        const parts = [];
+        parts.push(`Your total insurance coverage is ${fmt(totalCover)}`);
+        if (ins.lifeCover > 0) {
+            parts.push(`life cover of ${fmt(ins.lifeCover)} (${lifePctOfIdeal}% of the ideal ${fmt(ins.idealTermCover)})`);
+        }
+        if (ins.healthCover > 0) {
+            parts.push(`health cover of ${fmt(ins.healthCover)} (${healthPctOfIdeal}% of the ideal ${fmt(ins.idealHealth)})`);
+        }
+        narrative = parts[0] + ' — ' + parts.slice(1).join(' and ') + '. ';
+
+        if (ins.additionalCoverNeeded > 0) {
+            narrative += `You need an additional ${fmt(ins.additionalCoverNeeded)} in term life cover to meet the recommended 10x annual income benchmark.`;
+        } else if (ins.isAdequatelyInsured) {
+            narrative += 'Your insurance coverage meets the recommended benchmarks. Review annually as your income grows.';
+        }
+    }
+
+    /* IN10: Pre-compute analysis items with range (80%-150% of ideal) */
+    const analysisItems = [
+        { label: 'Emergency Funds', actual: emergency.emergencyFunds?.actual || 0, ideal: emergency.emergencyFunds?.ideal || 0 },
+        { label: 'Health Insurance', actual: emergency.healthInsurance?.actual || 0, ideal: emergency.healthInsurance?.ideal || 0 },
+        { label: 'Life Insurance', actual: emergency.lifeInsurance?.actual || 0, ideal: emergency.lifeInsurance?.ideal || 0 }
+    ].map(item => {
+        const min = item.ideal * 0.8;
+        const max = item.ideal * 1.5;
+        const inRange = item.actual >= min && item.actual <= max;
+        return { ...item, min, max, inRange };
+    });
+
     return (
         <div className="page-content">
 
             {/* PAGE HEADER */}
             <div className="page-header">
-                <div>
-                    <div className="page-title">Insurance</div>
-                </div>
+                <h1 className="page-title">Insurance</h1>
+            </div>
+
+            {/* IN8: NARRATIVE SECTION */}
+            <div className="inv-narrative">
+                <div className="inv-narrative-label">Insurance Summary</div>
+                <p className="inv-narrative-text">{narrative}</p>
             </div>
 
             {/* COVERAGE SUMMARY */}
@@ -64,15 +100,15 @@ function Insurance() {
                 <h2 className="section-heading">Coverage Summary</h2>
                 <div className="liab-layout">
 
-                    {/* DONUT */}
+                    {/* IN5: DONUT — colors matching Dashboard */}
                     <div className="donut-wrap">
-                        <div style={{ width: '160px', height: '160px' }}>
+                        <div className="donut-canvas">
                             {pieData.length > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
                                         <Pie data={pieData} innerRadius="70%" outerRadius="100%" paddingAngle={0} dataKey="value" stroke="none">
                                             {pieData.map((d, i) => (
-                                                <Cell key={i} fill={d.name === 'Life Insurance' ? '#1C1917' : '#A8A29E'} />
+                                                <Cell key={i} fill={d.name === 'Life Insurance' ? LIFE_COLOR : HEALTH_COLOR} />
                                             ))}
                                         </Pie>
                                         <RechartsTooltip formatter={(val) => fmtFull(val)} contentStyle={{ fontSize: '11px', padding: '4px 8px' }} />
@@ -82,7 +118,7 @@ function Insurance() {
                                 <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <div style={{ textAlign: 'center', color: 'var(--ink-ghost)' }}>
                                         <ShieldAlert size={32} style={{ margin: '0 auto 8px', display: 'block' }} />
-                                        <p style={{ fontSize: '12px' }}>No coverage</p>
+                                        <p style={{ fontSize: '14px' }}>No coverage</p>
                                     </div>
                                 </div>
                             )}
@@ -92,7 +128,7 @@ function Insurance() {
                                 const percentage = totalCover > 0 ? Math.round(d.value / totalCover * 100) : 0;
                                 return (
                                     <div key={d.name} className="legend-item">
-                                        <span className="legend-dot" style={{ background: d.name === 'Life Insurance' ? '#1C1917' : '#A8A29E' }}></span>
+                                        <span className="legend-dot" style={{ background: d.name === 'Life Insurance' ? LIFE_COLOR : HEALTH_COLOR }}></span>
                                         {d.name} ({percentage}%)
                                     </div>
                                 );
@@ -132,26 +168,18 @@ function Insurance() {
                 <div className="act-label">Analysis</div>
                 <h2 className="section-heading">Financial Analysis - Emergency Planning</h2>
                 <div className="analysis-grid">
-                    {[
-                        { label: 'Emergency Funds', actual: emergency.emergencyFunds?.actual || 0, ideal: emergency.emergencyFunds?.ideal || 0 },
-                        { label: 'Health Insurance', actual: emergency.healthInsurance?.actual || 0, ideal: emergency.healthInsurance?.ideal || 0 },
-                        { label: 'Life Insurance', actual: emergency.lifeInsurance?.actual || 0, ideal: emergency.lifeInsurance?.ideal || 0 }
-                    ].map(item => {
-                        const min = item.ideal * 0.8;
-                        const max = item.ideal * 1.5;
-                        const inRange = item.actual >= min && item.actual <= max;
-                        return (
-                            <div key={item.label} className="analysis-item">
-                                <div className="analysis-item-header">
-                                    <span className="analysis-item-title">{item.label}</span>
-                                    <span className={`status-pill ${inRange ? 'on' : 'outside'}`}>{inRange ? 'On track' : 'Outside range'}</span>
-                                </div>
-                                <div className="analysis-sub">Actual Value</div>
-                                <div className={`analysis-value ${inRange ? 'ok' : 'warn'}`}>{fmt(item.actual)}</div>
-                                <div className="analysis-ideal">Ideal: {fmt(item.ideal)}</div>
+                    {analysisItems.map(item => (
+                        <div key={item.label} className="analysis-item">
+                            <div className="analysis-item-header">
+                                <span className="analysis-item-title">{item.label}</span>
+                                <span className={`status-pill ${item.inRange ? 'on' : 'outside'}`}>{item.inRange ? 'On track' : 'Outside range'}</span>
                             </div>
-                        );
-                    })}
+                            <div className="analysis-sub">Actual Value</div>
+                            <div className={`analysis-value ${item.inRange ? 'ok' : 'warn'}`}>{fmt(item.actual)}</div>
+                            {/* IN10: Show range instead of single ideal value */}
+                            <div className="analysis-ideal">Ideal: {fmt(item.min)} – {fmt(item.max)}</div>
+                        </div>
+                    ))}
                 </div>
             </div>
 
@@ -159,15 +187,15 @@ function Insurance() {
             <div className="understanding">
                 <div className="understanding-title">Understanding Insurance & Emergency Planning</div>
                 <ul className="understanding-list">
-                    <li>Emergency Fund ideal = 6 months of effective monthly expenses (monthly living costs + prorated annual obligations like insurance & school fees).</li>
-                    <li>Health Insurance ideal = MAX(₹5L, 50% of annual gross income). Family size and city tier may warrant ₹10-25L+ cover.</li>
-                    <li>Life Insurance ideal = 10× annual gross income as a pure Term Plan, applicable only if you have dependents (spouse, children, or elderly parents).</li>
+                    <li>Emergency Fund ideal = 6 months of effective monthly expenses (monthly living costs + prorated annual obligations like insurance & school fees).{emergency.emergencyFunds?.actual > 0 ? ` You have ${fmt(emergency.emergencyFunds.actual)} saved.` : ''}</li>
+                    <li>Health Insurance ideal = MAX(₹5L, 50% of annual gross income). Family size and city tier may warrant ₹10-25L+ cover.{ins.healthCover > 0 ? ` Your cover: ${fmt(ins.healthCover)}.` : ''}</li>
+                    <li>Life Insurance ideal = 10× annual gross income as a pure Term Plan, applicable only if you have dependents (spouse, children, or elderly parents).{ins.lifeCover > 0 ? ` Your cover: ${fmt(ins.lifeCover)}.` : ''}</li>
                     <li>Term plans offer the best premium-to-cover ratio. Endowment/ULIP plans are generally not recommended for pure protection.</li>
                     <li>Status badge shows "On track" if your actual value is within 80%-150% of the ideal. Outside this range indicates a gap or over-allocation.</li>
                 </ul>
             </div>
 
-            {/* ADDITIONAL POLICIES SECTION (Styled to match the new system) */}
+            {/* IN1: POLICY EVALUATION — removed 8 always-empty columns, keep only 4 with data */}
             <div>
                 <div className="act-label">Policies</div>
                 <h2 className="section-heading">Life Insurance Policy Evaluation</h2>
@@ -175,9 +203,10 @@ function Insurance() {
                     <table className="liab-table">
                         <thead>
                             <tr>
-                                {['Policy Name', 'Plan Type', 'Sum Assured', 'Policy Before', 'Annual Premium', 'Life Cover', 'Accident Cover', 'Premium Paid Till Date', 'Premium Expense', 'Suggested Action', 'Surrender Value'].map(h => (
-                                    <th key={h} style={{ whiteSpace: 'nowrap' }}>{h}</th>
-                                ))}
+                                <th>Policy Name</th>
+                                <th>Plan Type</th>
+                                <th>Sum Assured</th>
+                                <th>Annual Premium</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -186,18 +215,11 @@ function Insurance() {
                                     <td><span className="asset-name">Term Life Policy</span></td>
                                     <td><span className="cat-good">Term</span></td>
                                     <td>{fmtFull(ins.lifeCover)}</td>
-                                    <td>-</td>
                                     <td>{fmtFull(ins.lifePremium)}</td>
-                                    <td>{fmtFull(ins.lifeCover)}</td>
-                                    <td>-</td>
-                                    <td>-</td>
-                                    <td>-</td>
-                                    <td>-</td>
-                                    <td>-</td>
                                 </tr>
                             ) : (
                                 <tr>
-                                    <td colSpan={11} style={{ padding: '40px 12px', textAlign: 'center', color: 'var(--ink-soft)' }}>No policies to evaluate</td>
+                                    <td colSpan={4} style={{ padding: '40px 12px', textAlign: 'center', color: 'var(--ink-soft)', fontSize: '16px' }}>No policies to evaluate</td>
                                 </tr>
                             )}
                         </tbody>
@@ -213,9 +235,10 @@ function Insurance() {
                     <table className="liab-table">
                         <thead>
                             <tr>
-                                {['Traditional / Life Insurance', 'Sum Assured', 'Premium', 'Term (yrs)', 'Plan Document'].map(h => (
-                                    <th key={h}>{h}</th>
-                                ))}
+                                <th>Insurance Type</th>
+                                <th>Sum Assured</th>
+                                <th>Premium</th>
+                                <th>Term (yrs)</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -225,29 +248,37 @@ function Insurance() {
                                     <td>{fmt(ins.additionalCoverNeeded)}</td>
                                     <td>-</td>
                                     <td>-</td>
-                                    <td>-</td>
                                 </tr>
                             )}
                             <tr>
                                 <td><span className="asset-name">Ideal term life cover: {fmt(ins.idealTermCover)}</span></td>
-                                <td colSpan={4}></td>
+                                <td colSpan={3}></td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            {/* IMPACT ALERTS */}
+            {/* IN9: IMPACT ALERT — CSS class instead of inline styles */}
             {ins.additionalCoverNeeded > 0 && (
-                <div style={{ backgroundColor: '#FBECEC', border: '0.5px solid #C04040', borderRadius: '4px', padding: '16px', display: 'flex', alignItems: 'center', gap: '12px', marginTop: '16px' }}>
-                    <ShieldAlert size={20} color="#C04040" />
-                    <div style={{ flex: 1 }}>
-                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--ink)' }}>Impact on Premiums: </span>
-                        <span style={{ fontSize: '13px', color: 'var(--ink-soft)' }}>Plan your financial protection. Required: {fmt(ins.idealTermCover)}. Shortfall: {fmt(ins.additionalCoverNeeded)}.</span>
+                <div className="impact-alert">
+                    <ShieldAlert size={20} color="var(--red)" />
+                    <div className="impact-alert-body">
+                        <strong>Impact on Premiums: </strong>
+                        Plan your financial protection. Required: {fmt(ins.idealTermCover)}. Shortfall: {fmt(ins.additionalCoverNeeded)}.
                     </div>
-                    <span style={{ fontSize: '15px', fontWeight: 700, color: '#C04040' }}>{fmt(ins.additionalCoverNeeded)}</span>
+                    <span className="impact-alert-amount">{fmt(ins.additionalCoverNeeded)}</span>
                 </div>
             )}
+
+            {/* CTA to action plan */}
+            <div className="inv-cta">
+                <div>
+                    <div className="inv-cta-title">Take action on your insurance gaps</div>
+                    <div className="inv-cta-desc">Your personalised action plan includes specific steps to improve your insurance coverage and protect your family.</div>
+                </div>
+                <Link to="/reports" className="inv-cta-link">View Action Plan ↗</Link>
+            </div>
         </div>
     );
 }

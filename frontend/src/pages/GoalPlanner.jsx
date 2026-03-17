@@ -1,10 +1,9 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { fetchWithAuth } from '../api';
 import {
     ComposedChart, Bar, Line, XAxis, YAxis, Tooltip as RechartsTooltip,
-    ResponsiveContainer, CartesianGrid, Legend, Cell
+    ResponsiveContainer, CartesianGrid
 } from 'recharts';
-import { Plus, Trash2, Target, TrendingUp, AlertTriangle, Edit2, Download, UploadCloud, FileText, Info } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -15,19 +14,7 @@ import {
 } from '../utils/goalCalculations';
 import { computeAllStrategies } from '../utils/budgetStrategies';
 
-// ═══════════════════════════════════════════════════
-// FORMATTING
-// ═══════════════════════════════════════════════════
-
-const fmt = (val) => {
-    const n = Number(val) || 0;
-    if (n >= 10000000) return '₹' + (n / 10000000).toFixed(2) + ' Cr';
-    if (n >= 100000) return '₹' + (n / 100000).toFixed(2) + 'L';
-    if (n >= 1000) return '₹' + (n / 1000).toFixed(1) + 'K';
-    return '₹' + Math.round(n).toLocaleString('en-IN');
-};
-
-const fmtFull = (val) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val || 0);
+import { fmt, fmtFull } from '../utils/formatCurrency';
 
 
 // ═══════════════════════════════════════════════════
@@ -90,6 +77,7 @@ function GoalPlanner() {
     const [customCommodityReturn, setCustomCommodityReturn] = useState('7');
     const [editingId, setEditingId] = useState(null);
     const [selectedStrategy, setSelectedStrategy] = useState(null);
+    const [notification, setNotification] = useState(null);
 
     // ── Compute results for each goal ──
     const goalResults = useMemo(() => goals.map(computeGoalResult), [goals]);
@@ -227,7 +215,7 @@ function GoalPlanner() {
     };
 
     const exportGoalsExcel = () => {
-        if (goalResults.length === 0) return alert("Add at least one goal to export.");
+        if (goalResults.length === 0) return setNotification({ type: 'warn', msg: 'Add at least one goal to export.' });
 
         const exportData = goalResults.map(g => ({
             "Goal Name": g.name,
@@ -264,7 +252,7 @@ function GoalPlanner() {
                 const ws = wb.Sheets[wsname];
                 const data = XLSX.utils.sheet_to_json(ws);
 
-                if (data.length === 0) return alert("The uploaded file is empty.");
+                if (data.length === 0) { setNotification({ type: 'warn', msg: 'The uploaded file is empty.' }); return; }
 
                 // Map excel rows to goals
                 const importedGoals = [];
@@ -297,13 +285,13 @@ function GoalPlanner() {
 
                 if (importedGoals.length > 0) {
                     setGoals(prev => [...prev, ...importedGoals]);
-                    alert(`Successfully imported ${importedGoals.length} goals!`);
+                    setNotification({ type: 'ok', msg: `Successfully imported ${importedGoals.length} goals!` });
                 } else {
-                    alert("Could not find any valid goals in the file. Please check the format.");
+                    setNotification({ type: 'warn', msg: 'Could not find any valid goals in the file. Please check the format.' });
                 }
             } catch (err) {
                 console.error(err);
-                alert("Error parsing the file. Please ensure it's a valid Excel format.");
+                setNotification({ type: 'warn', msg: "Error parsing the file. Please ensure it's a valid Excel format." });
             }
             // Reset input so the same file can be uploaded again if needed
             if (fileInputRef.current) fileInputRef.current.value = "";
@@ -312,7 +300,7 @@ function GoalPlanner() {
     };
 
     const downloadPDF = () => {
-        if (goalResults.length === 0) return alert("Add at least one goal to generate a report.");
+        if (goalResults.length === 0) return setNotification({ type: 'warn', msg: 'Add at least one goal to generate a report.' });
 
         const doc = new jsPDF();
         const pageWidth = doc.internal.pageSize.getWidth();
@@ -321,7 +309,7 @@ function GoalPlanner() {
         // Title
         doc.setFontSize(20);
         doc.setFont('helvetica', 'bold');
-        doc.text("Financial Goal Plannning Report", pageWidth / 2, currentY, { align: 'center' });
+        doc.text("Financial Goal Planning Report", pageWidth / 2, currentY, { align: 'center' });
         currentY += 15;
 
         // Overall Summary (if more than 0 goals)
@@ -397,20 +385,11 @@ function GoalPlanner() {
         doc.save("Goal_Planner_Report.pdf");
     };
 
-    // ── Styles ──
-    const cardS = { backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px solid #D8D3CB', padding: '20px', marginBottom: '16px' };
-    const headerS = { fontFamily: "'DM Serif Display', Georgia, serif", fontSize: '22px', fontWeight: 400, color: '#0D1B2A', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' };
-    const thS = { padding: '10px 12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#5C6B7A', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '2px solid #D8D3CB' };
-    const tdS = { padding: '10px 12px', fontSize: '13px', color: '#4A5A6A', borderBottom: '1px solid #E6EDF5' };
-    const inputS = { width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #D8D3CB', fontSize: '14px', color: '#0D1B2A', outline: 'none', backgroundColor: '#FFFFFF' };
-    const btnPrimary = { display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#111B2E', color: '#FFFFFF', padding: '10px 20px', borderRadius: '8px', border: 'none', fontSize: '14px', fontWeight: 600, cursor: 'pointer' };
-    const labelS = { fontSize: '13px', fontWeight: 600, color: '#4A5A6A', marginBottom: '6px', display: 'block' };
-
     // ── Custom tooltip ──
     const ChartTooltip = ({ active, payload, label }) => {
         if (!active || !payload?.length) return null;
         return (
-            <div style={{ backgroundColor: '#111B2E', borderRadius: '8px', padding: '10px 14px', color: '#FFFFFF', fontSize: '12px' }}>
+            <div style={{ backgroundColor: '#1C1A17', borderRadius: '8px', padding: '10px 14px', color: '#FFFFFF', fontSize: '12px' }}>
                 <div style={{ fontWeight: 700, marginBottom: '4px' }}>Year {label}</div>
                 {payload.map((p, i) => (
                     <div key={i} style={{ color: p.color || '#D8D3CB' }}>
@@ -421,8 +400,33 @@ function GoalPlanner() {
         );
     };
 
+    // ── G10: Extract IIFEs to computed vars ──
+    const autoAllocation = formYears && formRisk !== 5 ? getGoalAllocation(Number(formYears) || 1, formRisk) : null;
+    const customAllocTotal = Number(customEquityAlloc) + Number(customDebtAlloc) + Number(customCommodityAlloc);
+    const isCustomInvalid = formRisk === 5 && customAllocTotal !== 100;
+    const isBasicInvalid = !formName || !formTarget || !formYears;
+    const isFormDisabled = isCustomInvalid || isBasicInvalid;
+
+    if (!initialLoadDone) {
+        return (
+            <div className="dash-loading">
+                <div className="dash-loading-box">
+                    <div className="dash-loading-text">Loading goals…</div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '56px', paddingBottom: '64px' }}>
+            {/* ═══ Notification Banner ═══ */}
+            {notification && (
+                <div style={{ padding: '12px 16px', fontSize: '13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '0.5px solid var(--ink-ghost)', backgroundColor: notification.type === 'ok' ? 'rgba(45,90,61,0.06)' : 'rgba(200,64,64,0.06)', color: notification.type === 'ok' ? 'var(--green)' : 'var(--red)' }}>
+                    <span>{notification.msg}</span>
+                    <button onClick={() => setNotification(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-soft)', fontSize: '16px' }}>✕</button>
+                </div>
+            )}
+
             {/* ═══ Header ═══ */}
             <div className="page-header">
                 <div className="page-header-top">
@@ -492,7 +496,7 @@ function GoalPlanner() {
             {showForm && (
                 <div style={{ border: '0.5px solid var(--ink-ghost)', padding: '24px 28px' }}>
                     <div className="section-heading" style={{ marginBottom: '24px' }}>{editingId ? 'Edit Goal' : 'Add New Goal'}</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', alignItems: 'end' }}>
+                    <div className="goal-form-grid">
                         <div>
                             <label className="act-label" style={{ display: 'block', marginBottom: '8px' }}>Goal Name</label>
                             <input value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="e.g. Dream House" className="budget-input" style={{ width: '100%', border: '0.5px solid var(--ink-ghost)' }} />
@@ -507,7 +511,7 @@ function GoalPlanner() {
                         </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: '16px', marginTop: '20px', alignItems: 'end' }}>
+                    <div className="goal-form-grid-2">
                         <div>
                             <label className="act-label" style={{ display: 'block', marginBottom: '8px' }}>Risk Level Strategy</label>
                             <select value={formRisk} onChange={(e) => setFormRisk(Number(e.target.value))} className="budget-input" style={{ width: '100%', border: '0.5px solid var(--ink-ghost)' }}>
@@ -528,7 +532,12 @@ function GoalPlanner() {
 
                     {formRisk === 5 && (
                         <div style={{ marginTop: '24px', padding: '20px', border: '0.5px solid var(--ink-ghost)' }}>
-                            <div className="act-label">Custom Strategy Setup</div>
+                            <div className="act-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span>Custom Strategy Setup</span>
+                                <span style={{ fontSize: '12px', fontWeight: 500, color: customAllocTotal === 100 ? 'var(--green)' : 'var(--red)' }}>
+                                    Allocation Total: {customAllocTotal}% {customAllocTotal === 100 ? '✓' : `(need ${100 - customAllocTotal > 0 ? '+' : ''}${100 - customAllocTotal}%)`}
+                                </span>
+                            </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
                                 <div>
                                     <div style={{ fontSize: '11px', color: 'var(--ink-soft)', marginBottom: '12px', textTransform: 'uppercase' }}>Asset Allocation (%)</div>
@@ -568,31 +577,18 @@ function GoalPlanner() {
                         </div>
                     )}
 
-                    {formYears && formRisk !== 5 && (
+                    {autoAllocation && (
                         <div style={{ marginTop: '16px', fontSize: '12px', color: 'var(--ink-soft)' }}>
-                            {(() => {
-                                const alloc = getGoalAllocation(Number(formYears) || 1, formRisk);
-                                return <><span style={{ color: 'var(--ink)', fontWeight: 500 }}>Auto-Allocation: </span>Equity {alloc.equity}% · Debt {alloc.debt}% · Commodity {alloc.commodity}%</>;
-                            })()}
+                            <span style={{ color: 'var(--ink)', fontWeight: 500 }}>Auto-Allocation: </span>Equity {autoAllocation.equity}% · Debt {autoAllocation.debt}% · Commodity {autoAllocation.commodity}%
                         </div>
                     )}
 
                     <div style={{ display: 'flex', gap: '12px', marginTop: '24px', alignItems: 'center' }}>
-                        {(() => {
-                            const totalAlloc = Number(customEquityAlloc) + Number(customDebtAlloc) + Number(customCommodityAlloc);
-                            const isCustomInvalid = formRisk === 5 && totalAlloc !== 100;
-                            const isBasicInvalid = !formName || !formTarget || !formYears;
-                            const isDisabled = isCustomInvalid || isBasicInvalid;
-                            return (
-                                <>
-                                    <button onClick={addGoal} disabled={isDisabled} className="btn-primary" style={{ opacity: isDisabled ? 0.5 : 1 }}>
-                                        {editingId ? 'Update Goal' : 'Add Goal'}
-                                    </button>
-                                    <button onClick={resetForm} className="btn-ghost">Cancel</button>
-                                    {isCustomInvalid && <div style={{ fontSize: '12px', color: 'var(--red)' }}>⚠️ Total must be 100% (Current: {totalAlloc}%)</div>}
-                                </>
-                            );
-                        })()}
+                        <button onClick={addGoal} disabled={isFormDisabled} className="btn-primary" style={{ opacity: isFormDisabled ? 0.5 : 1 }}>
+                            {editingId ? 'Update Goal' : 'Add Goal'}
+                        </button>
+                        <button onClick={resetForm} className="btn-ghost">Cancel</button>
+                        {isCustomInvalid && <div style={{ fontSize: '12px', color: 'var(--red)' }}>Total must be 100% (Current: {customAllocTotal}%)</div>}
                     </div>
                 </div>
             )}
@@ -608,6 +604,7 @@ function GoalPlanner() {
                             <button onClick={() => setShowForm(true)} className="btn-primary">+ Add Goal</button>
                         )}
                     </div>
+                    <div className="goals-table-wrap">
                     <table className="goals-table">
                         <thead>
                             <tr>
@@ -673,6 +670,7 @@ function GoalPlanner() {
                             })}
                         </tbody>
                     </table>
+                    </div>
                     {displayGoalResults.some(g => g.highSip) && (
                         <div style={{ marginTop: '16px', fontSize: '12px', color: 'var(--accent)' }}>
                             ⚠ High SIP detected - Consider increasing the time horizon or reducing the goal amount.
@@ -687,7 +685,7 @@ function GoalPlanner() {
                     <div className="act-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span>Overall Summary</span>
                         {selectedStrategy && (
-                            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--green)', padding: '4px 10px', backgroundColor: 'rgba(26,122,80,0.1)', borderRadius: '20px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--green)', padding: '4px 10px', backgroundColor: 'rgba(45,90,61,0.1)', borderRadius: '20px' }}>
                                 Strategy Active: {strategyResults?.find(s => s.id === selectedStrategy)?.name}
                             </span>
                         )}
@@ -800,7 +798,7 @@ function GoalPlanner() {
                                                 <YAxis tick={{ fontFamily: 'Outfit', fontSize: 11, fill: 'var(--ink-soft)' }} axisLine={false} tickLine={false} tickFormatter={(v) => (v > 10000 ? (v / 100000).toFixed(1) + 'L' : v)} />
                                                 <RechartsTooltip content={<ChartTooltip />} />
                                                 <Bar dataKey="invested" name="Amount Invested" stackId="a" fill="#E8E3DA" />
-                                                <Bar dataKey="profit" name="Profit Earned" stackId="a" fill="#4A5568" />
+                                                <Bar dataKey="profit" name="Profit Earned" stackId="a" fill="#4A7C59" />
                                                 <Line type="monotone" dataKey="total" name="Total Corpus" stroke="#C4703A" strokeWidth={2} dot={{ r: 3, fill: '#C4703A', strokeWidth: 0 }} />
                                             </ComposedChart>
                                         </ResponsiveContainer>
@@ -843,7 +841,7 @@ function GoalPlanner() {
             })()}
 
             {/* ═══ Empty State ═══ */}
-            {goals.length === 0 && !showForm && (
+            {goals.length === 0 && !showForm && initialLoadDone && (
                 <div style={{ textAlign: 'center', padding: '60px 20px', border: '0.5px solid var(--ink-ghost)' }}>
                     <div className="page-title" style={{ fontSize: '24px', marginBottom: '8px' }}>No goals added yet</div>
                     <div className="page-desc" style={{ marginBottom: '24px' }}>Start planning your financial future by adding your first goal.</div>

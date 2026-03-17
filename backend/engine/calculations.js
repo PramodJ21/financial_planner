@@ -184,12 +184,12 @@ function computeLiabilities(p) {
 
     // Parse loans from JSONB array (new format) or fall back to flat columns (legacy)
     let rawLoans = [];
-    if (p.loans && Array.isArray(p.loans) && p.loans.length > 0) {
-        rawLoans = p.loans;
+    if (p.loans && Array.isArray(p.loans)) {
+        rawLoans = p.loans; // use as-is, even if empty (user explicitly cleared loans)
     } else if (p.loans && typeof p.loans === 'string') {
         try { rawLoans = JSON.parse(p.loans); } catch (e) { rawLoans = []; }
     } else if (Number(p.loan_outstanding) > 0) {
-        // Legacy fallback for un-migrated data
+        // Legacy fallback only when loans column is null/undefined (un-migrated data)
         rawLoans = [{
             type: p.loan_type || 'Other Loan',
             outstanding: Number(p.loan_outstanding) || 0,
@@ -199,7 +199,20 @@ function computeLiabilities(p) {
         }];
     }
 
-    const creditCardOutstanding = Number(p.credit_card_outstanding) || 0;
+    // ── Credit card parsing from JSONB array ──
+    // Each card: { name, balance, type: 'full'|'emi'|'revolving', emi_amount }
+    //   'full'      → paid in full every month; EMI = 0, interest = 0%
+    //                 Balance still counts as bad debt for fragility threshold.
+    //   'emi'       → converted to a fixed-instalment plan; 12–24% p.a.
+    //                 EMI = user-provided amount (fallback: 3% of balance)
+    //   'revolving' → minimum-due / revolving; most dangerous at 36–42% p.a.
+    //                 EMI = 3% of balance (standard Indian CC minimum payment)
+    let creditCards = [];
+    if (Array.isArray(p.credit_cards) && p.credit_cards.length > 0) {
+        creditCards = p.credit_cards;
+    } else if (typeof p.credit_cards === 'string' && p.credit_cards.length > 2) {
+        try { creditCards = JSON.parse(p.credit_cards); } catch (e) { creditCards = []; }
+    }
 
     // Build items array
     let items = rawLoans.map(loan => ({
@@ -211,17 +224,28 @@ function computeLiabilities(p) {
         remainingTenure: Number(loan.tenure) || 0
     }));
 
-    // Add credit card as a bad liability item if > 0
-    if (creditCardOutstanding > 0) {
+    creditCards.forEach(card => {
+        const balance = Number(card.balance) || 0;
+        if (balance <= 0) return; // skip zero-balance entries
+
+        const cardType = card.type || 'revolving';
+        let emi = 0;
+        if (cardType === 'emi') {
+            emi = Number(card.emi_amount) || Math.round(balance * 0.03);
+        } else if (cardType === 'revolving') {
+            emi = Math.round(balance * 0.03);
+        }
+
         items.push({
-            type: 'Credit Card',
+            type: card.name ? `Credit Card (${card.name})` : 'Credit Card',
             category: 'Bad',
-            outstanding: creditCardOutstanding,
-            emi: 0,
-            interestRate: 0,
-            remainingTenure: 0
+            outstanding: balance,
+            emi,
+            interestRate: cardType === 'revolving' ? 36 : (cardType === 'emi' ? 18 : 0),
+            remainingTenure: 0,
+            ccType: cardType
         });
-    }
+    });
 
     // Sum up
     let goodOutstanding = 0, goodEmiSum = 0;
@@ -243,12 +267,21 @@ function computeLiabilities(p) {
     const grossMonthly = (Number(p.annual_salary) || 0) / 12;
     const emiBurdenRatio = grossMonthly ? (totalEmi / grossMonthly * 100).toFixed(2) : 0;
 
+    // Compute credit card sub-totals by repayment type for use in FBS fragility logic
+    const ccItems = items.filter(i => i.ccType);
+    const revolvingBalance = ccItems.filter(i => i.ccType === 'revolving').reduce((s, c) => s + c.outstanding, 0);
+    const emiCCBalance     = ccItems.filter(i => i.ccType === 'emi').reduce((s, c) => s + c.outstanding, 0);
+    const fullBalance      = ccItems.filter(i => i.ccType === 'full').reduce((s, c) => s + c.outstanding, 0);
+
     return {
         hasLiabilities: totalOutstanding > 0,
         total: totalOutstanding,
         totalEmi,
         items,
-        creditCardOutstanding,
+        // creditCardOutstanding: total CC balance alias used by dashboard panels
+        creditCardOutstanding: revolvingBalance + emiCCBalance + fullBalance,
+        // creditCards: per-type breakdowns for FBS fragility multiplier logic
+        creditCards: { revolvingBalance, emiCCBalance, fullBalance },
         goodLiability: { outstanding: goodOutstanding, emi: goodEmiSum },
         badLiability: { outstanding: badOutstanding, emi: badEmiSum },
         emiBurdenRatio,
@@ -431,7 +464,9 @@ function computeSurplus(p) {
     const monthlyIncome = Number(p.monthly_take_home) || ((income.salaried + income.business) / 12);
 
     // We use effectiveMonthly here (Monthly + Prorated Annual) so that true investable surplus is accurate
-    const monthly = monthlyIncome - expenses.effectiveMonthly - emi;
+    // SIP is deducted so the surplus reflects actual free cash after committed investments
+    const sip = Number(p.inv_monthly_sip) || 0;
+    const monthly = monthlyIncome - expenses.effectiveMonthly - emi - sip;
     return { monthly, quarterly: monthly * 3 };
 }
 
@@ -455,25 +490,29 @@ function computeCashflow(p) {
     const sip3m = sip * 3;
     const insurance3m = insurancePremium / 4;
     const otherAnnual3m = (expenses.totalAnnualOnly - insurancePremium) / 4;
+    // If user entered monthly take-home, income is already post-tax — do not deduct tax again
+    const hasTakeHome = Number(p.monthly_take_home) > 0;
     const taxEstimate = computeTax(p);
-    const tax3m = Math.min(taxEstimate.newRegime.taxLiability, taxEstimate.oldRegime.taxLiability) / 4;
+    const tax3m = hasTakeHome ? 0 : Math.min(taxEstimate.newRegime.taxLiability, taxEstimate.oldRegime.taxLiability) / 4;
 
     // Do not add bonus3m to surplus
     const surplus = grossIncome3m - expenses3m - emi3m - sip3m - insurance3m - otherAnnual3m - tax3m;
 
-    return {
-        items: [
-            { name: 'Bonus Income', type: 'credit', amount: bonus3m },
-            { name: 'Gross Income', type: 'credit', amount: grossIncome3m },
-            { name: 'Monthly Living Expenses', type: 'debit', amount: expenses3m },
-            { name: 'Tax Expenses', type: 'debit', amount: tax3m },
-            { name: 'EMIs', type: 'debit', amount: emi3m },
-            { name: 'Planned Investments', type: 'debit', amount: sip3m },
-            { name: 'Insurance Premium Allocation', type: 'debit', amount: insurance3m },
-            { name: 'Other Annual Bills Allocation', type: 'debit', amount: otherAnnual3m }
-        ],
-        surplus
-    };
+    const items = [
+        { name: 'Bonus Income', type: 'credit', amount: bonus3m },
+        { name: 'Gross Income', type: 'credit', amount: grossIncome3m },
+        { name: 'Monthly Living Expenses', type: 'debit', amount: expenses3m },
+        { name: 'EMIs', type: 'debit', amount: emi3m },
+        { name: 'Planned Investments', type: 'debit', amount: sip3m },
+        { name: 'Insurance Premium Allocation', type: 'debit', amount: insurance3m },
+        { name: 'Other Annual Bills Allocation', type: 'debit', amount: otherAnnual3m },
+    ];
+    // Only show tax row when income is pre-tax (no take-home entered)
+    if (!hasTakeHome && tax3m > 0) {
+        items.splice(3, 0, { name: 'Tax Expenses (estimated)', type: 'debit', amount: tax3m });
+    }
+
+    return { items, surplus };
 }
 
 // ============ FINANCIAL BEHAVIOUR SCORE ============
@@ -613,22 +652,54 @@ function computeFBS(p) {
     else if (maxAlloc < 70) assetDiversity = 3;
     else if (maxAlloc < 85) assetDiversity = 1;
 
-    // ─── FRAGILITY PENALTY - up to −15 ───
+    // ─── FRAGILITY PENALTY ───
     const zeroEmergency = emergencyFund <= 1;
     const zeroInsurance = insuranceScore <= 2;
-    const highBadDebt = income.total > 0 && liabilities.badLiability.outstanding > income.total * 0.3;
+    // Threshold tightened from × 3 to × 2: owing more than 2 months of take-home
+    // in bad debt (CC + bad loans) is considered "high bad debt".
+    const highBadDebt = monthlyIncome > 0 && liabilities.badLiability.outstanding >= monthlyIncome * 2;
 
-    let penalty = 0;
+    // Pull credit card sub-totals for composition-aware multipliers.
+    const { revolvingBalance = 0, emiCCBalance = 0 } = liabilities.creditCards || {};
+    const effectiveRevolving = revolvingBalance;
+
+    // ── Standalone revolving penalty ──
+    // Applied regardless of other flags. Revolving credit card debt (minimum-due behaviour)
+    // compounds at 36–42% p.a. and is penalised even when emergency fund and insurance are fine.
+    // Capped at −10 so a single large card does not destroy the entire score.
+    // Each full multiple of monthly income in revolving balance = −3 pts.
+    const revolvingPenalty = monthlyIncome > 0
+        ? Math.min(10, Math.floor(effectiveRevolving / monthlyIncome) * 3)
+        : 0;
+
+    // ── Combination fragility penalties ──
+    // These apply when critical safety nets are missing alongside high bad debt.
+    // For the EF+debt and insurance+debt cases, the penalty is scaled up
+    // when the majority of bad debt is revolving (worst-case: 36% interest)
+    // or when an EMI CC balance alone exceeds one month's income (heavy fixed burden).
+    let fragilityPenalty = 0;
     let flags = [];
     if (zeroEmergency && zeroInsurance && highBadDebt) {
-        penalty = 15; flags = ['critical_triple_gap'];
+        fragilityPenalty = 15; flags = ['critical_triple_gap'];
     } else if (zeroEmergency && zeroInsurance) {
-        penalty = 8; flags = ['no_emergency_no_insurance'];
+        fragilityPenalty = 8; flags = ['no_emergency_no_insurance'];
     } else if (zeroEmergency && highBadDebt) {
-        penalty = 6; flags = ['no_emergency_high_debt'];
+        // Revolving majority → × 1.5 (up to −9); heavy EMI card → × 1.2 (up to −7)
+        let base = 6;
+        if (effectiveRevolving > liabilities.badLiability.outstanding * 0.5) base = Math.round(base * 1.5);
+        else if (emiCCBalance >= monthlyIncome)                               base = Math.round(base * 1.2);
+        fragilityPenalty = Math.min(base, 15);
+        flags = ['no_emergency_high_debt'];
     } else if (zeroInsurance && highBadDebt) {
-        penalty = 5; flags = ['no_insurance_high_debt'];
+        // Same composition logic; base is lower since insurance gap is less acute than EF gap
+        let base = 5;
+        if (effectiveRevolving > liabilities.badLiability.outstanding * 0.5) base = Math.round(base * 1.5);
+        else if (emiCCBalance >= monthlyIncome)                               base = Math.round(base * 1.2);
+        fragilityPenalty = Math.min(base, 15);
+        flags = ['no_insurance_high_debt'];
     }
+
+    const penalty = revolvingPenalty + fragilityPenalty;
 
     // ─── TOTALS ───
     const foundation = emergencyFund + insuranceScore + liabilitiesScore;
@@ -659,7 +730,9 @@ function computeFBS(p) {
             awareness,
         },
         fragility: {
-            penalty,
+            penalty,           // combined total (revolvingPenalty + fragilityPenalty)
+            fragilityPenalty,  // combination-based penalty only (EF/insurance/debt combos)
+            revolvingPenalty,  // standalone revolving CC penalty
             flags,
         }
     };
@@ -836,15 +909,21 @@ function generateActionPlan(p) {
     if (needsHealth || needsLife) missingFBS.insurance = 0;
 
     // ── 3. DEBT MANAGEMENT ──
-    if (liabilities.badLiability.outstanding > 0) {
+    // Only surface "Reduce Bad Liabilities" when bad debt is meaningful:
+    // more than ₹1L outstanding OR more than 10% of total liabilities
+    const badOutstanding = liabilities.badLiability.outstanding ?? 0;
+    const totalLiab = liabilities.total ?? 0;
+    const badPct = totalLiab > 0 ? badOutstanding / totalLiab : 0;
+    const isMeaningfulBadDebt = badOutstanding > 100000 || badPct > 0.1;
+    if (badOutstanding > 0 && isMeaningfulBadDebt) {
         actions.push({
             category: 'Debt Management',
             title: 'Reduce Bad Liabilities',
-            description: `You currently have ${fmtINR(liabilities.badLiability.outstanding)} in bad liabilities (personal loans, credit cards, car loans, etc.). These typically carry high interest rates and erode your net worth. Prioritise clearing the highest-interest debt first while maintaining minimum payments on others.`,
-            suggestedAmount: liabilities.badLiability.outstanding,
+            description: `You currently have ${fmtINR(badOutstanding)} in bad liabilities (personal loans, credit cards, car loans, etc.). These typically carry high interest rates and erode your net worth. Prioritise clearing the highest-interest debt first while maintaining minimum payments on others.`,
+            suggestedAmount: badOutstanding,
             monthlyContribution: liabilities.badLiability.emi,
             status: 'pending',
-            urgency: liabilities.badLiability.outstanding > income.total * 0.5 ? 'critical' : 'high',
+            urgency: badOutstanding > income.total * 0.5 ? 'critical' : 'high',
             fbsImpact: missingFBS.liabilities > 0 ? missingFBS.liabilities : 0,
             priority: 0
         });
@@ -981,8 +1060,9 @@ function generateActionPlan(p) {
         });
     }
 
-    // Monthly investment plan (if surplus exists)
-    if (investable > 0) {
+    // Monthly investment plan (if surplus exists AND user isn't already investing enough of it)
+    const existingSip = Number(p.inv_monthly_sip) || 0;
+    if (investable > 0 && existingSip < investable * 0.8) {
         const sipAmount = Math.max(investable, 5000);
         const eqAmt = Math.round(sipAmount * idealEquity / 100);
         const dtAmt = Math.round(sipAmount * idealDebt / 100);
@@ -1001,8 +1081,8 @@ function generateActionPlan(p) {
         missingFBS.investmentRegularity = 0;
     }
 
-    // Fallback: Investment Regularity task when no surplus but score is below max
-    if (missingFBS.investmentRegularity > 0) {
+    // Fallback: Investment Regularity task when no surplus, no SIP, and score is below max
+    if (missingFBS.investmentRegularity > 0 && existingSip === 0) {
         actions.push({
             category: 'Asset Reallocation',
             title: 'Start a Monthly SIP',
@@ -1341,6 +1421,7 @@ function computeFullDashboard(p, user) {
     return {
         user: { id: user.id, fullName: user.full_name, email: user.email },
         overview: {
+            profile: { age },
             generation,
             lifeStage,
             fbs: fbsObj.total,

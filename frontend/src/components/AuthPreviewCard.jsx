@@ -68,7 +68,8 @@ function AuthPreviewCard() {
 
             timeouts.push(setTimeout(() => {
                 setFillWidth('67%');
-                countUp(setScore, 67, 1800);
+                const cancelScore = countUp(setScore, 67, 1800);
+                intervals.push({ clear: cancelScore });
                 timeouts.push(setTimeout(() => {
                     setLabel('Good - above average for your age');
                     const moneyId = animateMoney();
@@ -76,9 +77,9 @@ function AuthPreviewCard() {
                 }, 1900));
             }, 400));
 
-            timeouts.push(setTimeout(() => countUp(setNetWorth, 14100000, 1400), 700));
-            timeouts.push(setTimeout(() => countUp(setSavings, 156279, 1400), 950));
-            timeouts.push(setTimeout(() => countUp(setTaxSaved, 135200, 1400), 1150));
+            timeouts.push(setTimeout(() => { const c = countUp(setNetWorth, 14100000, 1400); intervals.push({ clear: c }); }, 700));
+            timeouts.push(setTimeout(() => { const c = countUp(setSavings, 156279, 1400); intervals.push({ clear: c }); }, 950));
+            timeouts.push(setTimeout(() => { const c = countUp(setTaxSaved, 135200, 1400); intervals.push({ clear: c }); }, 1150));
 
             let step = 0;
             const iv = setInterval(() => {
@@ -111,7 +112,7 @@ function AuthPreviewCard() {
 
         return () => {
             timeouts.forEach(clearTimeout);
-            intervals.forEach(clearInterval);
+            intervals.forEach(iv => typeof iv === 'object' && iv.clear ? iv.clear() : clearInterval(iv));
         };
     }, []);
 
@@ -133,7 +134,7 @@ function AuthPreviewCard() {
                 </div>
                 <div className="preview-inner">
                     <div className="p-card">
-                        <div className="p-card-label">Financial Balance Score</div>
+                        <div className="p-card-label">Financial Behaviour Score</div>
                         <div className="p-score-row">
                             <div>
                                 <div className="p-score-num">{score}</div>

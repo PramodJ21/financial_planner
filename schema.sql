@@ -27,6 +27,19 @@ CREATE TABLE IF NOT EXISTS financial_profiles (
   employment_type VARCHAR(50),
   risk_comfort INTEGER DEFAULT 5,
   investment_experience VARCHAR(30),
+
+  -- Generational Wealth Background
+  gen_q1 INTEGER DEFAULT 3,
+  gen_q2 INTEGER DEFAULT 3,
+  gen_q3 INTEGER DEFAULT 3,
+  gen_q4 INTEGER DEFAULT 3,
+  gen_q5 INTEGER DEFAULT 3,
+  gen_q6 INTEGER DEFAULT 1,
+  gen_q6_selections JSONB DEFAULT '[]',
+  gen_q7 INTEGER DEFAULT 3,
+  gen_q8 INTEGER DEFAULT 3,
+  gen_q9 INTEGER DEFAULT 3,
+  gen_q10 INTEGER DEFAULT 3,
   
   -- Step 2: Income
   monthly_take_home NUMERIC(15,2) DEFAULT 0,
@@ -45,6 +58,13 @@ CREATE TABLE IF NOT EXISTS financial_profiles (
   expense_subscriptions NUMERIC(15,2) DEFAULT 0,
   expense_insurance NUMERIC(15,2) DEFAULT 0,
   expense_discretionary NUMERIC(15,2) DEFAULT 0,
+
+  -- Step 3: Expenses (annual)
+  expense_annual_insurance NUMERIC(15,2) DEFAULT 0,
+  expense_annual_education NUMERIC(15,2) DEFAULT 0,
+  expense_annual_property NUMERIC(15,2) DEFAULT 0,
+  expense_annual_travel NUMERIC(15,2) DEFAULT 0,
+  expense_annual_other NUMERIC(15,2) DEFAULT 0,
   
   -- Step 4: Assets & Banking
   savings_balance NUMERIC(15,2) DEFAULT 0,
@@ -63,10 +83,11 @@ CREATE TABLE IF NOT EXISTS financial_profiles (
   inv_real_estate NUMERIC(15,2) DEFAULT 0,
   inv_crypto_alt NUMERIC(15,2) DEFAULT 0,
   inv_num_mutual_funds INTEGER DEFAULT 0,
+  sip_consecutive_months INTEGER DEFAULT 0,
   
-  -- Step 6: Liabilities (multiple loans as JSONB + credit card)
+  -- Step 6: Liabilities (multiple loans as JSONB + credit cards JSONB)
   loans JSONB DEFAULT '[]',
-  credit_card_outstanding NUMERIC(15,2) DEFAULT 0,
+  credit_cards JSONB DEFAULT '[]',  -- multi-card array: [{name, balance, type, emi_amount}]
   credit_score INTEGER DEFAULT 0,
   
   -- Step 7: Insurance
@@ -99,6 +120,9 @@ CREATE TABLE IF NOT EXISTS financial_profiles (
   beh_anxious_decisions INTEGER DEFAULT 3,
   beh_familiar_brands INTEGER DEFAULT 3,
   beh_compare_peers INTEGER DEFAULT 3,
+  beh_market_reaction INTEGER DEFAULT 3,
+  beh_windfall_behaviour INTEGER DEFAULT 3,
+  beh_product_understanding INTEGER DEFAULT 3,
   
   -- Questionnaire progress
   current_step INTEGER DEFAULT 1,
@@ -117,6 +141,27 @@ CREATE TABLE IF NOT EXISTS action_plans (
   description TEXT,
   suggested_amount NUMERIC(15,2) DEFAULT 0,
   allocation_percent NUMERIC(5,2) DEFAULT 0,
-  status VARCHAR(20) DEFAULT 'pending',
+  status VARCHAR(50) DEFAULT 'pending',
   created_at TIMESTAMP DEFAULT NOW()
 );
+
+-- 4. User Goals
+CREATE TABLE IF NOT EXISTS user_goals (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  client_id VARCHAR(100),
+  name VARCHAR(255) NOT NULL,
+  target NUMERIC(15,2) DEFAULT 0,
+  years INTEGER DEFAULT 1,
+  risk_level VARCHAR(50),
+  include_inflation BOOLEAN DEFAULT TRUE,
+  equity_alloc NUMERIC(5,2),
+  debt_alloc NUMERIC(5,2),
+  commodity_alloc NUMERIC(5,2),
+  equity_return NUMERIC(5,2),
+  debt_return NUMERIC(5,2),
+  commodity_return NUMERIC(5,2),
+  priority_weight INTEGER DEFAULT 3,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+

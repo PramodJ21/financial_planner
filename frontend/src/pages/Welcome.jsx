@@ -1,12 +1,9 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import AuthPreviewCard from '../components/AuthPreviewCard';
 
 function Welcome() {
-    const { user } = useAuth();
-    const navigate = useNavigate();
 
     return (
         <div className="auth-screen">
@@ -18,7 +15,7 @@ function Welcome() {
                 
                 <div className="auth-left-container">
                     <div className="landing-eyebrow">Wealth Analytics</div>
-                    <div className="landing-title">Build Your Complete Financial Health Profile</div>
+                    <h1 className="landing-title">Build Your Complete Financial Health Profile</h1>
                     <div className="landing-desc">
                         Answer a few questions about your finances. We'll generate a comprehensive health score, identify gaps, and create a personalised action plan.
                     </div>

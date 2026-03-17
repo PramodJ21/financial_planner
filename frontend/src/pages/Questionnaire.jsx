@@ -1,37 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchWithAuth } from '../api';
-import { Check, Circle, ChevronRight, Info, Plus, Trash2 } from 'lucide-react';
+import { Check, ChevronRight, Info, Plus, Trash2 } from 'lucide-react';
 
 const STEPS = [
     { id: 1, name: 'Profile & Family', short: 'Tell us about yourself so we can personalize your plan.' },
-    { id: 2, name: 'Income', short: 'Assess savings potential and income streams.' },
-    { id: 3, name: 'Expenses', short: 'Understand your cash flow and spending patterns.' },
-    { id: 4, name: 'Assets & Banking', short: 'Your cash reserves and banking holdings.' },
-    { id: 5, name: 'Investments', short: 'Your investment portfolio breakdown.' },
-    { id: 6, name: 'Liabilities', short: 'Active loans, EMIs and credit cards.' },
-    { id: 7, name: 'Insurance', short: 'Evaluate your health and life coverage.' },
-    { id: 8, name: 'Tax', short: 'Current tax regime and deductions claimed.' },
-    { id: 9, name: 'Estate Planning', short: 'Will, nominations and succession plan.' },
-    { id: 10, name: 'Financial Behavior', short: 'Your habits and investment tendencies.' }
+    { id: 2, name: 'Financial Background', short: 'Your family\'s financial history helps us understand your starting point.' },
+    { id: 3, name: 'Income', short: 'Assess savings potential and income streams.' },
+    { id: 4, name: 'Expenses', short: 'Understand your cash flow and spending patterns.' },
+    { id: 5, name: 'Assets & Banking', short: 'Your cash reserves and banking holdings.' },
+    { id: 6, name: 'Investments', short: 'Your investment portfolio breakdown.' },
+    { id: 7, name: 'Liabilities', short: 'Active loans, EMIs and credit cards.' },
+    { id: 8, name: 'Insurance', short: 'Evaluate your health and life coverage.' },
+    { id: 9, name: 'Tax', short: 'Current tax regime and deductions claimed.' },
+    { id: 10, name: 'Nominations & Will', short: 'Will, nominations and succession plan.' },
+    { id: 11, name: 'Financial Behavior', short: 'Your habits and investment tendencies.' }
 ];
 
-/* ─── colour tokens ─── */
-const C = {
-    navy: '#111B2E',
-    navyLight: '#1C2D45',
-    label: '#0D1B2A',
-    sublabel: '#5C6B7A',
-    border: '#D6E0EB',
-    bg: '#EEF3F8',
-    sidebarBg: '#FFFFFF',
-    activeBg: '#EAF1F8',
-    activeText: '#0D1B2A',
-    inactiveText: '#8A9AA8',
-    completedIcon: '#1A8A5E',
-    progressBar: '#4F79B7',
-    white: '#FFFFFF'
-};
+// Maps frontend step number (1–11) to backend step number (1–10).
+// Steps 1 and 2 both save to backend step 1 (profile + gen wealth share the same backend step).
+const BACKEND_STEP = [null, 1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+const TOTAL_STEPS = 11;
+
 
 function Questionnaire() {
     const [currentStep, setCurrentStep] = useState(1);
@@ -46,7 +36,18 @@ function Questionnaire() {
         try {
             const data = await fetchWithAuth('/questionnaire');
             setFormData(data || {});
-            setCurrentStep(data.current_step || 1);
+            const dbStep = data.current_step || 1;
+            // DB step 2 is ambiguous: could be "finished profile, not gen wealth yet" OR "finished gen wealth"
+            // Check gen_q1 to distinguish — if filled, gen wealth was completed
+            let frontendStep;
+            if (dbStep <= 1) {
+                frontendStep = 1;
+            } else if (dbStep === 2) {
+                frontendStep = data.gen_q1 ? 3 : 2;
+            } else {
+                frontendStep = dbStep + 1; // offset for the extra step 2
+            }
+            setCurrentStep(Math.min(frontendStep, TOTAL_STEPS));
         } catch (err) { console.error('Failed to load profile', err); }
         finally { setLoading(false); }
     };
@@ -56,20 +57,22 @@ function Questionnaire() {
         setFormData(prev => ({ ...prev, [name]: type === 'number' ? (value ? Number(value) : '') : value }));
     };
 
-    const saveStep = async (step, isFinal = false) => {
+    const saveStep = async (frontendStep, isFinal = false) => {
         setSaving(true);
+        const backendStep = BACKEND_STEP[frontendStep];
         try {
-            const data = await fetchWithAuth(`/questionnaire/step/${step}`, { method: 'PUT', body: JSON.stringify(formData) });
+            const data = await fetchWithAuth(`/questionnaire/step/${backendStep}`, { method: 'PUT', body: JSON.stringify(formData) });
             setFormData(data);
             if (isFinal) {
                 navigate('/dashboard');
+            } else {
+                setCurrentStep(s => Math.min(s + 1, TOTAL_STEPS));
             }
-            else setCurrentStep(s => Math.min(s + 1, 10));
         } catch (err) { alert('Failed to save. Please try again.'); }
         finally { setSaving(false); }
     };
 
-    const handleNext = (e) => { e.preventDefault(); saveStep(currentStep, currentStep === 10); };
+    const handleNext = (e) => { e.preventDefault(); saveStep(currentStep, currentStep === TOTAL_STEPS); };
 
     if (loading) return (
         <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F7F4EF' }}>
@@ -133,11 +136,11 @@ function Questionnaire() {
             <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', overflowY: 'auto' }}>
                 {/* Top Progress Bar */}
                 <div className="qn-progress-bar-wrap">
-                    <span className="qn-progress-step-label">Step {currentStep} of 10</span>
+                    <span className="qn-progress-step-label">Step {currentStep} of {TOTAL_STEPS}</span>
                     <div className="qn-progress-track">
-                        <div className="qn-progress-fill" style={{ width: `${(currentStep / 10) * 100}%` }}></div>
+                        <div className="qn-progress-fill" style={{ width: `${(currentStep / TOTAL_STEPS) * 100}%` }}></div>
                     </div>
-                    <span className="qn-progress-pct">{Math.round((currentStep / 10) * 100)}%</span>
+                    <span className="qn-progress-pct">{Math.round((currentStep / TOTAL_STEPS) * 100)}%</span>
                 </div>
 
                 {/* Scrollable Form Area */}
@@ -148,16 +151,17 @@ function Questionnaire() {
                     </div>
 
                     <form onSubmit={handleNext} style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '48px' }}>
-                        {currentStep === 1 && <Step1 formData={formData} onChange={handleInputChange} />}
-                        {currentStep === 2 && <Step2 formData={formData} onChange={handleInputChange} />}
-                        {currentStep === 3 && <Step3 formData={formData} onChange={handleInputChange} />}
-                        {currentStep === 4 && <Step4 formData={formData} onChange={handleInputChange} />}
-                        {currentStep === 5 && <Step5 formData={formData} onChange={handleInputChange} />}
-                        {currentStep === 6 && <Step6 formData={formData} onChange={handleInputChange} setFormData={setFormData} />}
-                        {currentStep === 7 && <Step7 formData={formData} onChange={handleInputChange} />}
-                        {currentStep === 8 && <Step8 formData={formData} onChange={handleInputChange} />}
-                        {currentStep === 9 && <Step9 formData={formData} onChange={handleInputChange} />}
-                        {currentStep === 10 && <Step10 formData={formData} onChange={handleInputChange} />}
+                        {currentStep === 1 && <Step1Profile formData={formData} onChange={handleInputChange} />}
+                        {currentStep === 2 && <Step1GenWealth formData={formData} onChange={handleInputChange} />}
+                        {currentStep === 3 && <Step2 formData={formData} onChange={handleInputChange} />}
+                        {currentStep === 4 && <Step3 formData={formData} onChange={handleInputChange} />}
+                        {currentStep === 5 && <Step4 formData={formData} onChange={handleInputChange} />}
+                        {currentStep === 6 && <Step5 formData={formData} onChange={handleInputChange} />}
+                        {currentStep === 7 && <Step6 formData={formData} onChange={handleInputChange} setFormData={setFormData} />}
+                        {currentStep === 8 && <Step7 formData={formData} onChange={handleInputChange} />}
+                        {currentStep === 9 && <Step8 formData={formData} onChange={handleInputChange} />}
+                        {currentStep === 10 && <Step9 formData={formData} onChange={handleInputChange} />}
+                        {currentStep === 11 && <Step10 formData={formData} onChange={handleInputChange} />}
 
                         <div className="qn-nav-buttons">
                             {currentStep > 1 && (
@@ -166,8 +170,8 @@ function Questionnaire() {
                                 </button>
                             )}
                             <button type="submit" className="qn-btn-next" disabled={saving}>
-                                {saving ? 'Saving...' : (currentStep === 10 ? 'Generate Dashboard' : 'Next Step')}
-                                {!saving && currentStep < 10 && (
+                                {saving ? 'Saving...' : (currentStep === TOTAL_STEPS ? 'Generate Dashboard' : 'Next Step')}
+                                {!saving && currentStep < TOTAL_STEPS && (
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                                         <polyline points="9 18 15 12 9 6" />
                                     </svg>
@@ -241,12 +245,28 @@ const Row = ({ children, full }) => <div className={`qn-form-grid${full ? ' full
    STEP FORMS
    ═══════════════════════════════════════════════ */
 
-const Step1 = ({ formData: f, onChange }) => {
-    // Helper for 1-5 scale questions
+const Step1Profile = ({ formData: f, onChange }) => (
+    <>
+        <Row>
+            <InputField label="Date of Birth" name="date_of_birth" type="date" value={f.date_of_birth?.split('T')[0]} onChange={onChange} required />
+            <SelectField label="City" name="city" value={f.city} onChange={onChange} options={['Mumbai', 'Delhi', 'Bengaluru', 'Hyderabad', 'Chennai', 'Kolkata', 'Pune', 'Ahmedabad', 'Other']} required />
+        </Row>
+        <Row>
+            <SelectField label="Marital Status" name="marital_status" value={f.marital_status} onChange={onChange} options={['Single', 'Married', 'Divorced', 'Widowed']} required />
+            <InputField label="Dependents" name="dependents" type="number" value={f.dependents} onChange={onChange} placeholder="0" info="Number of people financially dependent on you" required />
+        </Row>
+        <SelectField label="Employment Type" name="employment_type" value={f.employment_type} onChange={onChange} options={['Salaried', 'Self-Employed', 'Business', 'Retired', 'Student']} required />
+        <Row>
+            <SelectField label="Risk Comfort" name="risk_comfort" value={f.risk_comfort} onChange={onChange} options={['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']} required info="Rate your comfort with financial risk, 1 = very low, 10 = very high" />
+            <SelectField label="Investment Experience" name="investment_experience" value={f.investment_experience} onChange={onChange} options={['None', '< 1 year', '1-3 years', '3-5 years', '5+ years']} required />
+        </Row>
+    </>
+);
+
+const Step1GenWealth = ({ formData: f, onChange }) => {
     const renderScaleQuestion = (num, label, name) => {
         const scaleLabels = ['1', '2', '3', '4', '5'];
         const current = f[name] ? String(f[name]) : '';
-        // Custom text for options to make the UI cleaner, mapping 1-5 to short texts based on question
         let optionsText = [];
         if (num === 1) optionsText = ['Struggled', 'Tight', 'Comfortable', 'Well-off', 'Wealthy'];
         else if (num === 2) optionsText = ['Rented', 'Stable, no own', 'Modest home', 'Valuable home', 'Multiple props'];
@@ -279,7 +299,6 @@ const Step1 = ({ formData: f, onChange }) => {
         );
     };
 
-    // Helper for multi-select Q6
     const renderQ6 = () => {
         const options = [
             { id: 'A', text: 'Paying for or contributing to my education' },
@@ -302,20 +321,16 @@ const Step1 = ({ formData: f, onChange }) => {
         const handleToggle = (id) => {
             let newSelections = [...selections];
             if (id === 'J') {
-                newSelections = ['J']; // Exclusive ('None of the above')
+                newSelections = ['J'];
             } else {
                 if (newSelections.includes('J')) newSelections = newSelections.filter(x => x !== 'J');
                 if (newSelections.includes(id)) newSelections = newSelections.filter(x => x !== id);
                 else newSelections.push(id);
             }
-            // Also calculate the score (1 to 5)
             let score = 1;
             if (!newSelections.includes('J') && newSelections.length > 0) {
-                // Keep the exact same max logic: 4 items = 5 points
                 score = Math.min(5, newSelections.length + 1);
             }
-
-            // Artificial event payload to bubble up to Questionnaire's onChange logic
             onChange({ target: { name: 'gen_q6_selections', value: newSelections, type: 'object' } });
             onChange({ target: { name: 'gen_q6', value: score, type: 'number' } });
         };
@@ -338,64 +353,47 @@ const Step1 = ({ formData: f, onChange }) => {
         );
     };
 
-
     return (
-        <>
-            <Row>
-                <InputField label="Date of Birth" name="date_of_birth" type="date" value={f.date_of_birth?.split('T')[0]} onChange={onChange} required />
-                <SelectField label="City" name="city" value={f.city} onChange={onChange} options={['Mumbai', 'Delhi', 'Bengaluru', 'Hyderabad', 'Chennai', 'Kolkata', 'Pune', 'Ahmedabad', 'Other']} required />
-            </Row>
-            <Row>
-                <SelectField label="Marital Status" name="marital_status" value={f.marital_status} onChange={onChange} options={['Single', 'Married', 'Divorced', 'Widowed']} required />
-                <InputField label="Dependents" name="dependents" type="number" value={f.dependents} onChange={onChange} placeholder="0" info="Number of people financially dependent on you" required />
-            </Row>
-            <SelectField label="Employment Type" name="employment_type" value={f.employment_type} onChange={onChange} options={['Salaried', 'Self-Employed', 'Business', 'Retired', 'Student']} required />
-            <Row>
-                <SelectField label="Risk Comfort" name="risk_comfort" value={f.risk_comfort} onChange={onChange} options={['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']} required info="Rate your comfort with financial risk, 1 = very low, 10 = very high" />
-                <SelectField label="Investment Experience" name="investment_experience" value={f.investment_experience} onChange={onChange} options={['None', '< 1 year', '1-3 years', '3-5 years', '5+ years']} required />
-            </Row>
+        <div className="qn-form-section">
+            <div>
+                <div className="qn-form-section-title">Generational Wealth Background</div>
+                <div className="qn-form-section-desc">Understanding your family's financial history helps us contextualise your starting point and the safety net available to you.</div>
+            </div>
 
-            <div className="qn-form-section">
-                <div>
-                    <div className="qn-form-section-title">Generational Wealth Background</div>
-                    <div className="qn-form-section-desc">Understanding your family's financial history helps us contextualise your starting point and the safety net available to you.</div>
-                </div>
-
-                <div>
-                    <div className="qn-block-label">Block A - Childhood Financial Environment</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-                        {renderScaleQuestion(1, "Growing up, how would you describe your family's financial situation?", 'gen_q1')}
-                        {renderScaleQuestion(2, "Did your parents own the home you grew up in?", 'gen_q2')}
-                        {renderScaleQuestion(3, "How was your education funded?", 'gen_q3')}
-                    </div>
-                </div>
-
-                <div>
-                    <div className="qn-block-label">Block B - Direct Parental Financial Support</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-                        {renderScaleQuestion(4, "Did your parents ever provide financial help in your adult life? (e.g. rent, car, emergencies)", 'gen_q4')}
-                        {renderScaleQuestion(5, "Did or will you receive any inheritance from your parents?", 'gen_q5')}
-                        {renderQ6()}
-                    </div>
-                </div>
-
-                <div>
-                    <div className="qn-block-label">Block C - Grandparental & Ancestral Wealth</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-                        {renderScaleQuestion(7, "How would you describe your grandparents' financial situation?", 'gen_q7')}
-                        {renderScaleQuestion(8, "Did your parents receive any inheritance or financial help from their parents?", 'gen_q8')}
-                    </div>
-                </div>
-
-                <div>
-                    <div className="qn-block-label">Block D - Current Safety Net & Wealth Signals</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-                        {renderScaleQuestion(9, "If you lost your job or faced a crisis, do you have family you could turn to for meaningful support?", 'gen_q9')}
-                        {renderScaleQuestion(10, "Do you currently own or expect to own assets that came from your family?", 'gen_q10')}
-                    </div>
+            <div>
+                <div className="qn-block-label">Block A - Childhood Financial Environment</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+                    {renderScaleQuestion(1, "Growing up, how would you describe your family's financial situation?", 'gen_q1')}
+                    {renderScaleQuestion(2, "Did your parents own the home you grew up in?", 'gen_q2')}
+                    {renderScaleQuestion(3, "How was your education funded?", 'gen_q3')}
                 </div>
             </div>
-        </>
+
+            <div>
+                <div className="qn-block-label">Block B - Direct Parental Financial Support</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+                    {renderScaleQuestion(4, "Did your parents ever provide financial help in your adult life? (e.g. rent, car, emergencies)", 'gen_q4')}
+                    {renderScaleQuestion(5, "Did or will you receive any inheritance from your parents?", 'gen_q5')}
+                    {renderQ6()}
+                </div>
+            </div>
+
+            <div>
+                <div className="qn-block-label">Block C - Grandparental & Ancestral Wealth</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+                    {renderScaleQuestion(7, "How would you describe your grandparents' financial situation?", 'gen_q7')}
+                    {renderScaleQuestion(8, "Did your parents receive any inheritance or financial help from their parents?", 'gen_q8')}
+                </div>
+            </div>
+
+            <div>
+                <div className="qn-block-label">Block D - Current Safety Net & Wealth Signals</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+                    {renderScaleQuestion(9, "If you lost your job or faced a crisis, do you have family you could turn to for meaningful support?", 'gen_q9')}
+                    {renderScaleQuestion(10, "Do you currently own or expect to own assets that came from your family?", 'gen_q10')}
+                </div>
+            </div>
+        </div>
     );
 };
 
@@ -453,6 +451,9 @@ const Step3 = ({ formData: f, onChange }) => (
 
 const Step4 = ({ formData: f, onChange }) => (
     <>
+        <div style={{ padding: '12px 16px', backgroundColor: '#FFFBF5', borderRadius: '8px', border: '1px solid #F0DEC8', fontSize: '12px', color: '#7A5230', lineHeight: 1.6 }}>
+            <strong>Not sure about exact numbers?</strong> Rough estimates are totally fine — leave any field blank and we'll still generate a complete plan.
+        </div>
         <InputField label="Savings Account Balance" name="savings_balance" type="currency" prefix="₹" value={f.savings_balance} onChange={onChange} info="Total balance across all savings accounts" />
         <Row>
             <InputField label="Fixed Deposits Balance" name="fd_balance" type="currency" prefix="₹" value={f.fd_balance} onChange={onChange} info="FDs are time-bound deposits with guaranteed returns at a fixed interest rate" />
@@ -464,6 +465,9 @@ const Step4 = ({ formData: f, onChange }) => (
 
 const Step5 = ({ formData: f, onChange }) => (
     <>
+        <div style={{ padding: '12px 16px', backgroundColor: '#FFFBF5', borderRadius: '8px', border: '1px solid #F0DEC8', fontSize: '12px', color: '#7A5230', lineHeight: 1.6 }}>
+            <strong>Just starting out?</strong> It's okay if you haven't invested yet — leave fields blank or enter 0. We'll include investment recommendations in your action plan.
+        </div>
         <Row>
             <InputField label="Direct Stocks" name="inv_direct_stocks" type="currency" prefix="₹" value={f.inv_direct_stocks} onChange={onChange} info="Current market value of shares you directly hold in a Demat account" />
             <InputField label="Equity Mutual Funds" name="inv_equity_mf" type="currency" prefix="₹" value={f.inv_equity_mf} onChange={onChange} info="Current NAV value of all equity-oriented mutual fund holdings" />
@@ -488,7 +492,9 @@ const Step5 = ({ formData: f, onChange }) => (
 
 const Step6 = ({ formData: f, onChange, setFormData }) => {
     const loans = Array.isArray(f.loans) ? f.loans : [];
+    const creditCards = Array.isArray(f.credit_cards) ? f.credit_cards : [];
 
+    // ── Loan helpers ──
     const addLoan = () => {
         setFormData(prev => ({
             ...prev,
@@ -511,9 +517,32 @@ const Step6 = ({ formData: f, onChange, setFormData }) => {
         });
     };
 
+    // ── Credit card helpers ──
+    const addCard = () => {
+        setFormData(prev => ({
+            ...prev,
+            credit_cards: [...(Array.isArray(prev.credit_cards) ? prev.credit_cards : []), { name: '', balance: '', type: 'full', emi_amount: '' }]
+        }));
+    };
+
+    const removeCard = (idx) => {
+        setFormData(prev => ({
+            ...prev,
+            credit_cards: (Array.isArray(prev.credit_cards) ? prev.credit_cards : []).filter((_, i) => i !== idx)
+        }));
+    };
+
+    const updateCard = (idx, field, value) => {
+        setFormData(prev => {
+            const updated = [...(Array.isArray(prev.credit_cards) ? prev.credit_cards : [])];
+            updated[idx] = { ...updated[idx], [field]: value };
+            return { ...prev, credit_cards: updated };
+        });
+    };
+
     return (
         <>
-            {/* Loans Section */}
+            {/* ── Active Loans ── */}
             <div className="qn-subsection-label" style={{ marginBottom: '24px' }}>
                 <span>Active Loans</span>
                 <button type="button" onClick={addLoan} className="qn-btn-add">
@@ -522,7 +551,7 @@ const Step6 = ({ formData: f, onChange, setFormData }) => {
             </div>
 
             {loans.length === 0 && (
-                <div style={{ padding: '24px', border: '1px dashed #E2E8F0', borderRadius: '8px', textAlign: 'center', marginBottom: '20px', color: '#94A3B8', fontSize: '13px' }}>
+                <div style={{ padding: '24px', border: '1px dashed var(--ink-ghost)', borderRadius: '8px', textAlign: 'center', marginBottom: '20px', color: 'var(--ink-soft)', fontSize: '13px' }}>
                     No loans added. Click "Add Loan" to add one.
                 </div>
             )}
@@ -578,14 +607,96 @@ const Step6 = ({ formData: f, onChange, setFormData }) => {
                 </div>
             ))}
 
-            {/* Credit Card Outstanding */}
-            <div className="qn-subsection-label">Credit Card</div>
-            <Row full>
-                <InputField label="Credit Card Outstanding" name="credit_card_outstanding" type="currency" prefix="₹" value={f.credit_card_outstanding} onChange={onChange} info="Total unpaid credit card balance" />
-            </Row>
+            {/* ── Credit Cards ── */}
+            <div className="qn-subsection-label" style={{ marginTop: '32px', marginBottom: '24px' }}>
+                <span>Credit Cards</span>
+                <button type="button" onClick={addCard} className="qn-btn-add">
+                    <Plus size={14} /> Add Card
+                </button>
+            </div>
 
-            {/* Credit Score */}
-            <div className="qn-subsection-label">Credit Score</div>
+            {creditCards.length === 0 && (
+                <div style={{ padding: '24px', border: '1px dashed var(--ink-ghost)', borderRadius: '8px', textAlign: 'center', marginBottom: '20px', color: 'var(--ink-soft)', fontSize: '13px' }}>
+                    No credit cards added. Click "Add Card" if you carry any outstanding balance.
+                </div>
+            )}
+
+            {creditCards.map((card, idx) => (
+                <div key={idx} className="qn-loan-card">
+                    <div className="qn-loan-card-header">
+                        <span className="qn-loan-card-title">Card {idx + 1}</span>
+                        <button type="button" onClick={() => removeCard(idx)} className="qn-btn-remove">
+                            <Trash2 size={12} /> Remove
+                        </button>
+                    </div>
+
+                    {/* Card name */}
+                    <div className="qn-form-grid full">
+                        <div className="qn-field">
+                            <label>Card Name / Issuer <span style={{ color: 'var(--ink-soft)', fontWeight: 400 }}>(optional)</span></label>
+                            <input
+                                type="text"
+                                placeholder="e.g. HDFC Regalia, SBI SimplyCLICK"
+                                value={card.name || ''}
+                                onChange={e => updateCard(idx, 'name', e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    <Row>
+                        {/* Outstanding balance */}
+                        <div className="qn-field">
+                            <label>Outstanding Balance</label>
+                            <div className="qn-rupee-wrap">
+                                <span>₹</span>
+                                <input
+                                    type="number"
+                                    placeholder="0"
+                                    value={card.balance || ''}
+                                    onChange={e => updateCard(idx, 'balance', e.target.value)}
+                                    min="0"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Repayment type */}
+                        <div className="qn-field">
+                            <label>How do you repay?</label>
+                            <select
+                                value={card.type || 'revolving'}
+                                onChange={e => updateCard(idx, 'type', e.target.value)}
+                            >
+                                <option value="full">Paid in full every month</option>
+                                <option value="emi">Converted to EMI</option>
+                                <option value="revolving">Revolving / minimum due only</option>
+                            </select>
+                        </div>
+                    </Row>
+
+                    {/* EMI amount — only shown when type === 'emi' */}
+                    {card.type === 'emi' && (
+                        <Row>
+                            <div className="qn-field">
+                                <label>Monthly EMI Amount</label>
+                                <div className="qn-rupee-wrap">
+                                    <span>₹</span>
+                                    <input
+                                        type="number"
+                                        placeholder="0"
+                                        value={card.emi_amount || ''}
+                                        onChange={e => updateCard(idx, 'emi_amount', e.target.value)}
+                                        min="0"
+                                    />
+                                </div>
+                            </div>
+                            <div className="qn-field" /> {/* spacer */}
+                        </Row>
+                    )}
+                </div>
+            ))}
+
+            {/* ── Credit Score ── */}
+            <div className="qn-subsection-label" style={{ marginTop: '32px' }}>Credit Score</div>
             <Row full>
                 <InputField label="Credit Score" name="credit_score" type="number" value={f.credit_score} onChange={onChange} placeholder="e.g. 750" info="Check on CIBIL, Experian, etc." />
             </Row>
@@ -610,6 +721,9 @@ const Step7 = ({ formData: f, onChange }) => (
 
 const Step8 = ({ formData: f, onChange }) => (
     <>
+        <div style={{ padding: '14px 16px', backgroundColor: '#F0F9FF', borderRadius: '8px', border: '1px solid #BAE6FD', fontSize: '13px', color: '#0369A1', lineHeight: 1.7 }}>
+            <strong>Never filed taxes before?</strong> Select <em>New Regime</em> and leave the rest blank — we'll still give you a complete financial plan. You can always update this later.
+        </div>
         <SelectField label="Current Tax Regime" name="tax_regime" value={f.tax_regime} onChange={onChange} options={['Old Regime', 'New Regime', 'Not Sure']} info="Old Regime allows deductions (80C, HRA, etc) but has higher base rates. New Regime has lower rates but fewer deductions." />
         <Row>
             <InputField label="80C Used (PPF, ELSS, etc)" name="tax_80c_used" type="currency" prefix="₹" value={f.tax_80c_used} onChange={onChange} info="Section 80C: up to ₹1.5L deduction for PPF, ELSS, LIC, tuition fees, home loan principal, etc." />
@@ -668,7 +782,7 @@ const Step10 = ({ formData: f, onChange }) => {
                             return (
                                 <button key={val} type="button"
                                     className={`qn-scale-btn ${selected ? 'selected' : ''}`}
-                                    onClick={() => onChange({ target: { name: q.name, value: val } })}
+                                    onClick={() => onChange({ target: { name: q.name, value: val, type: 'number' } })}
                                 >
                                     <span className="num">{val}</span>
                                     <span className="lbl">{lbl}</span>

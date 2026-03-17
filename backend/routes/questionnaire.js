@@ -11,7 +11,7 @@ const STEP_COLUMNS = {
     3: ['expense_household', 'expense_rent', 'expense_utilities', 'expense_transport', 'expense_food', 'expense_subscriptions', 'expense_insurance', 'expense_discretionary'],
     4: ['savings_balance', 'fd_balance', 'fd_rate', 'emergency_fund', 'monthly_surplus'],
     5: ['inv_direct_stocks', 'inv_equity_mf', 'inv_monthly_sip', 'inv_epf_ppf_nps', 'inv_debt_funds', 'inv_gold_commodities', 'inv_real_estate', 'inv_crypto_alt', 'inv_num_mutual_funds'],
-    6: ['loans', 'credit_card_outstanding', 'credit_score'],
+    6: ['loans', 'credit_cards', 'credit_score'],
     7: ['health_cover', 'health_premium', 'life_cover', 'life_premium'],
     8: ['tax_regime', 'tax_80c_used', 'tax_nps_80ccd', 'tax_hra', 'tax_home_loan_interest', 'tax_80d'],
     9: ['has_will', 'nominees_set', 'num_nominees'],
@@ -52,7 +52,7 @@ router.put('/step/:step', auth, async (req, res) => {
             if (data[col] !== undefined) {
                 setClauses.push(`${col} = $${paramIndex}`);
                 // JSONB columns need explicit stringification
-                if (col === 'loans' || col === 'gen_q6_selections') {
+                if (col === 'loans' || col === 'gen_q6_selections' || col === 'credit_cards') {
                     values.push(JSON.stringify(data[col]));
                 } else {
                     values.push(data[col]);

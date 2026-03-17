@@ -36,15 +36,16 @@ function Login() {
                 
                 <div className="auth-left-container">
                     <div className="auth-eyebrow">Welcome back</div>
-                    <div className="auth-title">Log in to your account</div>
+                    <h1 className="auth-title">Log in to your account</h1>
                     <div className="auth-sub">Your financial dashboard is waiting.</div>
                     
                     {error && <div className="auth-error">{error}</div>}
                     
                     <form className="auth-form" onSubmit={handleSubmit}>
                         <div className="auth-field">
-                            <label>Email</label>
+                            <label htmlFor="login-email">Email</label>
                             <input
+                                id="login-email"
                                 type="email" required value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 placeholder="you@example.com"
@@ -52,8 +53,9 @@ function Login() {
                         </div>
 
                         <div className="auth-field">
-                            <label>Password</label>
+                            <label htmlFor="login-password">Password</label>
                             <input
+                                id="login-password"
                                 type="password" required value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 placeholder="Enter your password"
@@ -64,12 +66,12 @@ function Login() {
                             {loading ? 'Logging in...' : 'Log In'} <ArrowRight size={15} />
                         </button>
                     </form>
-                    
+
                     <div className="auth-footer">
                         Don't have an account? <Link to="/register">Sign Up</Link>
                     </div>
-                    <div className="auth-footer" style={{ marginTop: '10px' }}>
-                        <Link to="/" style={{ color: '#C4BFB8' }}>← Back</Link>
+                    <div className="auth-footer">
+                        <Link to="/">← Back</Link>
                     </div>
                 </div>
             </div>

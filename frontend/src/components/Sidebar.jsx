@@ -1,7 +1,7 @@
 import React from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LogOut } from 'lucide-react';
+import { LogOut, PenLine } from 'lucide-react';
 
 function Sidebar({ mobileOpen, onCloseMobile }) {
     const { user, logout } = useAuth();
@@ -9,16 +9,13 @@ function Sidebar({ mobileOpen, onCloseMobile }) {
 
     const navItems = [
         { name: 'Overview', path: '/dashboard' },
+        { name: 'Goal Planner', path: '/goal-planner' },
         { name: 'Investments', path: '/investments' },
         { name: 'Liabilities', path: '/liabilities' },
         { name: 'Insurance', path: '/insurance' },
         { name: 'Tax', path: '/tax' },
-        { name: 'Will & Estate', path: '/estate' },
+        { name: 'Nominations & Will', path: '/estate' },
         { name: 'Action Plan', path: '/reports' },
-    ];
-
-    const toolItems = [
-        { name: 'Goal Planner', path: '/goal-planner' },
     ];
 
     // Get initials for avatar
@@ -46,18 +43,22 @@ function Sidebar({ mobileOpen, onCloseMobile }) {
                     </NavLink>
                 ))}
 
-                <div className="nav-section-label">Tools</div>
-
-                {toolItems.map((item) => (
-                    <NavLink
-                        key={item.name}
-                        to={item.path}
-                        className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+                <div style={{ marginTop: 'auto', padding: '16px 12px 4px' }}>
+                    <Link
+                        to="/questionnaire"
                         onClick={onCloseMobile}
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            padding: '10px 14px', borderRadius: '6px',
+                            background: '#F7F4EF', color: '#1C1A17',
+                            fontSize: '12px', fontWeight: 600, textDecoration: 'none',
+                            border: '1px solid #D4CBB8', letterSpacing: '0.03em'
+                        }}
                     >
-                        {item.name}
-                    </NavLink>
-                ))}
+                        <PenLine size={13} strokeWidth={2} />
+                        Edit Answers
+                    </Link>
+                </div>
             </nav>
 
             <div className="sidebar-user">

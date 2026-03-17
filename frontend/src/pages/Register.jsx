@@ -38,35 +38,35 @@ function Register() {
                 
                 <div className="auth-left-container">
                     <div className="auth-eyebrow">Get started</div>
-                    <div className="auth-title">Create your account</div>
+                    <h1 className="auth-title">Create your account</h1>
                     <div className="auth-sub">Start your financial health journey.</div>
 
                     {error && <div className="auth-error">{error}</div>}
 
                     <form className="auth-form" onSubmit={handleSubmit}>
                         <div className="auth-field">
-                            <label>Full Name</label>
-                            <input name="fullName" type="text" required onChange={handleChange} placeholder="Enter your full name" />
+                            <label htmlFor="reg-fullName">Full Name</label>
+                            <input id="reg-fullName" name="fullName" type="text" required value={formData.fullName} onChange={handleChange} placeholder="Enter your full name" />
                         </div>
 
                         <div className="auth-field">
-                            <label>Email</label>
-                            <input name="email" type="email" required onChange={handleChange} placeholder="you@example.com" />
+                            <label htmlFor="reg-email">Email</label>
+                            <input id="reg-email" name="email" type="email" required value={formData.email} onChange={handleChange} placeholder="you@example.com" />
                         </div>
 
                         <div className="auth-field">
-                            <label>Phone Number <span className="opt">(Optional)</span></label>
-                            <input name="phone" type="tel" onChange={handleChange} placeholder="+91 XXXXX XXXXX" />
+                            <label htmlFor="reg-phone">Phone Number <span className="opt">(Optional)</span></label>
+                            <input id="reg-phone" name="phone" type="tel" value={formData.phone} onChange={handleChange} placeholder="+91 XXXXX XXXXX" />
                         </div>
 
                         <div className="auth-row">
                             <div className="auth-field">
-                                <label>Password</label>
-                                <input name="password" type="password" required onChange={handleChange} placeholder="Min 6 characters" />
+                                <label htmlFor="reg-password">Password</label>
+                                <input id="reg-password" name="password" type="password" required value={formData.password} onChange={handleChange} placeholder="Min 6 characters" />
                             </div>
                             <div className="auth-field">
-                                <label>Confirm</label>
-                                <input name="confirmPassword" type="password" required onChange={handleChange} placeholder="Re-enter password" />
+                                <label htmlFor="reg-confirm">Confirm</label>
+                                <input id="reg-confirm" name="confirmPassword" type="password" required value={formData.confirmPassword} onChange={handleChange} placeholder="Re-enter password" />
                             </div>
                         </div>
 
@@ -78,8 +78,8 @@ function Register() {
                     <div className="auth-footer">
                         Already have an account? <Link to="/login">Log In</Link>
                     </div>
-                    <div className="auth-footer" style={{ marginTop: '10px' }}>
-                        <Link to="/" style={{ color: '#C4BFB8' }}>← Back</Link>
+                    <div className="auth-footer">
+                        <Link to="/">← Back</Link>
                     </div>
                 </div>
             </div>

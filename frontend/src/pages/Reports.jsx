@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { fetchWithAuth } from '../api';
 import { Download, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
-
-const fmt = (val) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val || 0);
+import { Link } from 'react-router-dom';
+import { fmtFull as fmt } from '../utils/formatCurrency';
 
 const PRIORITY_ORDER = ['critical', 'high', 'medium', 'low'];
 const PRIORITY_LABELS = {
@@ -17,34 +17,53 @@ function Reports() {
     const [loading, setLoading] = useState(true);
     const [expandedItems, setExpandedItems] = useState({});
     const [showReport, setShowReport] = useState(false);
+    const [error, setError] = useState('');
     const reportRef = useRef(null);
 
     useEffect(() => {
         fetchWithAuth('/dashboard/full').then(setData).finally(() => setLoading(false));
     }, []);
 
-    if (loading) return <div style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>Loading your financial plan...</div>;
-    if (!data) return null;
+    /* R8: Branded loading state */
+    if (loading) return (
+        <div className="page-loading">
+            <div className="page-loading-box"><span>FH</span></div>
+            <div className="page-loading-text">Loading your financial plan...</div>
+        </div>
+    );
+
+    /* R9: Branded empty state instead of returning null */
+    if (!data) return (
+        <div className="page-empty">
+            <div className="page-empty-title">No action plan data available</div>
+            <Link to="/questionnaire" className="page-empty-link">Complete your questionnaire to get started</Link>
+        </div>
+    );
 
     const { actionPlan } = data;
+    const fbs = data.overview?.fbs ?? 0;
 
     const toggleExpand = (idx) => setExpandedItems(prev => ({ ...prev, [idx]: !prev[idx] }));
 
     const toggleStatus = async (idx, currStatus) => {
         try {
+            setError('');
             const actionItem = data.actionPlan[idx];
             const updated = currStatus === 'pending' ? 'completed' : 'pending';
-            const result = await fetchWithAuth(`/dashboard/action-plan/status`, {
+            const result = await fetchWithAuth('/dashboard/action-plan/status', {
                 method: 'PUT', body: JSON.stringify({ title: actionItem.title, category: actionItem.category, status: updated })
             });
-            const newData = JSON.parse(JSON.stringify(data)); // Deep copy
+            /* R1: structuredClone instead of JSON.parse(JSON.stringify()) */
+            const newData = structuredClone(data);
             newData.actionPlan[idx].status = updated;
-            // Update FBS with completion bonus from backend
             if (result.updatedFbs !== null && result.updatedFbs !== undefined) {
                 newData.overview.fbs = result.updatedFbs;
             }
             setData(newData);
-        } catch (err) { alert('Failed to update status'); }
+        } catch {
+            /* R2: Inline error instead of alert() */
+            setError('Failed to update status. Please try again.');
+        }
     };
 
     const completedCount = actionPlan.filter(a => a.status === 'completed').length;
@@ -60,7 +79,7 @@ function Reports() {
         grouped[key].push({ ...a, _idx: idx });
     });
 
-    // Download report as HTML
+    /* R4/R5: Download report with app fonts and warm palette colors */
     const downloadReport = () => {
         setShowReport(true);
         setTimeout(() => {
@@ -72,29 +91,29 @@ function Reports() {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Financial Action Plan Report - FinHealth</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Inter', sans-serif; color: #1E293B; line-height: 1.6; background: #fff; padding: 40px; max-width: 800px; margin: 0 auto; }
-h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
-h2 { font-size: 16px; font-weight: 700; margin: 32px 0 16px; padding-bottom: 8px; border-bottom: 1px solid #E2E8F0; }
+body { font-family: 'Outfit', sans-serif; color: #1C1A17; line-height: 1.6; background: #fff; padding: 40px; max-width: 800px; margin: 0 auto; }
+h1 { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+h2 { font-size: 16px; font-weight: 700; margin: 32px 0 16px; padding-bottom: 8px; border-bottom: 1px solid #EDE7DC; }
 h3 { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
-p { font-size: 13px; color: #475569; margin-bottom: 8px; }
-.subtitle { font-size: 12px; color: #64748B; margin-bottom: 24px; }
+p { font-size: 13px; color: #6B6760; margin-bottom: 8px; }
+.subtitle { font-size: 12px; color: #6B6760; margin-bottom: 24px; }
 .summary-row { display: flex; gap: 24px; margin-bottom: 24px; }
-.summary-card { flex: 1; border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; }
-.summary-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748B; font-weight: 600; margin-bottom: 4px; }
-.summary-value { font-size: 20px; font-weight: 700; }
-.section-title { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin: 28px 0 12px; padding-bottom: 8px; border-bottom: 1px solid #E2E8F0; }
-.item { padding: 12px 0; border-bottom: 1px solid #F1F5F9; }
+.summary-card { flex: 1; border: 1px solid #EDE7DC; border-radius: 8px; padding: 16px; }
+.summary-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #6B6760; font-weight: 600; margin-bottom: 4px; }
+.summary-value { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; }
+.section-title { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin: 28px 0 12px; padding-bottom: 8px; border-bottom: 1px solid #EDE7DC; }
+.item { padding: 12px 0; border-bottom: 1px solid #F7F4EF; }
 .item-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
-.item-desc { font-size: 12px; color: #475569; line-height: 1.6; }
+.item-desc { font-size: 12px; color: #6B6760; line-height: 1.6; }
 .item-meta { display: flex; gap: 24px; margin-top: 8px; }
-.meta-label { font-size: 10px; text-transform: uppercase; color: #94A3B8; font-weight: 600; }
+.meta-label { font-size: 10px; text-transform: uppercase; color: #C4BFB8; font-weight: 600; }
 .meta-value { font-size: 13px; font-weight: 600; }
-.category-tag { font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; color: #64748B; font-weight: 600; }
-.footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #E2E8F0; font-size: 11px; color: #94A3B8; text-align: center; }
-.disclaimer { margin-top: 24px; padding: 16px; border: 1px solid #E2E8F0; border-radius: 8px; font-size: 11px; color: #64748B; line-height: 1.6; }
+.category-tag { font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; color: #6B6760; font-weight: 600; }
+.footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #EDE7DC; font-size: 11px; color: #C4BFB8; text-align: center; }
+.disclaimer { margin-top: 24px; padding: 16px; border: 1px solid #EDE7DC; border-radius: 8px; font-size: 11px; color: #6B6760; line-height: 1.6; }
 @media print { body { padding: 20px; } }
 </style>
 </head>
@@ -118,22 +137,34 @@ p { font-size: 13px; color: #475569; margin-bottom: 8px; }
             {/* Header */}
             <div className="page-header" style={{ alignItems: 'flex-start' }}>
                 <div>
-                    <div className="page-title">Financial Action Plan</div>
+                    <h1 className="page-title">Financial Action Plan</h1>
                 </div>
                 <button className="btn-dark" onClick={downloadReport} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px' }}>
                     <Download size={16} /> Download Report
                 </button>
             </div>
 
-            {/* Progress Summary */}
-            <div className="analysis-grid two-col">
+            {/* R2: Inline error banner */}
+            {error && <div className="reports-error">{error}</div>}
+
+            {/* R11: FBS Score + Progress Summary */}
+            <div className="analysis-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                <div className="analysis-item">
+                    <div className="analysis-item-header">
+                        <span className="analysis-item-title">FBS Score</span>
+                    </div>
+                    {/* R11: Show current FBS so users see impact of completing items */}
+                    <div className="analysis-value ok" style={{ marginTop: '8px' }}>{fbs}</div>
+                    <div className="analysis-sub" style={{ marginTop: '12px' }}>Financial Behaviour Score</div>
+                </div>
                 <div className="analysis-item">
                     <div className="analysis-item-header">
                         <span className="analysis-item-title">Progress</span>
                     </div>
-                    <div className="analysis-value" style={{ marginTop: '8px' }}>{progressPct}%</div>
-                    <div style={{ width: '100%', height: '4px', backgroundColor: 'var(--ink-ghost)', borderRadius: '2px', marginTop: '16px', overflow: 'hidden' }}>
-                        <div style={{ width: `${progressPct}%`, height: '100%', backgroundColor: 'var(--ink)', borderRadius: '2px', transition: 'width 0.3s' }}></div>
+                    {/* R10: Progress percentage with green color instead of default red */}
+                    <div className="analysis-value" style={{ marginTop: '8px', color: progressPct >= 50 ? 'var(--green)' : 'var(--accent)' }}>{progressPct}%</div>
+                    <div className="reports-progress-bar">
+                        <div className="reports-progress-fill" style={{ width: `${progressPct}%` }}></div>
                     </div>
                     <div className="analysis-sub" style={{ marginTop: '12px' }}>{completedCount} of {totalCount} completed</div>
                 </div>
@@ -141,7 +172,7 @@ p { font-size: 13px; color: #475569; margin-bottom: 8px; }
                     <div className="analysis-item-header">
                         <span className="analysis-item-title">Total Action Items</span>
                     </div>
-                    <div className="analysis-value" style={{ marginTop: '8px' }}>{totalCount}</div>
+                    <div className="analysis-value ok" style={{ marginTop: '8px' }}>{totalCount}</div>
                     <div className="analysis-sub" style={{ marginTop: '16px' }}>
                         {actionPlan.filter(a => a.status !== 'completed').length} pending
                     </div>
@@ -158,13 +189,13 @@ p { font-size: 13px; color: #475569; margin-bottom: 8px; }
                             <span className="group-title">{PRIORITY_LABELS[urgency]}</span>
                             <span className="group-count">{items.length} {items.length === 1 ? 'item' : 'items'}</span>
                         </div>
-                        {items.map((action, idx) => {
+                        {items.map((action) => {
                             const realIdx = action._idx;
                             const isExpanded = expandedItems[realIdx];
                             const isCompleted = action.status === 'completed';
 
                             return (
-                                <React.Fragment key={realIdx}>
+                                <div key={realIdx}>
                                     <div className={`action-item ${isCompleted ? 'completed' : ''}`} onClick={() => toggleExpand(realIdx)}>
                                         <button
                                             className={`action-checkbox ${isCompleted ? 'checked' : ''}`}
@@ -190,36 +221,35 @@ p { font-size: 13px; color: #475569; margin-bottom: 8px; }
                                         </div>
                                     </div>
 
+                                    {/* R3: Expanded detail panel — CSS classes instead of inline styles */}
                                     {isExpanded && (
-                                        <div style={{ padding: '0 0 24px 54px', borderLeft: `2px solid ${isCompleted ? 'var(--green)' : 'var(--ink-ghost)'}`, marginLeft: 0, borderBottom: '0.5px solid var(--ink-ghost)', opacity: isCompleted ? 0.45 : 1 }}>
+                                        <div className={`action-detail ${isCompleted ? 'done' : ''}`}>
                                             {action.description && (
-                                                <p style={{ fontSize: '13px', color: 'var(--ink-soft)', lineHeight: '1.6', margin: '4px 0 20px', fontWeight: 300 }}>
-                                                    {action.description}
-                                                </p>
+                                                <p className="action-detail-desc">{action.description}</p>
                                             )}
-                                            <div style={{ display: 'flex', gap: '48px', flexWrap: 'wrap' }}>
+                                            <div className="action-detail-kpis">
                                                 {action.suggestedAmount > 0 && (
                                                     <div>
-                                                        <div style={{ fontSize: '10px', color: 'var(--ink-ghost)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Target Amount</div>
-                                                        <div style={{ fontSize: '16px', fontWeight: 400, color: 'var(--ink)', marginTop: '6px', fontFamily: "'Playfair Display', serif" }}>{fmt(action.suggestedAmount)}</div>
+                                                        <div className="action-detail-kpi-label">Target Amount</div>
+                                                        <div className="action-detail-kpi-value">{fmt(action.suggestedAmount)}</div>
                                                     </div>
                                                 )}
                                                 {action.monthlyContribution > 0 && (
                                                     <div>
-                                                        <div style={{ fontSize: '10px', color: 'var(--ink-ghost)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Monthly Contribution</div>
-                                                        <div style={{ fontSize: '16px', fontWeight: 400, color: 'var(--ink)', marginTop: '6px', fontFamily: "'Playfair Display', serif" }}>{fmt(action.monthlyContribution)}</div>
+                                                        <div className="action-detail-kpi-label">Monthly Contribution</div>
+                                                        <div className="action-detail-kpi-value">{fmt(action.monthlyContribution)}</div>
                                                     </div>
                                                 )}
                                                 {action.currentPercent !== undefined && (
                                                     <div>
-                                                        <div style={{ fontSize: '10px', color: 'var(--ink-ghost)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Current → Ideal</div>
-                                                        <div style={{ fontSize: '16px', fontWeight: 400, color: 'var(--ink)', marginTop: '6px', fontFamily: "'Playfair Display', serif" }}>{action.currentPercent}% → {action.idealPercent}%</div>
+                                                        <div className="action-detail-kpi-label">Current → Ideal</div>
+                                                        <div className="action-detail-kpi-value">{action.currentPercent}% → {action.idealPercent}%</div>
                                                     </div>
                                                 )}
                                             </div>
                                         </div>
                                     )}
-                                </React.Fragment>
+                                </div>
                             );
                         })}
                     </div>
@@ -229,7 +259,7 @@ p { font-size: 13px; color: #475569; margin-bottom: 8px; }
             {/* Disclaimer */}
             <div className="understanding" style={{ marginTop: '0px' }}>
                 <div className="understanding-title" style={{ color: 'var(--ink-soft)' }}>Disclaimer</div>
-                <div style={{ fontSize: '12px', color: 'var(--ink-soft)', lineHeight: '1.6', marginTop: '8px' }}>
+                <div style={{ fontSize: '15px', color: 'var(--ink-soft)', lineHeight: '1.7', marginTop: '8px' }}>
                     <span style={{ fontWeight: 600 }}>Important:</span> This action plan is generated based on the financial data you have provided and is for informational purposes only. It does not constitute financial, investment, tax, or legal advice. Please consult a qualified financial advisor, tax consultant, or legal professional before making any financial decisions.
                 </div>
             </div>
@@ -244,14 +274,18 @@ p { font-size: 13px; color: #475569; margin-bottom: 8px; }
                         </p>
                         <div className="summary-row">
                             <div className="summary-card">
+                                <div className="summary-label">FBS Score</div>
+                                <div className="summary-value">{fbs}/100</div>
+                            </div>
+                            <div className="summary-card">
                                 <div className="summary-label">Progress</div>
                                 <div className="summary-value">{progressPct}%</div>
-                                <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '4px' }}>{completedCount} of {totalCount} completed</div>
+                                <div style={{ fontSize: '11px', color: '#C4BFB8', marginTop: '4px' }}>{completedCount} of {totalCount} completed</div>
                             </div>
                             <div className="summary-card">
                                 <div className="summary-label">Action Items</div>
                                 <div className="summary-value">{totalCount}</div>
-                                <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '4px' }}>{actionPlan.filter(a => a.status !== 'completed').length} pending</div>
+                                <div style={{ fontSize: '11px', color: '#C4BFB8', marginTop: '4px' }}>{actionPlan.filter(a => a.status !== 'completed').length} pending</div>
                             </div>
                         </div>
 
@@ -261,8 +295,8 @@ p { font-size: 13px; color: #475569; margin-bottom: 8px; }
                             return (
                                 <div key={urgency}>
                                     <div className="section-title">{PRIORITY_LABELS[urgency]}</div>
-                                    {items.map((action, i) => (
-                                        <div key={i} className="item">
+                                    {items.map((action) => (
+                                        <div key={action._idx} className="item">
                                             <div className="category-tag">{action.category}</div>
                                             <div className="item-title">
                                                 {action.status === 'completed' ? '✓ ' : ''}{action.title}
