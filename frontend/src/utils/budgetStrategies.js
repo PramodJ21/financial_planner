@@ -91,7 +91,7 @@ function recomputeSIP(goal, overrides = {}) {
  * @param {Object} overridesMap - { goalId: { years?, target?, riskLevel? } }
  * @returns {number} Total monthly SIP
  */
-function computeTotalSIPWithOverrides(goals, goalResults, overridesMap) {
+function _computeTotalSIPWithOverrides(goals, goalResults, overridesMap) {
     return goals.reduce((sum, g, i) => {
         const overrides = overridesMap[g.id];
         if (overrides) {
@@ -207,11 +207,9 @@ function strategyProtectHighPriority(goals, monthlyBudget, goalResults) {
 // STRATEGY 2 - LEAST DISRUPTIVE
 // ═══════════════════════════════════════════════════
 
-function strategyLeastDisruptive(goals, monthlyBudget, goalResults) {
-    const totalSIP = goalResults.reduce((s, g) => s + g.sip, 0);
+function _strategyLeastDisruptive(goals, monthlyBudget, goalResults) {
     const modifiedGoals = [];
     let resolved = false;
-    let yearExtension = 0;
 
     // Add +1 year to ALL goals simultaneously, repeat until resolved or cap
     for (let ext = 1; ext <= 10; ext++) {
@@ -237,7 +235,6 @@ function strategyLeastDisruptive(goals, monthlyBudget, goalResults) {
 
         if (newTotalSIP <= monthlyBudget) {
             resolved = true;
-            yearExtension = ext;
             modifiedGoals.push(...tempMods);
             break;
         }
@@ -250,7 +247,7 @@ function strategyLeastDisruptive(goals, monthlyBudget, goalResults) {
 
     const newTotalSIP = modifiedGoals.reduce((s, m) => s + m.newSIP, 0)
         + goals.filter(g => !modifiedGoals.find(m => m.goalId === g.id))
-            .reduce((s, g, i) => {
+            .reduce((s, g) => {
                 const idx = goals.indexOf(g);
                 return s + goalResults[idx].sip;
             }, 0);

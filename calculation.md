@@ -292,172 +292,77 @@ surplus_3m = gross_income_3m - expenses_3m - emi_3m - sip_3m
 
 ## 11. Financial Behaviour Score (FBS) [0–100]
 
-FBS has three tiers totalling 100 points, with a fragility penalty applied at the end.
+FBS uses **dynamic life-stage weights** — each component's max points vary by age bracket. See `fbs.md` for full weight tables and life stage definitions.
 
-### Tier 1 — Foundation (max 40 pts)
+### Life Stages (age only, via `getFBSLifeStage`)
+- EARLY_CAREER (<30), ESTABLISHING (30-39), CONSOLIDATING (40-49), PEAK_EARNING (50-57), PRE_RETIREMENT (≥58)
 
-#### Emergency Fund (15 pts)
+### Score Formula
+Each component is scored raw against original thresholds, then scaled:
+```
+scaledScore = ROUND((rawScore / originalMax) × dynamicWeight)
+FBS = CLAMP(foundation + behaviour + awareness − penalty, 0, 100)
+```
+
+Income-based tax cap redistributes excess to portfolioUnderstanding.
+
+### Tier 1 — Foundation (dynamic max)
+
+#### Emergency Fund (raw out of 15, scaled to weight)
 ```
 em_ratio = actual_emergency / ideal_emergency   (ideal = effective_monthly × 6)
-
-em_ratio >= 2.0  → 15 pts
-em_ratio >= 1.0  → 12 pts
-em_ratio >= 0.75 → 9 pts
-em_ratio >= 0.5  → 6 pts
-em_ratio >= 0.25 → 3 pts
-em_ratio < 0.25  → 1 pt
+em_ratio >= 2.0 → 15, >= 1.0 → 12, >= 0.75 → 9, >= 0.5 → 6, >= 0.25 → 3, else → 1
 ```
 
-#### Insurance Coverage (15 pts = health 8 + life 7)
+#### Insurance Coverage (computed directly against weight)
+- **No dependents:** All insurance weight → health scoring. No free life insurance points.
+- **Has dependents:** Split ~53% health / ~47% life, scored against sub-weights.
 
-Health (8 pts):
+#### Liability Management (computed directly against weight)
+Uses two dimensions: `emiRatio` (serviceability) + `cushionRatio` (coverability).
 ```
-health_cover >= ideal_health           → 8 pts
-health_cover >= ideal_health × 0.5     → 5 pts
-otherwise                              → 2 pts
+emiRatio = totalEmi / monthlyIncome   (if income=0 and EMI>0 → 1.0)
+cushionRatio = liquidAssets / badDebtOutstanding   (if no bad debt → Infinity)
+liquidAssets = totalAssets − realEstate
 ```
+Score ranges from 100% (no liabilities) to 10% (bad debt, can't cover, high EMI) of weight.
 
-Life (7 pts):
+### Tier 2 — Behaviour (dynamic max)
+
+#### Investment Regularity (raw out of 15)
+`sipRatio = (monthlySip × 12) / income.total × 100`
+>30% → 15, ≥20% → 14, ≥15% → 12, ≥10% → 9, ≥5% → 6, >0% → 2, 0% → 0
+Multiplied by consistency: ≥6mo → ×1.0, ≥3mo → ×0.9, <3mo → ×0.8
+
+#### Goal Clarity (raw out of 15)
+≥3 timed goals → 15, 2 → 10, 1 → 6, untimed → 3, none → 0
+
+#### Behavioural Tendencies (raw out of 10)
+`ROUND((rawTotal / 45) × 10)` — 5 positive + 4 inverted questions
+
+### Tier 3 — Awareness (dynamic max)
+
+#### Portfolio Understanding (raw out of 10)
+5 → 10, 4 → 8, 3 → 6, 2 → 3, 1 → 1, **missing → 0**
+
+#### Tax Literacy (raw out of 5)
+If income = 0 → 0. Otherwise: match+deductions → 5, match → 3, small gap → 2, mismatch → 0
+
+#### Asset Diversity — age-aware (raw out of 5)
+Each asset class is compared to its ideal range for the user's age (e.g., age < 30: equity 50–85%, debt 0–30%). Deviation = distance outside the ideal range per class (0 if within). Sum all 5 classes (equity, debt, commodity, alt, real estate).
+Total deviation: 0 → 5, ≤15 → 4, ≤30 → 3, ≤50 → 2, ≤70 → 1, >70 → 0. If total assets = 0, score = 0.
+
+### Fragility Penalty (up to −25)
+
+#### Revolving Penalty (up to −10)
 ```
-ideal_life === 0 (no dependents)       → automatic 7 pts
-life_cover >= ideal_life               → 7 pts
-life_cover >= ideal_life × 0.5         → 4 pts
-otherwise                              → 1 pt
-```
-
-#### Liability Management (10 pts)
-```
-no liabilities at all                                    → 10 pts
-only good debt AND emi_ratio ≤ 0.4                       → 10 pts
-only good debt AND emi_ratio > 0.4                       → 4 pts
-good_outstanding > bad_outstanding AND emi_ratio ≤ 0.4  → 7 pts
-good_outstanding > bad_outstanding AND emi_ratio > 0.4  → 4 pts
-bad debt exists AND emi_ratio ≤ 0.2                     → 4 pts
-bad debt exists AND emi_ratio > 0.2                     → 2 pts
-
-emi_ratio = total_monthly_emi / monthly_income
-```
-
----
-
-### Tier 2 — Behaviour (max 40 pts)
-
-#### Investment Regularity / Consistency (15 pts)
-```
-sip_ratio = (inv_monthly_sip × 12) / total_annual_income × 100
-
-sip_ratio > 30%  → 15 pts (base)
-sip_ratio ≥ 20%  → 14 pts
-sip_ratio ≥ 15%  → 12 pts
-sip_ratio ≥ 10%  → 9 pts
-sip_ratio ≥ 5%   → 6 pts
-sip_ratio > 0%   → 2 pts
-sip_ratio = 0%   → 0 pts
-
-Consistency multiplier (applied to base):
-sip_consecutive_months ≥ 6  → × 1.0
-sip_consecutive_months ≥ 3  → × 0.9
-sip_consecutive_months < 3  → × 0.8
-(field absent / null        → × 1.0, no penalty)
-
-investment_regularity = ROUND(base × multiplier)
+With income:    MIN(10, FLOOR(revolving_balance / monthly_income) × 3)
+Without income: MIN(10, CEIL(revolving_balance / 50000) × 3)
 ```
 
-#### Goal Clarity (15 pts)
-```
-timed_goals = goals where years > 0
-
-timed_goals ≥ 3  → 15 pts
-timed_goals = 2  → 10 pts
-timed_goals = 1  → 6 pts
-goals exist but none timed → 3 pts
-no goals at all  → 0 pts
-```
-
-#### Behavioural Tendencies (10 pts)
-Positive questions (higher answer = better financial behaviour):
-- `beh_review_monthly`, `beh_avoid_debt`, `beh_market_reaction`, `beh_windfall_behaviour`, `beh_product_understanding`
-
-Inverted questions (higher answer = worse — inverted as `6 − value`):
-- `beh_delay_decisions`, `beh_spend_impulsively`, `beh_hold_losing`, `beh_compare_peers`
-
-```
-raw_total = sum of all 9 values (after inversion)   ← max = 45
-behavioral_tendencies = ROUND((raw_total / 45) × 10)
-```
-
----
-
-### Tier 3 — Awareness (max 20 pts)
-
-#### Portfolio Understanding (10 pts)
-Mapped directly from `beh_product_understanding` (1–5):
-```
-5 → 10 pts
-4 → 8 pts
-3 → 6 pts
-2 → 3 pts
-1 → 1 pt
-0 / missing → 6 pts (neutral default)
-```
-
-#### Tax & Regime Literacy (5 pts)
-```
-regime_match = (opted_regime === recommended_regime)
-has_any_deduction = any of 80C, 80CCD, HRA, home loan interest, 80D > 0
-
-regime_match AND has_any_deduction  → 5 pts
-regime_match only                   → 3 pts
-potential_savings ≤ ₹5,000          → 2 pts
-regime mismatch with large savings  → 0 pts
-```
-
-#### Asset Diversity (5 pts)
-```
-max_alloc = MAX(equity%, debt%, commodity%, real_estate%, alt%)
-
-max_alloc < 50%  → 5 pts
-max_alloc < 70%  → 3 pts
-max_alloc < 85%  → 1 pt
-max_alloc ≥ 85%  → 0 pts
-```
-
----
-
-### Fragility Penalty (up to −15 combination + up to −10 revolving)
-
-#### Standalone Revolving Penalty
-Applied before and independently of combination flags. Penalises minimum-due credit card behaviour (36–42% p.a. compounding):
-```
-revolving_balance = Σ balance of credit cards with type="revolving"
-                    (legacy: = credit_card_outstanding)
-revolving_penalty = MIN(10, FLOOR(revolving_balance / monthly_income) × 3)
-```
-
-#### Combination flags
-- `zero_emergency` = emergency_fund score ≤ 1
-- `zero_insurance` = insurance score ≤ 2
-- `high_bad_debt`  = bad_outstanding ≥ monthly_income × 2
-
-```
-all three present               → −15 pts  [flag: critical_triple_gap]
-zero_emergency + zero_insurance → −8 pts   [flag: no_emergency_no_insurance]
-zero_emergency + high_bad_debt  → −6 pts × multiplier  [flag: no_emergency_high_debt]
-zero_insurance + high_bad_debt  → −5 pts × multiplier  [flag: no_insurance_high_debt]
-```
-
-**Multipliers** (for the high_bad_debt cases):
-- Revolving majority (`revolving_balance > bad_outstanding × 0.5`) → × 1.5
-- Heavy EMI CC (`emi_cc_balance ≥ monthly_income`) → × 1.2
-- Neither → × 1.0
-- Result capped at 15
-
-#### Final Score
-```
-penalty   = revolving_penalty + fragility_combination_penalty
-raw_total = foundation + behaviour + awareness
-FBS = CLAMP(raw_total − penalty, 0, 100)
-```
+#### Combination Penalty (up to −15)
+Flags: `zeroEmergency`, `zeroInsurance`, `highBadDebt` (requires cushionRatio < 2)
+All three → −15, EF+Ins → −8, EF+Debt → −6 (×1.5 revolving), Ins+Debt → −5 (×1.5 revolving)
 
 ---
 

@@ -3,11 +3,46 @@ import { fetchWithAuth } from '../api';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { Link } from 'react-router-dom';
 import { ShieldAlert } from 'lucide-react';
+import '../styles/insurance.css';
 import { fmt, fmtFull } from '../utils/formatCurrency';
 
 /* IN5: Match Dashboard's Insurance donut colors */
 const LIFE_COLOR = '#1C1A17';
 const HEALTH_COLOR = '#C4703A';
+
+function FlipCard({ name, statusPill, sub, value, ideal, explanation, action }) {
+    const [flipped, setFlipped] = useState(false);
+    const hasBack = explanation || action;
+    return (
+        <div
+            className={`insurance-analysis-item${flipped ? ' insurance-flipped' : ''}`}
+            onClick={() => hasBack && setFlipped(f => !f)}
+        >
+            <div className="insurance-flip-inner">
+                <div className="insurance-flip-front">
+                    <div className="insurance-analysis-item-header">
+                        <span className="insurance-analysis-item-title">{name}</span>
+                        {statusPill}
+                    </div>
+                    {sub && <div className="insurance-analysis-sub">{sub}</div>}
+                    {value}
+                    {ideal && <div className="insurance-analysis-ideal">{ideal}</div>}
+                    {hasBack && (
+                        <div className="insurance-flip-front-link">→ Flip for analysis</div>
+                    )}
+                </div>
+                {hasBack && (
+                    <div className="insurance-flip-back">
+                        <div className="insurance-flip-back-title">{name}</div>
+                        {explanation && <div className="insurance-flip-back-explanation">{explanation}</div>}
+                        {action && <div className="insurance-flip-back-action">{action}</div>}
+                        <div className="insurance-flip-back-link">← Flip back</div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
 
 function Insurance() {
     const [data, setData] = useState(null);
@@ -19,17 +54,17 @@ function Insurance() {
 
     /* IN7: Branded loading state */
     if (loading) return (
-        <div className="page-loading">
-            <div className="page-loading-box"><span>FH</span></div>
-            <div className="page-loading-text">Loading your insurance data...</div>
+        <div className="insurance-page-loading">
+            <div className="insurance-page-loading-box"><span>FH</span></div>
+            <div className="insurance-page-loading-text">Loading your insurance data...</div>
         </div>
     );
 
     /* IN7: Branded empty state */
     if (!data) return (
-        <div className="page-empty">
-            <div className="page-empty-title">No insurance data available</div>
-            <Link to="/questionnaire" className="page-empty-link">Complete your questionnaire to get started</Link>
+        <div className="insurance-page-empty">
+            <div className="insurance-page-empty-title">No insurance data available</div>
+            <Link to="/questionnaire" className="insurance-page-empty-link">Complete your questionnaire to get started</Link>
         </div>
     );
 
@@ -81,28 +116,31 @@ function Insurance() {
     });
 
     return (
-        <div className="page-content">
+        <div className="insurance-page-content">
 
             {/* PAGE HEADER */}
-            <div className="page-header">
-                <h1 className="page-title">Insurance</h1>
+            <div className="insurance-page-header">
+                <div>
+                    <div className="insurance-page-super">Explore — Insurance</div>
+                    <h1 className="insurance-page-title">Insurance</h1>
+                </div>
             </div>
 
             {/* IN8: NARRATIVE SECTION */}
-            <div className="inv-narrative">
-                <div className="inv-narrative-label">Insurance Summary</div>
-                <p className="inv-narrative-text">{narrative}</p>
+            <div className="insurance-narrative">
+                <div className="insurance-narrative-label">Insurance Summary</div>
+                <p className="insurance-narrative-text">{narrative}</p>
             </div>
 
             {/* COVERAGE SUMMARY */}
             <div>
-                <div className="act-label">Portfolio</div>
-                <h2 className="section-heading">Coverage Summary</h2>
-                <div className="liab-layout">
+                <div className="insurance-act-label">Portfolio</div>
+                <h2 className="insurance-section-heading">Coverage Summary</h2>
+                <div className="insurance-layout">
 
                     {/* IN5: DONUT — colors matching Dashboard */}
-                    <div className="donut-wrap">
-                        <div className="donut-canvas">
+                    <div className="insurance-donut-wrap">
+                        <div className="insurance-donut-canvas">
                             {pieData.length > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
@@ -123,12 +161,12 @@ function Insurance() {
                                 </div>
                             )}
                         </div>
-                        <div className="donut-legend">
+                        <div className="insurance-donut-legend">
                             {pieData.map((d) => {
                                 const percentage = totalCover > 0 ? Math.round(d.value / totalCover * 100) : 0;
                                 return (
-                                    <div key={d.name} className="legend-item">
-                                        <span className="legend-dot" style={{ background: d.name === 'Life Insurance' ? LIFE_COLOR : HEALTH_COLOR }}></span>
+                                    <div key={d.name} className="insurance-legend-item">
+                                        <span className="insurance-legend-dot" style={{ background: d.name === 'Life Insurance' ? LIFE_COLOR : HEALTH_COLOR }}></span>
                                         {d.name} ({percentage}%)
                                     </div>
                                 );
@@ -137,8 +175,8 @@ function Insurance() {
                     </div>
 
                     {/* TABLE */}
-                    <div className="table-scroll-wrapper">
-                        <table className="liab-table">
+                    <div className="insurance-table-scroll-wrapper">
+                        <table className="insurance-table">
                             <thead>
                                 <tr>
                                     <th>Insurance</th>
@@ -148,12 +186,12 @@ function Insurance() {
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td><span className="asset-name">Life Insurance</span></td>
+                                    <td><span className="insurance-asset-name">Life Insurance</span></td>
                                     <td>{fmtFull(ins.lifeCover)}</td>
                                     <td>{fmtFull(ins.lifePremium)}</td>
                                 </tr>
                                 <tr>
-                                    <td><span className="asset-name">Health Insurance</span></td>
+                                    <td><span className="insurance-asset-name">Health Insurance</span></td>
                                     <td>{fmtFull(ins.healthCover)}</td>
                                     <td>{fmtFull(ins.healthPremium)}</td>
                                 </tr>
@@ -165,28 +203,40 @@ function Insurance() {
 
             {/* FINANCIAL ANALYSIS – EMERGENCY PLANNING */}
             <div>
-                <div className="act-label">Analysis</div>
-                <h2 className="section-heading">Financial Analysis - Emergency Planning</h2>
-                <div className="analysis-grid">
-                    {analysisItems.map(item => (
-                        <div key={item.label} className="analysis-item">
-                            <div className="analysis-item-header">
-                                <span className="analysis-item-title">{item.label}</span>
-                                <span className={`status-pill ${item.inRange ? 'on' : 'outside'}`}>{item.inRange ? 'On track' : 'Outside range'}</span>
-                            </div>
-                            <div className="analysis-sub">Actual Value</div>
-                            <div className={`analysis-value ${item.inRange ? 'ok' : 'warn'}`}>{fmt(item.actual)}</div>
-                            {/* IN10: Show range instead of single ideal value */}
-                            <div className="analysis-ideal">Ideal: {fmt(item.min)} – {fmt(item.max)}</div>
-                        </div>
-                    ))}
+                <div className="insurance-act-label">Analysis</div>
+                <h2 className="insurance-section-heading">Financial Analysis - Emergency Planning</h2>
+                <div className="insurance-analysis-grid">
+                    {analysisItems.map(item => {
+                        const explanations = {
+                            'Emergency Funds': 'Emergency fund should cover 6 months of effective monthly expenses (living costs + prorated annual bills). Liquid instruments only — savings account or short-duration FD.',
+                            'Health Insurance': 'Ideal cover = MAX(₹5L, 50% of annual gross income). Family floater plans should cover all dependents. Hospitalisation costs in India can escalate rapidly without cover.',
+                            'Life Insurance': 'Ideal term cover = 10× annual gross income. Applicable only if you have dependents. Pure term plans offer the highest cover at the lowest premium — avoid endowment or ULIP for protection.'
+                        };
+                        const actions = {
+                            'Emergency Funds': !item.inRange ? `Your emergency fund of ${fmt(item.actual)} is ${item.actual < item.min ? 'below' : 'above'} the ideal range of ${fmt(item.min)}–${fmt(item.max)}. ${item.actual < item.min ? 'Build this up before deploying surplus into investments.' : 'Consider moving some excess to higher-yield instruments.'}` : null,
+                            'Health Insurance': !item.inRange ? `Health cover of ${fmt(item.actual)} is ${item.actual < item.min ? 'below ideal' : 'above ideal range'}. ${item.actual < item.min ? `Increase by ${fmt(item.min - item.actual)} to reach minimum recommended cover.` : ''}` : null,
+                            'Life Insurance': !item.inRange ? `Life cover of ${fmt(item.actual)} is ${item.actual < item.min ? 'below' : 'above'} the recommended range. ${item.actual < item.min ? `Additional ${fmt(item.min - item.actual)} in term cover is recommended.` : ''}` : null
+                        };
+                        return (
+                            <FlipCard
+                                key={item.label}
+                                name={item.label}
+                                statusPill={<span className={`insurance-status-pill ${item.inRange ? 'insurance-on' : 'insurance-outside'}`}>{item.inRange ? 'On track' : 'Outside range'}</span>}
+                                sub="Actual Value"
+                                value={<div className={`insurance-analysis-value ${item.inRange ? 'insurance-ok' : 'insurance-warn'}`}>{fmt(item.actual)}</div>}
+                                ideal={`Ideal: ${fmt(item.min)} – ${fmt(item.max)}`}
+                                explanation={explanations[item.label] || null}
+                                action={actions[item.label] || null}
+                            />
+                        );
+                    })}
                 </div>
             </div>
 
             {/* UNDERSTANDING INSURANCE & EMERGENCY PLANNING */}
-            <div className="understanding">
-                <div className="understanding-title">Understanding Insurance & Emergency Planning</div>
-                <ul className="understanding-list">
+            <div className="insurance-understanding">
+                <div className="insurance-understanding-title">Understanding Insurance & Emergency Planning</div>
+                <ul className="insurance-understanding-list">
                     <li>Emergency Fund ideal = 6 months of effective monthly expenses (monthly living costs + prorated annual obligations like insurance & school fees).{emergency.emergencyFunds?.actual > 0 ? ` You have ${fmt(emergency.emergencyFunds.actual)} saved.` : ''}</li>
                     <li>Health Insurance ideal = MAX(₹5L, 50% of annual gross income). Family size and city tier may warrant ₹10-25L+ cover.{ins.healthCover > 0 ? ` Your cover: ${fmt(ins.healthCover)}.` : ''}</li>
                     <li>Life Insurance ideal = 10× annual gross income as a pure Term Plan, applicable only if you have dependents (spouse, children, or elderly parents).{ins.lifeCover > 0 ? ` Your cover: ${fmt(ins.lifeCover)}.` : ''}</li>
@@ -197,10 +247,10 @@ function Insurance() {
 
             {/* IN1: POLICY EVALUATION — removed 8 always-empty columns, keep only 4 with data */}
             <div>
-                <div className="act-label">Policies</div>
-                <h2 className="section-heading">Life Insurance Policy Evaluation</h2>
-                <div className="table-scroll-wrapper" style={{ marginTop: '24px' }}>
-                    <table className="liab-table">
+                <div className="insurance-act-label">Policies</div>
+                <h2 className="insurance-section-heading">Life Insurance Policy Evaluation</h2>
+                <div className="insurance-table-scroll-wrapper" style={{ marginTop: '24px' }}>
+                    <table className="insurance-table">
                         <thead>
                             <tr>
                                 <th>Policy Name</th>
@@ -212,8 +262,8 @@ function Insurance() {
                         <tbody>
                             {ins.lifeCover > 0 ? (
                                 <tr>
-                                    <td><span className="asset-name">Term Life Policy</span></td>
-                                    <td><span className="cat-good">Term</span></td>
+                                    <td><span className="insurance-asset-name">Term Life Policy</span></td>
+                                    <td><span className="insurance-cat-good">Term</span></td>
                                     <td>{fmtFull(ins.lifeCover)}</td>
                                     <td>{fmtFull(ins.lifePremium)}</td>
                                 </tr>
@@ -229,10 +279,10 @@ function Insurance() {
 
             {/* RECOMMENDATIONS */}
             <div>
-                <div className="act-label">Recommendations</div>
-                <h2 className="section-heading">Recommendation Summary</h2>
-                <div className="table-scroll-wrapper" style={{ marginTop: '24px' }}>
-                    <table className="liab-table">
+                <div className="insurance-act-label">Recommendations</div>
+                <h2 className="insurance-section-heading">Recommendation Summary</h2>
+                <div className="insurance-table-scroll-wrapper" style={{ marginTop: '24px' }}>
+                    <table className="insurance-table">
                         <thead>
                             <tr>
                                 <th>Insurance Type</th>
@@ -244,14 +294,14 @@ function Insurance() {
                         <tbody>
                             {ins.additionalCoverNeeded > 0 && (
                                 <tr>
-                                    <td><span className="asset-name">Additional Cover Recommended</span></td>
+                                    <td><span className="insurance-asset-name">Additional Cover Recommended</span></td>
                                     <td>{fmt(ins.additionalCoverNeeded)}</td>
                                     <td>-</td>
                                     <td>-</td>
                                 </tr>
                             )}
                             <tr>
-                                <td><span className="asset-name">Ideal term life cover: {fmt(ins.idealTermCover)}</span></td>
+                                <td><span className="insurance-asset-name">Ideal term life cover: {fmt(ins.idealTermCover)}</span></td>
                                 <td colSpan={3}></td>
                             </tr>
                         </tbody>
@@ -261,23 +311,23 @@ function Insurance() {
 
             {/* IN9: IMPACT ALERT — CSS class instead of inline styles */}
             {ins.additionalCoverNeeded > 0 && (
-                <div className="impact-alert">
+                <div className="insurance-impact-alert">
                     <ShieldAlert size={20} color="var(--red)" />
-                    <div className="impact-alert-body">
+                    <div className="insurance-impact-alert-body">
                         <strong>Impact on Premiums: </strong>
                         Plan your financial protection. Required: {fmt(ins.idealTermCover)}. Shortfall: {fmt(ins.additionalCoverNeeded)}.
                     </div>
-                    <span className="impact-alert-amount">{fmt(ins.additionalCoverNeeded)}</span>
+                    <span className="insurance-impact-alert-amount">{fmt(ins.additionalCoverNeeded)}</span>
                 </div>
             )}
 
             {/* CTA to action plan */}
-            <div className="inv-cta">
+            <div className="insurance-cta">
                 <div>
-                    <div className="inv-cta-title">Take action on your insurance gaps</div>
-                    <div className="inv-cta-desc">Your personalised action plan includes specific steps to improve your insurance coverage and protect your family.</div>
+                    <div className="insurance-cta-title">Take action on your insurance gaps</div>
+                    <div className="insurance-cta-desc">Your personalised action plan includes specific steps to improve your insurance coverage and protect your family.</div>
                 </div>
-                <Link to="/reports" className="inv-cta-link">View Action Plan ↗</Link>
+                <Link to="/reports" className="insurance-cta-link">View Action Plan ↗</Link>
             </div>
         </div>
     );

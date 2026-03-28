@@ -19,6 +19,58 @@ function getAge(dob) {
     return Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
 }
 
+// ============ FBS LIFE STAGE (for scoring weights) ============
+function getFBSLifeStage(age) {
+    if (age < 30) return { key: 'EARLY_CAREER', label: 'Early Career', description: 'Building foundations and habits' };
+    if (age < 40) return { key: 'ESTABLISHING', label: 'Establishing', description: 'Managing major life commitments' };
+    if (age < 50) return { key: 'CONSOLIDATING', label: 'Consolidating', description: 'Balancing peak expenses and wealth growth' };
+    if (age < 58) return { key: 'PEAK_EARNING', label: 'Peak Earning', description: 'Maximising and protecting wealth' };
+    return { key: 'PRE_RETIREMENT', label: 'Pre-Retirement', description: 'Preserving wealth and reducing risk' };
+}
+
+// Dynamic weight tables — each sums to exactly 100
+const FBS_WEIGHTS = {
+    EARLY_CAREER: {
+        emergencyFund: 16, insurance: 11, liabilityManagement: 8,
+        investmentRegularity: 20, goalClarity: 16, behaviouralTendencies: 9,
+        portfolioUnderstanding: 9, taxLiteracy: 2, assetDiversity: 9,
+    },
+    ESTABLISHING: {
+        emergencyFund: 16, insurance: 16, liabilityManagement: 10,
+        investmentRegularity: 15, goalClarity: 14, behaviouralTendencies: 9,
+        portfolioUnderstanding: 9, taxLiteracy: 6, assetDiversity: 5,
+    },
+    CONSOLIDATING: {
+        emergencyFund: 14, insurance: 16, liabilityManagement: 10,
+        investmentRegularity: 13, goalClarity: 13, behaviouralTendencies: 11,
+        portfolioUnderstanding: 10, taxLiteracy: 8, assetDiversity: 5,
+    },
+    PEAK_EARNING: {
+        emergencyFund: 13, insurance: 19, liabilityManagement: 10,
+        investmentRegularity: 11, goalClarity: 10, behaviouralTendencies: 12,
+        portfolioUnderstanding: 11, taxLiteracy: 9, assetDiversity: 5,
+    },
+    PRE_RETIREMENT: {
+        emergencyFund: 14, insurance: 21, liabilityManagement: 11,
+        investmentRegularity: 9, goalClarity: 8, behaviouralTendencies: 12,
+        portfolioUnderstanding: 12, taxLiteracy: 9, assetDiversity: 4,
+    },
+};
+
+function scaleScore(rawScore, originalMax, newMax) {
+    if (originalMax === 0) return 0;
+    return Math.round((rawScore / originalMax) * newMax);
+}
+
+// Ideal allocation ranges (%) by age — used for FBS asset diversity scoring
+function getIdealAllocRanges(age) {
+    if (age < 30)  return { equity: [50, 85], debt: [0, 30], commodity: [0, 20], alt: [0, 15], realEstate: [0, 25] };
+    if (age <= 40) return { equity: [40, 75], debt: [5, 35], commodity: [0, 20], alt: [0, 15], realEstate: [0, 30] };
+    if (age <= 50) return { equity: [30, 65], debt: [10, 40], commodity: [0, 20], alt: [0, 10], realEstate: [0, 35] };
+    if (age <= 60) return { equity: [20, 50], debt: [20, 55], commodity: [0, 20], alt: [0, 10], realEstate: [0, 35] };
+    return              { equity: [10, 35], debt: [35, 65], commodity: [0, 15], alt: [0, 10], realEstate: [0, 35] };
+}
+
 // ============ INCOME & EXPENSES ============
 function computeIncome(p) {
     const salaried = Number(p.annual_salary) || 0;
@@ -525,50 +577,94 @@ function computeFBS(p) {
     const tax = computeTax(p);
     const monthlyIncome = Number(p.monthly_take_home) || ((income.salaried + income.business) / 12);
 
-    // ─── TIER 1: FOUNDATION - 40 pts ───
+    // ─── DYNAMIC WEIGHTS ───
+    const age = getAge(p.date_of_birth);
+    const fbsLifeStage = getFBSLifeStage(age);
+    const w = { ...FBS_WEIGHTS[fbsLifeStage.key] };
 
-    // Emergency Fund - 15 pts
+    // Income-based tax cap — tax planning matters less at low incomes
+    const incomeTotal = income.total;
+    let taxMax = w.taxLiteracy;
+    if (incomeTotal === 0) taxMax = 0;
+    else if (incomeTotal < 500000) taxMax = Math.min(w.taxLiteracy, 2);
+    else if (incomeTotal < 1200000) taxMax = Math.min(w.taxLiteracy, 5);
+    else if (incomeTotal >= 2500000) taxMax = w.taxLiteracy + 2;
+    const taxDiff = w.taxLiteracy - taxMax;
+    w.taxLiteracy = taxMax;
+    w.portfolioUnderstanding += taxDiff; // redistribute to keep tier 3 constant
+
+    // ─── TIER 1: FOUNDATION ───
+
+    // Emergency Fund (raw out of 15)
     const emRatio = emergency.emergencyFunds.ideal ? emergency.emergencyFunds.actual / emergency.emergencyFunds.ideal : 0;
-    let emergencyFund = 1;
-    if (emRatio >= 2.0) emergencyFund = 15;
-    else if (emRatio >= 1.0) emergencyFund = 12;
-    else if (emRatio >= 0.75) emergencyFund = 9;
-    else if (emRatio >= 0.5) emergencyFund = 6;
-    else if (emRatio >= 0.25) emergencyFund = 3;
+    let emergencyFundRaw = 1;
+    if (emRatio >= 2.0) emergencyFundRaw = 15;
+    else if (emRatio >= 1.0) emergencyFundRaw = 12;
+    else if (emRatio >= 0.75) emergencyFundRaw = 9;
+    else if (emRatio >= 0.5) emergencyFundRaw = 6;
+    else if (emRatio >= 0.25) emergencyFundRaw = 3;
 
-    // Insurance Coverage - 15 pts (health 8 + life 7)
-    let healthPts = 2;
-    if (insurance.healthCover >= insurance.idealHealth) healthPts = 8;
-    else if (insurance.idealHealth > 0 && insurance.healthCover >= insurance.idealHealth * 0.5) healthPts = 5;
+    // Insurance Coverage — redistribute life weight to health when no dependents
+    let insuranceScore;
+    if (insurance.idealLife === 0) {
+        // No dependents: all insurance weight goes to health scoring
+        const fullInsW = w.insurance;
+        let healthPts = scaleScore(2, 8, fullInsW); // floor (no/low cover)
+        if (insurance.healthCover >= insurance.idealHealth) healthPts = fullInsW;
+        else if (insurance.idealHealth > 0 && insurance.healthCover >= insurance.idealHealth * 0.5) healthPts = scaleScore(5, 8, fullInsW);
+        insuranceScore = healthPts;
+    } else {
+        // Normal split: ~53% health, ~47% life (same ratio as original 8/7)
+        const healthMax = Math.round(w.insurance * 8 / 15);
+        const lifeMax = w.insurance - healthMax;
 
-    let lifePts = 1;
-    if (insurance.idealLife === 0) lifePts = 7; // No dependants = automatic full
-    else if (insurance.lifeCover >= insurance.idealLife) lifePts = 7;
-    else if (insurance.lifeCover >= insurance.idealLife * 0.5) lifePts = 4;
+        let healthPts = scaleScore(2, 8, healthMax);
+        if (insurance.healthCover >= insurance.idealHealth) healthPts = healthMax;
+        else if (insurance.idealHealth > 0 && insurance.healthCover >= insurance.idealHealth * 0.5) healthPts = scaleScore(5, 8, healthMax);
 
-    const insuranceScore = healthPts + lifePts;
+        let lifePts = scaleScore(1, 7, lifeMax);
+        if (insurance.lifeCover >= insurance.idealLife) lifePts = lifeMax;
+        else if (insurance.lifeCover >= insurance.idealLife * 0.5) lifePts = scaleScore(4, 7, lifeMax);
 
-    // Liability Management - 10 pts
-    const emiRatio = monthlyIncome > 0 ? liabilities.totalEmi / monthlyIncome : 0;
-    let liabilitiesScore = 2;
-    if (!liabilities.hasLiabilities) {
-        liabilitiesScore = 10;
-    } else if (liabilities.badLiability.outstanding === 0 && emiRatio <= 0.4) {
-        liabilitiesScore = 10; // Only good debt, manageable EMI
-    } else if (liabilities.badLiability.outstanding === 0 && emiRatio > 0.4) {
-        liabilitiesScore = 4;  // Only good debt, high EMI
-    } else if (liabilities.goodLiability.outstanding > liabilities.badLiability.outstanding && emiRatio <= 0.4) {
-        liabilitiesScore = 7;
-    } else if (liabilities.goodLiability.outstanding > liabilities.badLiability.outstanding && emiRatio > 0.4) {
-        liabilitiesScore = 4;
-    } else if (emiRatio <= 0.2) {
-        liabilitiesScore = 4;  // Bad debt present, low EMI
+        insuranceScore = healthPts + lifePts;
     }
-    // else stays at 2: bad debt + high EMI
 
-    // ─── TIER 2: BEHAVIOUR - 40 pts ───
+    // Liability Management — with cushionRatio
+    const emiRatio = monthlyIncome > 0
+        ? liabilities.totalEmi / monthlyIncome
+        : (liabilities.totalEmi > 0 ? 1 : 0); // FIX: no income + EMI = worst case
 
-    // Consistency & Discipline - 15 pts
+    const liquidAssets = assets.total - (assets.realEstate || 0);
+    const badOutstanding = liabilities.badLiability.outstanding;
+    const cushionRatio = badOutstanding > 0 ? liquidAssets / badOutstanding : Infinity;
+
+    const liabMax = w.liabilityManagement;
+    let liabilitiesScore;
+    if (!liabilities.hasLiabilities) {
+        liabilitiesScore = liabMax;                                                         // no liabilities
+    } else if (liabilities.badLiability.outstanding === 0 && emiRatio <= 0.4) {
+        liabilitiesScore = liabMax;                                                         // only good debt, manageable EMI
+    } else if (liabilities.badLiability.outstanding === 0 && emiRatio > 0.4) {
+        liabilitiesScore = Math.round(liabMax * 0.4);                                       // only good debt, high EMI
+    } else if (badOutstanding > 0 && cushionRatio >= 5) {
+        liabilitiesScore = Math.round(liabMax * 0.8);                                       // bad debt trivial vs assets
+    } else if (badOutstanding > 0 && cushionRatio >= 2 && emiRatio <= 0.4) {
+        liabilitiesScore = Math.round(liabMax * 0.6);                                       // bad debt covered, low EMI
+    } else if (liabilities.goodLiability.outstanding > badOutstanding && emiRatio <= 0.4) {
+        liabilitiesScore = Math.round(liabMax * 0.7);                                       // good > bad, low EMI
+    } else if (liabilities.goodLiability.outstanding > badOutstanding && emiRatio > 0.4) {
+        liabilitiesScore = Math.round(liabMax * 0.4);                                       // good > bad, high EMI
+    } else if (cushionRatio >= 1 && emiRatio <= 0.2) {
+        liabilitiesScore = Math.round(liabMax * 0.4);                                       // barely covered, low EMI
+    } else if (cushionRatio < 1 && emiRatio <= 0.2) {
+        liabilitiesScore = Math.round(liabMax * 0.2);                                       // can't cover, low EMI
+    } else {
+        liabilitiesScore = Math.round(liabMax * 0.1);                                       // worst: can't cover + high EMI
+    }
+
+    // ─── TIER 2: BEHAVIOUR ───
+
+    // Investment Regularity (raw out of 15)
     const monthlySip = Number(p.inv_monthly_sip) || assets.monthlySip || 0;
     const sipRatio = income.total > 0 ? (monthlySip * 12 / income.total * 100) : 0;
     let sipBase = 0;
@@ -579,104 +675,132 @@ function computeFBS(p) {
     else if (sipRatio >= 5) sipBase = 6;
     else if (sipRatio > 0) sipBase = 2;
 
-    // Consistency multiplier (sip_consecutive_months)
-    let sipMultiplier = 1.0; // Default: no penalty if field missing
+    let sipMultiplier = 1.0;
     if (p.sip_consecutive_months !== undefined && p.sip_consecutive_months !== null) {
         const months = Number(p.sip_consecutive_months) || 0;
         if (months >= 6) sipMultiplier = 1.0;
         else if (months >= 3) sipMultiplier = 0.9;
         else sipMultiplier = 0.8;
     }
-    const investmentRegularity = Math.round(sipBase * sipMultiplier);
+    const investmentRegularityRaw = Math.round(sipBase * sipMultiplier);
 
-    // Goal Clarity - 15 pts
-    let goalClarity = 0;
-    // TODO: If p.goals is not populated, score 0
+    // Goal Clarity (raw out of 15)
+    // Scoring tiers:
+    //   - Has goals defined: base points
+    //   - Goals have timelines: more points
+    //   - Actively saving toward goals: even more points
+    // Note: 'regular' and 'irregular' saving get the same points —
+    // the act of saving matters, not the frequency.
+    let goalClarityRaw = 0;
     if (Array.isArray(p.goals) && p.goals.length > 0) {
         const timedGoals = p.goals.filter(g => Number(g.years) > 0);
-        if (timedGoals.length >= 3) goalClarity = 15;
-        else if (timedGoals.length === 2) goalClarity = 10;
-        else if (timedGoals.length === 1) goalClarity = 6;
-        else goalClarity = 3; // Goals exist but none timed
+        const savingGoals = p.goals.filter(g => g.is_saving === 'regular' || g.is_saving === 'irregular');
+
+        // Base: has goals (3 pts)
+        goalClarityRaw = 3;
+
+        // Timed goals (up to 6 pts)
+        if (timedGoals.length >= 3) goalClarityRaw = 9;
+        else if (timedGoals.length === 2) goalClarityRaw = 7;
+        else if (timedGoals.length === 1) goalClarityRaw = 5;
+
+        // Actively saving bonus (up to 6 pts)
+        if (savingGoals.length >= 3) goalClarityRaw += 6;
+        else if (savingGoals.length === 2) goalClarityRaw += 4;
+        else if (savingGoals.length === 1) goalClarityRaw += 2;
+
+        goalClarityRaw = Math.min(goalClarityRaw, 15);
     }
 
-    // Behavioural Tendencies - 10 pts
-    // Positive questions (higher = better): take value as-is, default to 1 (worst)
+    // Behavioural Tendencies (raw out of 10)
     const bReview = Number(p.beh_review_monthly) || 1;
     const bAvoidDebt = Number(p.beh_avoid_debt) || 1;
     const bMarketReaction = Number(p.beh_market_reaction) || 1;
     const bWindfall = Number(p.beh_windfall_behaviour) || 1;
     const bProductUnderstanding = Number(p.beh_product_understanding) || 1;
 
-    // Inverted questions (higher = worse): apply 6 - value, default to 5 (worst → inverted to 1)
     const bDelay = 6 - (Number(p.beh_delay_decisions) || 5);
     const bImpulse = 6 - (Number(p.beh_spend_impulsively) || 5);
-    const bLossAversion = 6 - (Number(p.beh_hold_losing) || 5);       // DB: beh_hold_losing
-    const bPeerComparison = 6 - (Number(p.beh_compare_peers) || 5);   // DB: beh_compare_peers
+    const bLossAversion = 6 - (Number(p.beh_hold_losing) || 5);
+    const bPeerComparison = 6 - (Number(p.beh_compare_peers) || 5);
 
     const behavRawTotal = bReview + bAvoidDebt + bMarketReaction + bWindfall + bProductUnderstanding
         + bDelay + bImpulse + bLossAversion + bPeerComparison;
-    const behavioralTendencies = Math.round((behavRawTotal / 45) * 10);
+    const behavioralTendenciesRaw = Math.round((behavRawTotal / 45) * 10);
 
-    // ─── TIER 3: AWARENESS - 20 pts ───
+    // ─── TIER 3: AWARENESS ───
 
-    // Portfolio Understanding - 10 pts
+    // Portfolio Understanding (raw out of 10) — FIX: default 0 not 6
     const puVal = Number(p.beh_product_understanding) || 0;
-    let portfolioUnderstanding = 6; // neutral default if missing
-    if (puVal === 5) portfolioUnderstanding = 10;
-    else if (puVal === 4) portfolioUnderstanding = 8;
-    else if (puVal === 3) portfolioUnderstanding = 6;
-    else if (puVal === 2) portfolioUnderstanding = 3;
-    else if (puVal === 1) portfolioUnderstanding = 1;
+    let portfolioUnderstandingRaw = 0; // unknown = no credit
+    if (puVal === 5) portfolioUnderstandingRaw = 10;
+    else if (puVal === 4) portfolioUnderstandingRaw = 8;
+    else if (puVal === 3) portfolioUnderstandingRaw = 6;
+    else if (puVal === 2) portfolioUnderstandingRaw = 3;
+    else if (puVal === 1) portfolioUnderstandingRaw = 1;
 
-    // Tax & Regime Literacy - 5 pts
-    const optedRegime = p.tax_regime || 'New Regime';
-    const has80cUsed = (Number(p.tax_80c_used) || 0) > 0;
-    const hasNps = (Number(p.tax_nps_80ccd) || 0) > 0;
-    const hasHra = (Number(p.tax_hra) || 0) > 0;
-    const hasHomeLoan = (Number(p.tax_home_loan_interest) || 0) > 0;
-    const has80d = (Number(p.tax_80d) || 0) > 0;
-    const hasAnyDeduction = has80cUsed || hasNps || hasHra || hasHomeLoan || has80d;
+    // Tax & Regime Literacy (raw out of 5) — FIX: 0 when no income
+    let taxScoreRaw = 0;
+    if (incomeTotal > 0) {
+        const optedRegime = p.tax_regime || 'New Regime';
+        const has80cUsed = (Number(p.tax_80c_used) || 0) > 0;
+        const hasNps = (Number(p.tax_nps_80ccd) || 0) > 0;
+        const hasHra = (Number(p.tax_hra) || 0) > 0;
+        const hasHomeLoan = (Number(p.tax_home_loan_interest) || 0) > 0;
+        const has80d = (Number(p.tax_80d) || 0) > 0;
+        const hasAnyDeduction = has80cUsed || hasNps || hasHra || hasHomeLoan || has80d;
 
-    let taxScore = 0;
-    if (tax.recommended === optedRegime && hasAnyDeduction) taxScore = 5;
-    else if (tax.recommended === optedRegime) taxScore = 3;
-    else if (tax.potentialSavings <= 5000) taxScore = 2;
-    // else 0: regime mismatch with significant savings left on the table
+        if (tax.recommended === optedRegime && hasAnyDeduction) taxScoreRaw = 5;
+        else if (tax.recommended === optedRegime) taxScoreRaw = 3;
+        else if (tax.potentialSavings <= 5000) taxScoreRaw = 2;
+    }
 
-    // Asset Diversity - 5 pts
+    // Asset Diversity — age-aware (raw out of 5)
     const alloc = assets.allocation;
-    const maxAlloc = Math.max(alloc.equity, alloc.debt, alloc.commodity, alloc.realEstate, alloc.altInvestments);
-    let assetDiversity = 0;
-    if (maxAlloc < 50) assetDiversity = 5;
-    else if (maxAlloc < 70) assetDiversity = 3;
-    else if (maxAlloc < 85) assetDiversity = 1;
+    let assetDiversityRaw = 0;
+    if (assets.total > 0) {
+        const idealRanges = getIdealAllocRanges(age);
+        const dev = (actual, [min, max]) => actual >= min && actual <= max ? 0 : (actual < min ? min - actual : actual - max);
+        const totalDev = dev(alloc.equity, idealRanges.equity)
+            + dev(alloc.debt, idealRanges.debt)
+            + dev(alloc.commodity, idealRanges.commodity)
+            + dev(alloc.altInvestments, idealRanges.alt)
+            + dev(alloc.realEstate, idealRanges.realEstate);
+        if (totalDev === 0) assetDiversityRaw = 5;
+        else if (totalDev <= 15) assetDiversityRaw = 4;
+        else if (totalDev <= 30) assetDiversityRaw = 3;
+        else if (totalDev <= 50) assetDiversityRaw = 2;
+        else if (totalDev <= 70) assetDiversityRaw = 1;
+    }
+
+    // ─── SCALE TO DYNAMIC WEIGHTS ───
+    const scaledEmergencyFund = scaleScore(emergencyFundRaw, 15, w.emergencyFund);
+    // insuranceScore and liabilitiesScore already computed against dynamic weights
+    const scaledInvestmentRegularity = scaleScore(investmentRegularityRaw, 15, w.investmentRegularity);
+    const scaledGoalClarity = scaleScore(goalClarityRaw, 15, w.goalClarity);
+    const scaledBehavioral = scaleScore(behavioralTendenciesRaw, 10, w.behaviouralTendencies);
+    const scaledPortfolio = scaleScore(portfolioUnderstandingRaw, 10, w.portfolioUnderstanding);
+    const scaledTax = scaleScore(taxScoreRaw, 5, w.taxLiteracy);
+    const scaledDiversity = scaleScore(assetDiversityRaw, 5, w.assetDiversity);
 
     // ─── FRAGILITY PENALTY ───
-    const zeroEmergency = emergencyFund <= 1;
-    const zeroInsurance = insuranceScore <= 2;
-    // Threshold tightened from × 3 to × 2: owing more than 2 months of take-home
-    // in bad debt (CC + bad loans) is considered "high bad debt".
-    const highBadDebt = monthlyIncome > 0 && liabilities.badLiability.outstanding >= monthlyIncome * 2;
+    const zeroEmergency = emergency.emergencyFunds.actual === 0;
+    const zeroInsurance = insurance.healthCover === 0 && insurance.lifeCover === 0;
 
-    // Pull credit card sub-totals for composition-aware multipliers.
+    // FIX: fire highBadDebt when income=0 and bad debt exists, but exempt if assets cover it
+    const highBadDebt = badOutstanding > 0
+        && cushionRatio < 2
+        && (monthlyIncome === 0 || badOutstanding >= monthlyIncome * 2);
+
     const { revolvingBalance = 0, emiCCBalance = 0 } = liabilities.creditCards || {};
     const effectiveRevolving = revolvingBalance;
 
-    // ── Standalone revolving penalty ──
-    // Applied regardless of other flags. Revolving credit card debt (minimum-due behaviour)
-    // compounds at 36–42% p.a. and is penalised even when emergency fund and insurance are fine.
-    // Capped at −10 so a single large card does not destroy the entire score.
-    // Each full multiple of monthly income in revolving balance = −3 pts.
+    // Standalone revolving penalty — FIX: also penalize when income=0
     const revolvingPenalty = monthlyIncome > 0
         ? Math.min(10, Math.floor(effectiveRevolving / monthlyIncome) * 3)
-        : 0;
+        : (effectiveRevolving > 0 ? Math.min(10, Math.ceil(effectiveRevolving / 50000) * 3) : 0);
 
-    // ── Combination fragility penalties ──
-    // These apply when critical safety nets are missing alongside high bad debt.
-    // For the EF+debt and insurance+debt cases, the penalty is scaled up
-    // when the majority of bad debt is revolving (worst-case: 36% interest)
-    // or when an EMI CC balance alone exceeds one month's income (heavy fixed burden).
+    // Combination fragility penalties (structure unchanged, flags still apply)
     let fragilityPenalty = 0;
     let flags = [];
     if (zeroEmergency && zeroInsurance && highBadDebt) {
@@ -684,17 +808,15 @@ function computeFBS(p) {
     } else if (zeroEmergency && zeroInsurance) {
         fragilityPenalty = 8; flags = ['no_emergency_no_insurance'];
     } else if (zeroEmergency && highBadDebt) {
-        // Revolving majority → × 1.5 (up to −9); heavy EMI card → × 1.2 (up to −7)
         let base = 6;
-        if (effectiveRevolving > liabilities.badLiability.outstanding * 0.5) base = Math.round(base * 1.5);
-        else if (emiCCBalance >= monthlyIncome)                               base = Math.round(base * 1.2);
+        if (effectiveRevolving > badOutstanding * 0.5) base = Math.round(base * 1.5);
+        else if (emiCCBalance >= monthlyIncome && monthlyIncome > 0) base = Math.round(base * 1.2);
         fragilityPenalty = Math.min(base, 15);
         flags = ['no_emergency_high_debt'];
     } else if (zeroInsurance && highBadDebt) {
-        // Same composition logic; base is lower since insurance gap is less acute than EF gap
         let base = 5;
-        if (effectiveRevolving > liabilities.badLiability.outstanding * 0.5) base = Math.round(base * 1.5);
-        else if (emiCCBalance >= monthlyIncome)                               base = Math.round(base * 1.2);
+        if (effectiveRevolving > badOutstanding * 0.5) base = Math.round(base * 1.5);
+        else if (emiCCBalance >= monthlyIncome && monthlyIncome > 0) base = Math.round(base * 1.2);
         fragilityPenalty = Math.min(base, 15);
         flags = ['no_insurance_high_debt'];
     }
@@ -702,39 +824,41 @@ function computeFBS(p) {
     const penalty = revolvingPenalty + fragilityPenalty;
 
     // ─── TOTALS ───
-    const foundation = emergencyFund + insuranceScore + liabilitiesScore;
-    const behaviour = investmentRegularity + goalClarity + behavioralTendencies;
-    const awareness = portfolioUnderstanding + taxScore + assetDiversity;
+    const foundation = scaledEmergencyFund + insuranceScore + liabilitiesScore;
+    const behaviour = scaledInvestmentRegularity + scaledGoalClarity + scaledBehavioral;
+    const awareness = scaledPortfolio + scaledTax + scaledDiversity;
     const rawTotal = foundation + behaviour + awareness;
     const totalScore = Math.min(100, Math.max(0, rawTotal - penalty));
 
     const breakdown = {
-        emergencyFund,
+        emergencyFund: scaledEmergencyFund,
         insurance: insuranceScore,
         liabilities: liabilitiesScore,
-        investmentRegularity,
-        goalClarity,
-        behavioralTendencies,
-        behavior: behavioralTendencies, // DEPRECATED: kept for backward compat with generateActionPlan
-        portfolioUnderstanding,
-        tax: taxScore,
-        assetDiversity,
+        investmentRegularity: scaledInvestmentRegularity,
+        goalClarity: scaledGoalClarity,
+        behavioralTendencies: scaledBehavioral,
+        behavior: scaledBehavioral,
+        portfolioUnderstanding: scaledPortfolio,
+        tax: scaledTax,
+        assetDiversity: scaledDiversity,
     };
 
     return {
         total: totalScore,
         breakdown,
         subScores: {
-            foundation,
-            behaviour,
-            awareness,
+            foundation: { score: foundation, max: w.emergencyFund + w.insurance + w.liabilityManagement },
+            behaviour: { score: behaviour, max: w.investmentRegularity + w.goalClarity + w.behaviouralTendencies },
+            awareness: { score: awareness, max: w.portfolioUnderstanding + w.taxLiteracy + w.assetDiversity },
         },
         fragility: {
-            penalty,           // combined total (revolvingPenalty + fragilityPenalty)
-            fragilityPenalty,  // combination-based penalty only (EF/insurance/debt combos)
-            revolvingPenalty,  // standalone revolving CC penalty
+            penalty,
+            fragilityPenalty,
+            revolvingPenalty,
             flags,
-        }
+        },
+        lifeStage: fbsLifeStage,
+        appliedWeights: w,
     };
 }
 
@@ -838,15 +962,16 @@ function generateActionPlan(p) {
     const tax = computeTax(p);
     const age = getAge(p.date_of_birth);
     const fbs = computeFBS(p);
+    const fbsW = fbs.appliedWeights;
     const missingFBS = {
-        emergencyFund: 15 - fbs.breakdown.emergencyFund,
-        insurance: 15 - fbs.breakdown.insurance,
-        liabilities: 10 - fbs.breakdown.liabilities,
-        tax: 5 - fbs.breakdown.tax,
-        investmentRegularity: 15 - fbs.breakdown.investmentRegularity,
-        goalClarity: 15 - (fbs.breakdown.goalClarity || 0),
-        assetDiversity: 5 - fbs.breakdown.assetDiversity,
-        behavioralTendencies: 10 - fbs.breakdown.behavioralTendencies,
+        emergencyFund: fbsW.emergencyFund - fbs.breakdown.emergencyFund,
+        insurance: fbsW.insurance - fbs.breakdown.insurance,
+        liabilities: fbsW.liabilityManagement - fbs.breakdown.liabilities,
+        tax: fbsW.taxLiteracy - fbs.breakdown.tax,
+        investmentRegularity: fbsW.investmentRegularity - fbs.breakdown.investmentRegularity,
+        goalClarity: fbsW.goalClarity - (fbs.breakdown.goalClarity || 0),
+        assetDiversity: fbsW.assetDiversity - fbs.breakdown.assetDiversity,
+        behavioralTendencies: fbsW.behaviouralTendencies - fbs.breakdown.behavioralTendencies,
     };
 
     const actions = [];
@@ -1146,16 +1271,20 @@ function generateActionPlan(p) {
     if (missingFBS.goalClarity > 0) {
         const hasGoals = Array.isArray(p.goals) && p.goals.length > 0;
         const hasTimedGoals = hasGoals && p.goals.some(g => Number(g.years) > 0);
+        const hasSavingGoals = hasGoals && p.goals.some(g => g.is_saving === 'regular' || g.is_saving === 'irregular');
         let goalTitle, goalDesc;
         if (!hasGoals) {
             goalTitle = 'Set Up Your Financial Goals';
-            goalDesc = 'You haven\'t defined any financial goals yet. Visit the Goal Planner to add your goals - whether it\'s buying a home, building a retirement corpus, or planning for education. Goals with clear timelines dramatically improve your financial score.';
+            goalDesc = 'You haven\'t defined any financial goals yet. Visit the Goal Planner to add your goals - whether it\'s buying a home, building a retirement corpus, or planning for education. Goals with clear timelines and active savings dramatically improve your financial score.';
         } else if (!hasTimedGoals) {
             goalTitle = 'Add Timelines to Your Goals';
             goalDesc = 'You have financial goals but none have specific timelines. Visit the Goal Planner and add target years to each goal. Timed goals enable precise SIP calculations and help you track progress.';
+        } else if (!hasSavingGoals) {
+            goalTitle = 'Start Saving Towards Your Goals';
+            goalDesc = 'You have goals with timelines but haven\'t started saving for any of them yet. Even small, irregular contributions count — the act of saving matters more than the amount. Start setting aside money towards at least one goal.';
         } else {
             goalTitle = 'Add More Financial Goals';
-            goalDesc = 'Adding more timed financial goals improves your goal clarity score. Consider diversifying your goals across short-term, medium-term, and long-term horizons in the Goal Planner.';
+            goalDesc = 'Adding more timed financial goals with active savings improves your goal clarity score. Consider diversifying your goals across short-term, medium-term, and long-term horizons in the Goal Planner.';
         }
         actions.push({
             category: 'Goal Clarity',
@@ -1421,13 +1550,23 @@ function computeFullDashboard(p, user) {
     return {
         user: { id: user.id, fullName: user.full_name, email: user.email },
         overview: {
-            profile: { age },
+            profile: {
+                age,
+                city: p.city || null,
+                employmentType: p.employment_type || null,
+                dependents: p.dependents != null ? Number(p.dependents) : null,
+                riskComfort: p.risk_comfort != null ? Number(p.risk_comfort) : null,
+                investmentExperience: p.investment_experience || null,
+            },
+            maritalStatus: p.marital_status || null,
             generation,
             lifeStage,
             fbs: fbsObj.total,
             fbsBreakdown: fbsObj.breakdown,
             fbsSubScores: fbsObj.subScores,
             fbsFragility: fbsObj.fragility,
+            fbsLifeStage: fbsObj.lifeStage,
+            fbsWeights: fbsObj.appliedWeights,
             moneySign,
             biases,
             netWorth,

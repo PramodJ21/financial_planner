@@ -1,0 +1,265 @@
+Read backend/engine/calculations.js → computeFBS 
+thoroughly before making any changes.
+
+---
+
+TASK: Refactor FBS to use dynamic weights based on 
+life stage determined by AGE ONLY.
+Income is NOT used for life stage assignment.
+Income is only used inside individual component 
+scoring where it already exists.
+
+The three tiers stay exactly as they are:
+- Tier 1: Foundation (Emergency Fund, Insurance, Liabilities)
+- Tier 2: Behaviour (Investment Regularity, Goals, Tendencies)
+- Tier 3: Awareness (Portfolio, Tax, Diversity)
+
+Per-component scoring logic does not change except 
+where explicitly stated below.
+
+---
+
+STEP 1 — ADD getLifeStage(user) HELPER
+
+function getLifeStage(user) {
+  const age = user.age
+  if (age < 30)  return 'EARLY_CAREER'
+  if (age < 40)  return 'ESTABLISHING'
+  if (age < 50)  return 'CONSOLIDATING'
+  if (age < 58)  return 'PEAK_EARNING'
+  return 'PRE_RETIREMENT'
+}
+
+Life stage descriptions:
+EARLY_CAREER:   'Building foundations and habits'
+ESTABLISHING:   'Managing major life commitments'
+CONSOLIDATING:  'Balancing peak expenses and wealth growth'
+PEAK_EARNING:   'Maximising and protecting wealth'
+PRE_RETIREMENT: 'Preserving wealth and reducing risk'
+
+---
+
+STEP 2 — DEFINE WEIGHT TABLES
+Each table must sum to exactly 100.
+
+const LIFE_STAGE_WEIGHTS = {
+
+  EARLY_CAREER: {
+    // Tier 1: 35pts — foundation important but behaviour 
+    // matters more at this stage
+    emergencyFund: 16,
+    insurance: 11,
+    liabilityManagement: 8,
+    // Tier 2: 45pts — habits formed now last a lifetime
+    investmentRegularity: 20,
+    goalClarity: 16,
+    behaviouralTendencies: 9,
+    // Tier 3: 20pts — awareness building
+    portfolioUnderstanding: 9,
+    taxLiteracy: 2,     // minimal complexity at this age
+    assetDiversity: 9,
+  },
+
+  ESTABLISHING: {
+    // Tier 1: 42pts — home loan, dependents appearing
+    emergencyFund: 16,
+    insurance: 16,      // dependents now likely
+    liabilityManagement: 10,
+    // Tier 2: 38pts — behaviour still critical
+    investmentRegularity: 15,
+    goalClarity: 14,    // goals more defined now
+    behaviouralTendencies: 9,
+    // Tier 3: 20pts
+    portfolioUnderstanding: 9,
+    taxLiteracy: 6,     // home loan deductions, HRA etc
+    assetDiversity: 5,
+  },
+
+  CONSOLIDATING: {
+    // Tier 1: 40pts
+    emergencyFund: 14,
+    insurance: 16,      // health risk increasing
+    liabilityManagement: 10,
+    // Tier 2: 37pts — regularity less critical, 
+    // quality of investment matters more
+    investmentRegularity: 13,
+    goalClarity: 13,
+    behaviouralTendencies: 11,
+    // Tier 3: 23pts — awareness growing in importance
+    portfolioUnderstanding: 10,
+    taxLiteracy: 8,
+    assetDiversity: 5,
+  },
+
+  PEAK_EARNING: {
+    // Tier 1: 42pts — must be protected by now
+    emergencyFund: 13,
+    insurance: 19,      // health cover critical
+    liabilityManagement: 10,
+    // Tier 2: 33pts — hopefully habits are set
+    investmentRegularity: 11,
+    goalClarity: 10,
+    behaviouralTendencies: 12,
+    // Tier 3: 25pts — tax and diversity matter a lot now
+    portfolioUnderstanding: 11,
+    taxLiteracy: 9,
+    assetDiversity: 5,
+  },
+
+  PRE_RETIREMENT: {
+    // Tier 1: 46pts — protection is everything
+    emergencyFund: 14,
+    insurance: 21,      // highest insurance weight
+    liabilityManagement: 11, // must be debt free
+    // Tier 2: 29pts — less time to course correct
+    investmentRegularity: 9,
+    goalClarity: 8,
+    behaviouralTendencies: 12,
+    // Tier 3: 25pts
+    portfolioUnderstanding: 12,
+    taxLiteracy: 9,
+    assetDiversity: 4,
+  }
+}
+
+Verify all 5 tables sum to exactly 100 before proceeding.
+
+---
+
+STEP 3 — INCOME-BASED ADJUSTMENT FOR TAX LITERACY ONLY
+
+After applying life stage weights, override the 
+taxLiteracy max points based on income:
+
+const incomeBracket = user.income.total
+if (incomeBracket < 500000)  taxMax = Math.min(w.taxLiteracy, 2)
+if (incomeBracket < 1200000) taxMax = Math.min(w.taxLiteracy, 5)
+if (incomeBracket < 2500000) taxMax = w.taxLiteracy
+if (incomeBracket >= 2500000) taxMax = w.taxLiteracy + 2
+
+Redistribute any difference to portfolioUnderstanding 
+so tier 3 total stays constant.
+
+---
+
+STEP 4 — REFACTOR computeFBS
+
+Replace all hardcoded max point values with values 
+from the weight table for the user's life stage.
+
+Create scaleScore(rawRatio, currentMax, newMax):
+  Proportionally maps existing score to new ceiling.
+  Example: user scores 12/15 → scales to 
+  (12/15) × newMax for their life stage.
+
+The ratios and thresholds do not change.
+Only the ceiling for each component changes.
+
+---
+
+STEP 5 — UPDATE TIER SUMMARIES
+
+Calculate tier subtotals dynamically:
+
+tierMaxes = {
+  tier1Max: w.emergencyFund + w.insurance + 
+            w.liabilityManagement,
+  tier2Max: w.investmentRegularity + w.goalClarity + 
+            w.behaviouralTendencies,
+  tier3Max: w.portfolioUnderstanding + w.taxLiteracy + 
+            w.assetDiversity,
+}
+
+---
+
+STEP 6 — UPDATE FBS API RESPONSE
+
+Add to existing response object:
+
+{
+  // all existing fields unchanged
+  score: <final>,
+  penalty: <total>,
+
+  // new fields
+  lifeStage: {
+    key: 'ESTABLISHING',
+    label: 'Establishing',
+    description: 'Managing major life commitments'
+  },
+  tierBreakdown: {
+    tier1: { score: <actual>, max: <dynamic max>, 
+             label: 'Foundation' },
+    tier2: { score: <actual>, max: <dynamic max>, 
+             label: 'Behaviour' },
+    tier3: { score: <actual>, max: <dynamic max>, 
+             label: 'Awareness' },
+  },
+  appliedWeights: w
+}
+
+---
+
+STEP 7 — UPDATE FRONTEND OVERVIEW PAGE ONLY
+
+In the FBS section update tier breakdown display:
+
+Foundation    18 / 35
+Behaviour     32 / 45
+Awareness      9 / 20
+
+Below the FBS score bar add one line in muted text:
+"Scored for your life stage: [label] — 
+[description]"
+
+---
+
+STEP 8 — WRITE THESE TESTS FIRST
+
+Before touching any production code write tests for:
+
+1. getLifeStage boundaries
+   age 29 → EARLY_CAREER
+   age 30 → ESTABLISHING
+   age 39 → ESTABLISHING
+   age 40 → CONSOLIDATING
+   age 49 → CONSOLIDATING
+   age 50 → PEAK_EARNING
+   age 57 → PEAK_EARNING
+   age 58 → PRE_RETIREMENT
+
+2. All 5 weight tables sum to exactly 100
+
+3. Same profile scored across all 5 life stages 
+   produces different scores
+
+4. WEALTH_BUILDING no longer exists — confirm no 
+   reference to it remains in the codebase
+
+5. A 45-year-old earning ₹3.6L/year is assigned 
+   CONSOLIDATING (not EARLY_CAREER)
+   This is the key regression test for the old 
+   income-based logic
+
+6. Tax literacy cap applies correctly:
+   CONSOLIDATING + income ₹4L → taxMax = 2
+   CONSOLIDATING + income ₹10L → taxMax = 5 (or 8 
+   from weight, whichever is lower)
+
+7. No score exceeds component max for any life stage
+
+8. Fragility penalty still capped at -15 across 
+   all life stages
+
+---
+
+RULES:
+- Age only determines life stage — income does not
+- Income only affects taxLiteracy component max
+- Do not change fragility penalty logic
+- Do not change per-component ratio thresholds
+- Run all tests before touching any component file
+- Show test results before proceeding to frontend
+- Do not touch any page except FBS section of Overview
+- After changes, run the existing test suite to confirm 
+  no regressions

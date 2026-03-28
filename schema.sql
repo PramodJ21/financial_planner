@@ -162,6 +162,7 @@ CREATE TABLE IF NOT EXISTS user_goals (
   debt_return NUMERIC(5,2),
   commodity_return NUMERIC(5,2),
   priority_weight INTEGER DEFAULT 3,
+  is_saving VARCHAR(20) DEFAULT 'no',
   created_at TIMESTAMP DEFAULT NOW()
 );
 

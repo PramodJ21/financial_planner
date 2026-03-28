@@ -9,13 +9,15 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
     INFLATION_RATE, ASSET_RETURNS, RISK_LABELS, RISK_COLORS, GOAL_COLORS,
-    calcSIP, inflationAdjusted, getGoalAllocation, getBlendedReturn,
-    generateYearlyData, generateMonthlyData, corpusAtMonth, computeGoalResult
+    getGoalAllocation,
+    computeGoalResult
 } from '../utils/goalCalculations';
 import { computeAllStrategies } from '../utils/budgetStrategies';
 
-import { fmt, fmtFull } from '../utils/formatCurrency';
+import { fmt } from '../utils/formatCurrency';
 
+
+let _goalIdCounter = 1;
 
 // ═══════════════════════════════════════════════════
 // COMPONENT
@@ -148,7 +150,7 @@ function GoalPlanner() {
         }
 
         const newGoal = {
-            id: editingId || Date.now().toString(),
+            id: editingId || String(_goalIdCounter++),
             name: formName,
             target: Number(formTarget), years: Number(formYears),
             riskLevel: formRisk,
@@ -621,7 +623,7 @@ function GoalPlanner() {
                             </tr>
                         </thead>
                         <tbody>
-                            {displayGoalResults.map((g, i) => {
+                            {displayGoalResults.map((g) => {
                                 const orig = g._original;
                                 return (
                                     <tr key={g.id}>
@@ -794,8 +796,8 @@ function GoalPlanner() {
                                         <ResponsiveContainer width="100%" height="100%">
                                             <ComposedChart data={g.yearlyData} margin={{ top: 5, right: 0, left: -20, bottom: 5 }}>
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--ink-ghost)" opacity={0.5} />
-                                                <XAxis dataKey="year" tick={{ fontFamily: 'Outfit', fontSize: 11, fill: 'var(--ink-soft)' }} axisLine={false} tickLine={false} dy={10} />
-                                                <YAxis tick={{ fontFamily: 'Outfit', fontSize: 11, fill: 'var(--ink-soft)' }} axisLine={false} tickLine={false} tickFormatter={(v) => (v > 10000 ? (v / 100000).toFixed(1) + 'L' : v)} />
+                                                <XAxis dataKey="year" tick={{ fontFamily: 'Inter', fontSize: 11, fill: 'var(--ink-soft)' }} axisLine={false} tickLine={false} dy={10} />
+                                                <YAxis tick={{ fontFamily: 'Inter', fontSize: 11, fill: 'var(--ink-soft)' }} axisLine={false} tickLine={false} tickFormatter={(v) => (v > 10000 ? (v / 100000).toFixed(1) + 'L' : v)} />
                                                 <RechartsTooltip content={<ChartTooltip />} />
                                                 <Bar dataKey="invested" name="Amount Invested" stackId="a" fill="#E8E3DA" />
                                                 <Bar dataKey="profit" name="Profit Earned" stackId="a" fill="#4A7C59" />
@@ -823,7 +825,7 @@ function GoalPlanner() {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {(activeTableTab === 'yearly' ? g.yearlyData : g.monthlyData).map((row, ri) => (
+                                            {(activeTableTab === 'yearly' ? g.yearlyData : g.monthlyData).map((row) => (
                                                 <tr key={activeTableTab === 'yearly' ? row.year : row.month}>
                                                     <td>{activeTableTab === 'yearly' ? `Year ${row.year}` : `Month ${row.month}`}</td>
                                                     <td>{fmt(row.invested)}</td>

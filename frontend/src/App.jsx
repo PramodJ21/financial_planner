@@ -1,6 +1,12 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  return null;
+}
 import Welcome from './pages/Welcome';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -25,6 +31,7 @@ const ProtectedRoute = ({ children }) => {
 function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <Routes>
         {/* Public */}
         <Route path="/" element={<Welcome />} />

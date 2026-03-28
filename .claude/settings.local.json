@@ -7,7 +7,17 @@
       "Bash(curl -s -X POST http://localhost:5000/api/goals -H \"Content-Type: application/json\" -H \"Authorization: Bearer $TOKEN\" -d '{\"\"goals\"\":[{\"\"id\"\":\"\"g1\"\",\"\"name\"\":\"\"Test Goal\"\",\"\"target\"\":1000000,\"\"years\"\":10,\"\"riskLevel\"\":\"\"Moderate\"\",\"\"includeInflation\"\":true,\"\"priorityWeight\"\":3}]}')",
       "Bash(node -e \":*)",
       "Bash(npm run:*)",
-      "Bash(npx vite:*)"
+      "Bash(npx vite:*)",
+      "Bash(node -c engine/calculations.js)",
+      "Bash(node tasks/fbstester.js)",
+      "Bash(node -c backend/engine/calculations.js)",
+      "Bash(node tasks/fbs_multi_test.js)",
+      "Bash(awk 'NR>=55 && NR<=200' \"c:\\\\Users\\\\pramo\\\\.gemini\\\\antigravity\\\\playground\\\\spinning-space\\\\frontend_issues.md\")",
+      "Bash(awk 'NR>=1 && NR<=65' \"c:\\\\Users\\\\pramo\\\\.gemini\\\\antigravity\\\\playground\\\\spinning-space\\\\frontend_issues.md\")",
+      "Bash(awk 'NR>=91 && NR<=182' \"c:\\\\Users\\\\pramo\\\\.gemini\\\\antigravity\\\\playground\\\\spinning-space\\\\frontend_issues.md\")",
+      "Bash(\"c:\\\\Users\\\\pramo\\\\.gemini\\\\antigravity\\\\playground\\\\spinning-space\\\\frontend\\\\src\\\\pages\\\\Questionnaire.jsx\")",
+      "Bash(grep -n \"\\\\\\\\!\" \"c:\\\\Users\\\\pramo\\\\.gemini\\\\antigravity\\\\playground\\\\spinning-space\\\\frontend\\\\src\\\\pages\\\\Questionnaire.jsx\")",
+      "Bash(wc -l /d/fin_planner/frontend/src/pages/*.jsx)"
     ]
   }
 }

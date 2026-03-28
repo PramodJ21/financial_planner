@@ -1,0 +1,1681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pramod — Financial Report</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,300;1,9..144,400&family=DM+Mono:wght@300;400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --orange: #D97757;
+  --black: #111010;
+  --bg-01: #F2EBE0;
+  --bg-02: #E4EBF0;
+  --bg-03: #DDE8DD;
+  --bg-04: #F0E6DC;
+  --bg-05: #EDE8DC;
+  --bg-06: #1A1C1F;
+  --sidebar-w: 220px;
+  --sidebar-collapsed: 56px;
+  --transition: 0.42s cubic-bezier(0.4,0,0.2,1);
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Inter', sans-serif;
+}
+
+/* ═══════════════════════════
+   APP SHELL
+═══════════════════════════ */
+.app {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+/* ═══════════════════════════
+   SIDEBAR
+═══════════════════════════ */
+.sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 28px 0 28px 20px;
+  position: relative;
+  z-index: 20;
+  transition: width var(--transition), background 0.5s ease;
+  overflow: hidden;
+}
+
+.sidebar.collapsed {
+  width: var(--sidebar-collapsed);
+}
+
+/* Toggle button */
+.sidebar-toggle {
+  position: absolute;
+  top: 26px;
+  right: 14px;
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  padding: 4px;
+  z-index: 2;
+  flex-shrink: 0;
+}
+
+.toggle-bar {
+  display: block;
+  height: 1.5px;
+  background: #aaa;
+  border-radius: 1px;
+  transition: all 0.3s;
+  transform-origin: center;
+}
+
+.toggle-bar:nth-child(1) { width: 20px; }
+.toggle-bar:nth-child(2) { width: 14px; }
+.toggle-bar:nth-child(3) { width: 20px; }
+
+.sidebar.collapsed .toggle-bar:nth-child(1) { width: 14px; transform: translateY(6.5px) rotate(45deg); }
+.sidebar.collapsed .toggle-bar:nth-child(2) { opacity: 0; width: 0; }
+.sidebar.collapsed .toggle-bar:nth-child(3) { width: 14px; transform: translateY(-6.5px) rotate(-45deg); }
+
+.sidebar-toggle:hover .toggle-bar { background: var(--black); }
+
+/* Logo */
+.sidebar-logo {
+  font-family: 'Fraunces', serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--black);
+  margin-bottom: 48px;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  opacity: 1;
+  transition: opacity 0.2s 0.1s;
+  padding-right: 44px;
+}
+
+.sidebar-logo em { font-style: italic; color: var(--orange); }
+
+.sidebar.collapsed .sidebar-logo {
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+/* Nav */
+.sidebar-nav {
+  flex: 1;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.sidebar-nav li button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  padding: 11px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.nav-num {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: #bbb;
+  letter-spacing: 0.08em;
+  width: 20px;
+  flex-shrink: 0;
+  transition: color 0.2s;
+}
+
+.nav-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #aaa;
+  transition: color 0.2s, opacity 0.2s;
+  opacity: 1;
+}
+
+.sidebar.collapsed .nav-label {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.nav-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--orange);
+  opacity: 0;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
+  margin-left: auto;
+  margin-right: 18px;
+}
+
+.sidebar-nav li.active .nav-dot { opacity: 1; }
+.sidebar-nav li.active .nav-num { color: var(--orange); }
+.sidebar-nav li.active button .nav-label { color: var(--black); }
+.sidebar-nav li button:hover .nav-label { color: var(--black); }
+.sidebar-nav li button:hover .nav-num { color: #666; }
+
+/* Footer */
+.sidebar-footer {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  color: #bbb;
+  line-height: 1.8;
+  white-space: nowrap;
+  opacity: 1;
+  transition: opacity 0.2s 0.1s;
+  padding-right: 16px;
+}
+
+.sidebar.collapsed .sidebar-footer {
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+/* dark sidebar for s05 */
+.sidebar.dark .sidebar-logo,
+.sidebar.dark .nav-label,
+.sidebar.dark .nav-num { color: #555; }
+.sidebar.dark .sidebar-nav li.active .nav-num { color: var(--orange); }
+.sidebar.dark .sidebar-nav li.active button .nav-label,
+.sidebar.dark .sidebar-nav li button:hover .nav-label { color: #ccc; }
+.sidebar.dark .sidebar-footer { color: #444; }
+.sidebar.dark .toggle-bar { background: #555; }
+.sidebar.dark .sidebar-logo { color: #666; }
+
+/* ═══════════════════════════
+   SCROLL CONTAINER
+═══════════════════════════ */
+.scroll-wrap {
+  flex: 1;
+  height: 100vh;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  scroll-behavior: smooth;
+  /* hide scrollbar */
+  scrollbar-width: none;
+}
+.scroll-wrap::-webkit-scrollbar { display: none; }
+
+/* ═══════════════════════════
+   SECTIONS
+═══════════════════════════ */
+.section {
+  height: 100vh;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  display: flex;
+  flex-direction: column;
+  padding: 36px 60px 36px 48px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Watermark */
+.watermark {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(120px, 16vw, 200px);
+  font-weight: 700;
+  line-height: 1;
+  color: rgba(0,0,0,0.04);
+  position: absolute;
+  right: 40px;
+  top: 16px;
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+}
+
+#s05 .watermark { color: rgba(255,255,255,0.03); }
+
+/* Top bar */
+.sec-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
+}
+
+.sec-chapter {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--orange);
+}
+
+.sec-actions { display: flex; gap: 24px; align-items: center; }
+
+.sec-btn {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #999;
+  transition: color 0.2s;
+}
+.sec-btn:hover { color: var(--black); }
+.sec-btn.accent { color: var(--orange); }
+
+.content { flex: 1; position: relative; z-index: 2; min-height: 0; }
+
+/* ═══════════════════════════
+   ENTRANCE ANIMATIONS
+   Elements start hidden, animate in when section becomes .in-view
+═══════════════════════════ */
+.ani {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+}
+.ani-left {
+  opacity: 0;
+  transform: translateX(-22px);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+}
+.ani-right {
+  opacity: 0;
+  transform: translateX(22px);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+}
+.ani-scale {
+  opacity: 0;
+  transform: scale(0.94);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+}
+
+/* delays */
+.d1 { transition-delay: 0.08s; }
+.d2 { transition-delay: 0.16s; }
+.d3 { transition-delay: 0.24s; }
+.d4 { transition-delay: 0.32s; }
+.d5 { transition-delay: 0.40s; }
+.d6 { transition-delay: 0.48s; }
+.d7 { transition-delay: 0.56s; }
+.d8 { transition-delay: 0.64s; }
+
+.section.in-view .ani,
+.section.in-view .ani-left,
+.section.in-view .ani-right,
+.section.in-view .ani-scale {
+  opacity: 1;
+  transform: none;
+}
+
+/* ═══════════════════════════
+   BG COLORS
+═══════════════════════════ */
+#s01 { background: var(--bg-01); }
+#s02 { background: var(--bg-02); }
+#s03 { background: var(--bg-03); }
+#s04 { background: var(--bg-04); }
+#s05 { background: var(--bg-05); }
+#s06 { background: var(--bg-06); }
+
+/* ═══════════════════════════
+   01 — PROFILE
+═══════════════════════════ */
+.profile-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto;
+  gap: 0;
+  height: 100%;
+  align-items: start;
+}
+
+.profile-left {
+  padding-right: 48px;
+  border-right: 1px solid rgba(0,0,0,0.1);
+  padding-bottom: 32px;
+}
+
+.profile-mid {
+  padding: 0 0 32px 48px;
+}
+
+.profile-bottom {
+  grid-column: 1 / -1;
+  border-top: 1px solid rgba(0,0,0,0.08);
+  padding-top: 28px;
+}
+
+.profile-greeting {
+  font-family: 'Fraunces', serif;
+  font-size: 56px;
+  font-weight: 300;
+  line-height: 1;
+  color: var(--black);
+  margin-bottom: 6px;
+  white-space: nowrap;
+}
+.profile-greeting em { font-style: italic; color: var(--orange); }
+
+.profile-age {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: #999;
+  margin-bottom: 24px;
+  letter-spacing: 0.12em;
+}
+
+.archetype-block {
+  border-left: 2px solid var(--orange);
+  padding-left: 18px;
+  margin-bottom: 28px;
+}
+
+.arch-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--orange);
+  margin-bottom: 4px;
+}
+
+.arch-icon { font-size: 24px; margin-bottom: 4px; }
+
+.arch-name {
+  font-family: 'Fraunces', serif;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--black);
+  margin-bottom: 6px;
+}
+
+.arch-desc {
+  font-size: 12px;
+  color: #666;
+  line-height: 1.7;
+}
+
+.profile-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--orange);
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--orange);
+  cursor: pointer;
+  padding-bottom: 2px;
+  transition: gap 0.2s;
+  margin-bottom: 20px;
+}
+.profile-cta:hover { gap: 14px; }
+
+.profile-snapshot {
+  font-size: 12px;
+  color: #777;
+  line-height: 1.75;
+  border-top: 1px solid rgba(0,0,0,0.08);
+  padding-top: 20px;
+}
+
+.stats-heading {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #888;
+  margin-bottom: 16px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.07);
+}
+.stat-row:first-of-type { border-top: 1px solid rgba(0,0,0,0.07); }
+
+.stat-key {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #444;
+}
+
+.stat-val {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--black);
+}
+
+/* ═══════════════════════════
+   02 — FINANCIAL HEALTH
+═══════════════════════════ */
+.health-grid {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 56px;
+  height: 100%;
+  align-items: start;
+}
+
+.score-eyebrow {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #aaa;
+  margin-bottom: 12px;
+}
+
+.score-big {
+  font-family: 'Fraunces', serif;
+  font-size: 108px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--black);
+}
+
+.score-denom {
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  color: #aaa;
+  margin: 4px 0 6px;
+}
+
+.score-rating {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--orange);
+  margin-bottom: 20px;
+}
+
+.donut-wrap {
+  width: 120px;
+  height: 120px;
+  position: relative;
+  margin-bottom: 16px;
+}
+.donut-wrap svg { transform: rotate(-90deg); }
+.d-bg { fill: none; stroke: rgba(0,0,0,0.08); stroke-width: 9; }
+.d-fill {
+  fill: none;
+  stroke: var(--orange);
+  stroke-width: 9;
+  stroke-linecap: butt;
+  stroke-dasharray: 314;
+  stroke-dashoffset: 314;
+  transition: stroke-dashoffset 2s cubic-bezier(0.4,0,0.2,1) 0.3s;
+}
+.section.in-view .d-fill { stroke-dashoffset: 154; }
+
+.pts-tag {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: #3D8C45;
+  letter-spacing: 0.06em;
+}
+
+.health-title {
+  font-family: 'Fraunces', serif;
+  font-size: 56px;
+  font-weight: 300;
+  line-height: 1;
+  color: var(--black);
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+
+.health-sub {
+  font-size: 12px;
+  color: #888;
+  line-height: 1.65;
+  margin-bottom: 24px;
+  max-width: 500px;
+}
+
+.spectrum-track {
+  height: 3px;
+  background: linear-gradient(to right, #C94040, #D97757, #C9A84C, #5A9C5A, #2D7A2D);
+  position: relative;
+  margin-bottom: 8px;
+}
+
+.spectrum-needle {
+  position: absolute;
+  top: 50%;
+  left: 51%;
+  transform: translate(-50%, -50%);
+  width: 12px;
+  height: 12px;
+  background: var(--black);
+  border-radius: 50%;
+  border: 2px solid var(--bg-02);
+}
+
+.spectrum-labels {
+  display: flex;
+  justify-content: space-between;
+  font-family: 'DM Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #bbb;
+  margin-bottom: 28px;
+}
+
+.ss-row {
+  display: grid;
+  grid-template-columns: 110px 1fr 70px;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.07);
+}
+.ss-row:first-child { border-top: 1px solid rgba(0,0,0,0.07); }
+
+.ss-name {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #999;
+}
+
+.ss-bar-track { height: 2px; background: rgba(0,0,0,0.1); }
+.ss-bar-fill {
+  height: 2px;
+  background: var(--orange);
+  width: 0%;
+  transition: width 1.4s ease 0.5s;
+}
+.section.in-view .ss-bar-fill { width: var(--w); }
+
+.ss-score {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--black);
+  text-align: right;
+}
+
+.health-insight {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(0,0,0,0.07);
+  font-size: 12px;
+  color: #666;
+  line-height: 1.75;
+}
+.health-insight strong { color: var(--black); }
+.health-insight .pri { color: var(--orange); font-weight: 600; }
+
+/* ═══════════════════════════
+   03 — WHAT'S WORKING
+═══════════════════════════ */
+.w-title {
+  font-family: 'Fraunces', serif;
+  font-size: 56px;
+  font-weight: 300;
+  line-height: 1;
+  color: var(--black);
+  margin-bottom: 6px;
+  white-space: nowrap;
+}
+
+.w-sub {
+  font-size: 12px;
+  color: #6A8F6A;
+  font-weight: 500;
+  margin-bottom: 32px;
+}
+
+.str-row {
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  gap: 20px;
+  align-items: start;
+  padding: 22px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.09);
+}
+.str-row:first-child { border-top: 1px solid rgba(0,0,0,0.09); }
+
+.str-idx {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  color: var(--orange);
+  padding-top: 3px;
+}
+
+.str-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--black);
+  margin-bottom: 4px;
+}
+
+.str-desc {
+  font-size: 12px;
+  color: #666;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
+.str-link {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--orange);
+  text-decoration: none;
+  border-bottom: 1px solid var(--orange);
+  padding-bottom: 1px;
+}
+
+.str-val {
+  text-align: right;
+}
+
+.str-val-num {
+  font-family: 'Fraunces', serif;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--orange);
+  line-height: 1.1;
+}
+
+.str-val-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #aaa;
+  margin-top: 2px;
+}
+
+/* ═══════════════════════════
+   04 — ATTENTION
+═══════════════════════════ */
+.att-title {
+  font-family: 'Fraunces', serif;
+  font-size: 56px;
+  font-weight: 300;
+  line-height: 1;
+  color: var(--black);
+  margin-bottom: 6px;
+  white-space: nowrap;
+}
+
+.att-sub {
+  font-size: 12px;
+  color: #B07050;
+  font-weight: 500;
+  margin-bottom: 32px;
+}
+
+.al-row {
+  display: grid;
+  grid-template-columns: 3px 1fr auto;
+  gap: 24px;
+  align-items: start;
+  padding: 20px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.07);
+}
+.al-row:first-child { border-top: 1px solid rgba(0,0,0,0.07); }
+
+.al-bar { background: var(--orange); align-self: stretch; min-height: 50px; }
+
+.al-tag {
+  font-family: 'DM Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--orange);
+  margin-bottom: 4px;
+}
+
+.al-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--black);
+  margin-bottom: 4px;
+}
+
+.al-desc {
+  font-size: 12px;
+  color: #777;
+  line-height: 1.6;
+  margin-bottom: 6px;
+}
+
+.al-link {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--orange);
+  text-decoration: none;
+  border-bottom: 1px solid var(--orange);
+  padding-bottom: 1px;
+}
+
+.al-meta { text-align: right; padding-top: 2px; }
+
+.al-meta-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #bbb;
+  margin-bottom: 3px;
+}
+
+.al-meta-val {
+  font-family: 'Fraunces', serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--black);
+}
+
+/* ═══════════════════════════
+   05 — CASHFLOW OUTLOOK
+═══════════════════════════ */
+#s05 { background: var(--bg-05); }
+
+.cf-title {
+  font-family: 'Fraunces', serif;
+  font-size: 56px;
+  font-weight: 300;
+  line-height: 1;
+  color: var(--black);
+  margin-bottom: 6px;
+  white-space: nowrap;
+}
+
+.cf-sub {
+  font-size: 12px;
+  color: #999;
+  font-weight: 500;
+  margin-bottom: 36px;
+}
+
+.cf-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.cf-table thead tr {
+  border-bottom: 1px solid rgba(0,0,0,0.15);
+}
+
+.cf-table th {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #aaa;
+  font-weight: 400;
+  padding: 0 0 12px;
+  text-align: left;
+}
+
+.cf-table th:last-child { text-align: right; }
+
+.cf-table td {
+  padding: 16px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.07);
+  font-size: 14px;
+  color: var(--black);
+}
+
+.cf-table td:last-child {
+  text-align: right;
+  font-family: 'Fraunces', serif;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.cf-table .cf-positive { color: #3D8C45; }
+.cf-table .cf-negative { color: var(--black); }
+
+.cf-table .cf-total td {
+  border-bottom: none;
+  border-top: 1px solid rgba(0,0,0,0.15);
+  padding-top: 18px;
+  font-weight: 700;
+}
+
+.cf-table .cf-total td:first-child {
+  font-size: 14px;
+  font-weight: 700;
+  font-family: 'Inter', sans-serif;
+}
+
+.cf-table .cf-total td:last-child {
+  font-size: 22px;
+  color: var(--orange);
+}
+
+.cf-footnote {
+  margin-top: 28px;
+  font-size: 12px;
+  color: #888;
+  line-height: 1.7;
+  border-top: 1px solid rgba(0,0,0,0.07);
+  padding-top: 20px;
+}
+
+/* ═══════════════════════════
+   06 — ACTION PLAN
+═══════════════════════════ */
+#s06 .sec-chapter { color: var(--orange); }
+
+.act-title {
+  font-family: 'Fraunces', serif;
+  font-size: 56px;
+  font-weight: 300;
+  line-height: 1;
+  color: #fff;
+  margin-bottom: 6px;
+  white-space: nowrap;
+}
+
+/* Journey So Far — full-width bottom band */
+.journey-panel {
+  background: rgba(217,119,87,0.08);
+  border-left: 3px solid var(--orange);
+  padding: 20px 28px;
+  display: flex;
+  gap: 40px;
+  align-items: flex-start;
+}
+
+.journey-panel-header {
+  flex-shrink: 0;
+  width: 160px;
+}
+
+.journey-panel-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--orange);
+  margin-bottom: 4px;
+}
+
+.journey-panel-title {
+  font-family: 'Fraunces', serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--black);
+  line-height: 1.2;
+}
+
+.journey-list {
+  list-style: none;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0;
+  flex: 1;
+}
+
+.journey-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12px;
+  color: #2a2a2a;
+  font-weight: 500;
+  line-height: 1.5;
+  padding: 8px 20px 8px 0;
+  width: 50%;
+  border-bottom: 1px solid rgba(217,119,87,0.12);
+}
+
+.journey-list li:nth-child(odd) { padding-right: 24px; }
+.journey-list li:nth-last-child(-n+2) { border-bottom: none; }
+
+.j-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--orange);
+  margin-top: 5px;
+  flex-shrink: 0;
+  display: block;
+}
+
+/* Your Numbers — s02 */
+.numbers-heading {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #aaa;
+  margin-top: 28px;
+  margin-bottom: 16px;
+}
+
+.numbers-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: rgba(0,0,0,0.1);
+  border: 1px solid rgba(0,0,0,0.1);
+}
+
+.num-cell {
+  background: var(--bg-02);
+  padding: 14px 16px;
+}
+
+.num-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #aaa;
+  margin-bottom: 6px;
+}
+
+.num-val {
+  font-family: 'Fraunces', serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--black);
+  line-height: 1;
+}
+
+.num-val.negative { color: #C94040; }
+
+.act-sub { font-size: 12px; color: #aaa; font-weight: 500; margin-bottom: 20px; }
+
+.proj-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.proj-label { font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: #999; }
+.proj-num { font-family: 'Fraunces', serif; font-size: 44px; font-weight: 700; color: var(--orange); line-height: 1; }
+.proj-denom { font-family: 'DM Mono', monospace; font-size: 11px; color: #999; }
+
+.proj-track { height: 2px; background: #333; margin-bottom: 32px; }
+.proj-fill {
+  height: 2px;
+  background: var(--orange);
+  width: 0%;
+  transition: width 1.6s ease 0.2s;
+}
+#s06.section.in-view .proj-fill { width: 79%; }
+
+.act-item {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  gap: 24px;
+  align-items: start;
+  padding: 20px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.act-item:first-child { border-top: 1px solid rgba(255,255,255,0.08); }
+
+.act-pts { font-family: 'Fraunces', serif; font-size: 30px; font-weight: 700; color: var(--orange); line-height: 1; text-align: center; }
+.act-pts-label { font-family: 'DM Mono', monospace; font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; color: #888; text-align: center; }
+
+.act-name { font-size: 15px; font-weight: 700; color: #f0f0f0; margin-bottom: 4px; }
+.act-desc { font-size: 12px; color: #aaa; line-height: 1.65; margin-bottom: 6px; }
+.act-highlight { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--orange); letter-spacing: 0.04em; }
+
+.act-cta {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--orange);
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--orange);
+  cursor: pointer;
+  padding-bottom: 1px;
+  white-space: nowrap;
+  margin-top: 4px;
+  transition: opacity 0.2s;
+}
+.act-cta:hover { opacity: 0.6; }
+
+/* ═══════════════════════════
+   06 — GOALS
+═══════════════════════════ */
+.g-title {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(36px, 5vw, 60px);
+  font-weight: 300;
+  line-height: 1.05;
+  color: var(--black);
+  margin-bottom: 32px;
+}
+
+.g-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 48px;
+  padding: 24px 0;
+  border-top: 1px solid rgba(0,0,0,0.1);
+  border-bottom: 1px solid rgba(0,0,0,0.1);
+  margin-bottom: 32px;
+}
+
+.g-sum-num {
+  font-family: 'Fraunces', serif;
+  font-size: 48px;
+  font-weight: 700;
+  color: var(--black);
+  line-height: 1;
+  margin-bottom: 3px;
+}
+
+.g-sum-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #bbb;
+}
+
+.g-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: baseline;
+  gap: 36px;
+  padding: 20px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.07);
+}
+
+.g-name {
+  font-family: 'Fraunces', serif;
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--black);
+  margin-bottom: 3px;
+}
+
+.g-meta {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: #bbb;
+}
+
+.g-target-num {
+  font-family: 'Fraunces', serif;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--black);
+}
+
+.g-target-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #bbb;
+  margin-top: 2px;
+}
+
+.g-sip-num {
+  font-family: 'Fraunces', serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--orange);
+}
+
+.g-sip-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #bbb;
+  margin-top: 2px;
+}
+
+.g-cta {
+  margin-top: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--orange);
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--orange);
+  cursor: pointer;
+  padding-bottom: 2px;
+  transition: gap 0.2s;
+}
+.g-cta:hover { gap: 14px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <button class="sidebar-toggle" id="toggleBtn" aria-label="Toggle sidebar">
+      <span class="toggle-bar"></span>
+      <span class="toggle-bar"></span>
+      <span class="toggle-bar"></span>
+    </button>
+
+    <div class="sidebar-logo">Praxis<em>Wealth</em></div>
+
+    <ul class="sidebar-nav" id="sidebarNav">
+      <li class="active" data-sec="s01">
+        <button>
+          <span class="nav-num">01</span>
+          <span class="nav-label">Your Profile</span>
+          <span class="nav-dot"></span>
+        </button>
+      </li>
+      <li data-sec="s02">
+        <button>
+          <span class="nav-num">02</span>
+          <span class="nav-label">Financial Health</span>
+          <span class="nav-dot"></span>
+        </button>
+      </li>
+      <li data-sec="s03">
+        <button>
+          <span class="nav-num">03</span>
+          <span class="nav-label">What's Working</span>
+          <span class="nav-dot"></span>
+        </button>
+      </li>
+      <li data-sec="s04">
+        <button>
+          <span class="nav-num">04</span>
+          <span class="nav-label">Needs Attention</span>
+          <span class="nav-dot"></span>
+        </button>
+      </li>
+      <li data-sec="s05">
+        <button>
+          <span class="nav-num">05</span>
+          <span class="nav-label">Cashflow</span>
+          <span class="nav-dot"></span>
+        </button>
+      </li>
+      <li data-sec="s06">
+        <button>
+          <span class="nav-num">06</span>
+          <span class="nav-label">Action Plan</span>
+          <span class="nav-dot"></span>
+        </button>
+      </li>
+    </ul>
+
+    <div class="sidebar-footer">
+      Report generated<br>
+      March 2026<br>
+      Praxis v2
+    </div>
+  </aside>
+
+  <!-- SCROLL CONTAINER -->
+  <div class="scroll-wrap" id="scrollWrap">
+
+    <!-- 01 PROFILE -->
+    <section class="section" id="s01">
+      <div class="watermark">01</div>
+      <div class="sec-bar ani d1">
+        <span class="sec-chapter">01 — Your Profile</span>
+        <div class="sec-actions">
+          <button class="sec-btn">Help</button>
+          <button class="sec-btn">Sign out</button>
+        </div>
+      </div>
+      <div class="content">
+        <div class="profile-grid">
+          <div class="profile-left">
+            <div class="profile-greeting ani d1">Hi <em>Pramod</em></div>
+            <div class="profile-age ani d2">AGE 21 · MUMBAI</div>
+            <div class="archetype-block ani d3">
+              <div class="arch-icon">🐢</div>
+              <div class="arch-label">Investor Archetype</div>
+              <div class="arch-name">Cautious Turtle</div>
+              <div class="arch-desc">You prioritise safety and guaranteed returns over market-beating growth. While this protects capital, being too conservative can mean your wealth doesn't outpace inflation.</div>
+            </div>
+            <button class="profile-cta ani d4">Review Profile →</button>
+          </div>
+          <div class="profile-mid">
+            <div class="stats-heading ani d2">Profile Details</div>
+            <div class="stat-row ani d3"><span class="stat-key">Employment</span><span class="stat-val">Salaried</span></div>
+            <div class="stat-row ani d3"><span class="stat-key">City</span><span class="stat-val">Mumbai</span></div>
+            <div class="stat-row ani d4"><span class="stat-key">Dependents</span><span class="stat-val">0</span></div>
+            <div class="stat-row ani d4"><span class="stat-key">Risk Comfort</span><span class="stat-val">Very High</span></div>
+            <div class="stat-row ani d5"><span class="stat-key">Experience</span><span class="stat-val">&lt; 1 year</span></div>
+            <div class="stat-row ani d5"><span class="stat-key">Status</span><span class="stat-val">Single</span></div>
+          </div>
+          <div class="profile-bottom ani d6">
+            <div class="journey-panel">
+              <div class="journey-panel-header">
+                <div class="journey-panel-label">Snapshot</div>
+                <div class="journey-panel-title">Your Journey So Far</div>
+              </div>
+              <ul class="journey-list">
+                <li><span class="j-dot"></span><span>Your effective monthly outflow is ₹43.0K.</span></li>
+                <li><span class="j-dot"></span><span>You haven't started investing yet.</span></li>
+                <li><span class="j-dot"></span><span>You carry ₹10.0K in liabilities.</span></li>
+                <li><span class="j-dot"></span><span>You have some insurance coverage in place.</span></li>
+                <li><span class="j-dot"></span><span>No emergency fund has been set aside.</span></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 02 FINANCIAL HEALTH -->
+    <section class="section" id="s02">
+      <div class="watermark">02</div>
+      <div class="sec-bar ani d1">
+        <span class="sec-chapter">02 — Financial Health</span>
+        <div class="sec-actions">
+          <button class="sec-btn accent">Export PDF</button>
+          <button class="sec-btn">Show Report</button>
+        </div>
+      </div>
+      <div class="content">
+        <div class="health-title ani d1">Financial Health</div>
+        <div class="health-sub ani d2">A diagnostic snapshot of core financial resilience across Foundation, Behaviour and Awareness.</div>
+        <div class="health-grid">
+          <div>
+            <div class="score-eyebrow ani d2">Overall Score</div>
+            <div class="score-big ani d3">51</div>
+            <div class="score-denom ani d3">/ 100</div>
+            <div class="score-rating ani d3">Moderate</div>
+            <div class="donut-wrap ani-scale d4">
+              <svg width="120" height="120" viewBox="0 0 120 120">
+                <circle class="d-bg" cx="60" cy="60" r="50"/>
+                <circle class="d-fill" cx="60" cy="60" r="50"/>
+              </svg>
+            </div>
+            <div class="pts-tag ani d4">↑ +28 pts achievable</div>
+          </div>
+          <div>
+            <div class="ani d3">
+              <div class="spectrum-track"><div class="spectrum-needle"></div></div>
+              <div class="spectrum-labels">
+                <span>Critical</span><span>Poor</span><span>Moderate</span><span>Good</span><span>Excellent</span>
+              </div>
+            </div>
+            <div class="ani d4">
+              <div class="ss-row">
+                <span class="ss-name">Foundation</span>
+                <div class="ss-bar-track"><div class="ss-bar-fill" style="--w:40%"></div></div>
+                <span class="ss-score">14 / 35</span>
+              </div>
+              <div class="ss-row">
+                <span class="ss-name">Behaviour</span>
+                <div class="ss-bar-track"><div class="ss-bar-fill" style="--w:33%"></div></div>
+                <span class="ss-score">15 / 45</span>
+              </div>
+              <div class="ss-row">
+                <span class="ss-name">Awareness</span>
+                <div class="ss-bar-track"><div class="ss-bar-fill" style="--w:35%"></div></div>
+                <span class="ss-score">7 / 20</span>
+              </div>
+            </div>
+            <div class="health-insight ani d5">
+              Health insurance coverage — <strong>robust</strong>. No emergency fund — <span class="pri">priority</span>. As a Cautious Turtle, consider increasing equity exposure for long-term growth.
+            </div>
+            <div class="numbers-heading ani d6">Your Numbers</div>
+            <div class="numbers-grid ani d6">
+              <div class="num-cell">
+                <div class="num-label">Monthly Expenses</div>
+                <div class="num-val">₹43.0K</div>
+              </div>
+              <div class="num-cell">
+                <div class="num-label">Monthly Surplus</div>
+                <div class="num-val">₹36.5K</div>
+              </div>
+              <div class="num-cell">
+                <div class="num-label">Net Worth</div>
+                <div class="num-val negative">−₹10.0K</div>
+              </div>
+              <div class="num-cell">
+                <div class="num-label">Total Assets</div>
+                <div class="num-val">₹0</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 03 WHAT'S WORKING -->
+    <section class="section" id="s03">
+      <div class="watermark">03</div>
+      <div class="sec-bar ani d1">
+        <span class="sec-chapter">03 — What's Working</span>
+      </div>
+      <div class="content">
+        <div class="w-title ani d1">What's<br>Working</div>
+        <div class="w-sub ani d2">3 strengths identified in your profile</div>
+        <div class="str-row ani d3">
+          <span class="str-idx">01</span>
+          <div>
+            <div class="str-name">Health Insurance</div>
+            <div class="str-desc">Your health cover of ₹10.0L meets the recommended ₹5.0L — fully protected against medical emergencies. Policy renewal: 19 Oct 2026.</div>
+            <a href="#" class="str-link">Review itemised →</a>
+          </div>
+          <div class="str-val">
+            <div class="str-val-num">₹10.0L</div>
+            <div class="str-val-label">Cover</div>
+          </div>
+        </div>
+        <div class="str-row ani d4">
+          <span class="str-idx">02</span>
+          <div>
+            <div class="str-name">Tax Optimised</div>
+            <div class="str-desc">Already on the optimal tax regime. Current allocations make the New Regime more tax-efficient for your income profile this year.</div>
+            <a href="#" class="str-link">Keep Optimised →</a>
+          </div>
+          <div class="str-val">
+            <div class="str-val-num">~₹32.4K</div>
+            <div class="str-val-label">Est. savings/yr</div>
+          </div>
+        </div>
+        <div class="str-row ani d5">
+          <span class="str-idx">03</span>
+          <div>
+            <div class="str-name">Positive Surplus</div>
+            <div class="str-desc">Consistent buffer for investments and contingency. Stable surplus across last 6 months.</div>
+            <a href="#" class="str-link">Allocate Surplus →</a>
+          </div>
+          <div class="str-val">
+            <div class="str-val-num">₹36.5K</div>
+            <div class="str-val-label">Per month</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 04 WHAT NEEDS ATTENTION -->
+    <section class="section" id="s04">
+      <div class="watermark">04</div>
+      <div class="sec-bar ani d1">
+        <span class="sec-chapter">04 — What Needs Attention</span>
+      </div>
+      <div class="content">
+        <div class="att-title ani d1">What Needs<br>Attention</div>
+        <div class="att-sub ani d2">4 areas — prioritised by urgency and expected impact</div>
+        <div class="al-row ani d3">
+          <div class="al-bar"></div>
+          <div>
+            <div class="al-tag">Priority — Highest Impact</div>
+            <div class="al-title">No Emergency Fund</div>
+            <div class="al-desc">No liquid savings set aside for unexpected expenses. Building a cushion reduces the chance of high-interest borrowing.</div>
+            <a href="#" class="al-link">Start Fund →</a>
+          </div>
+          <div class="al-meta">
+            <div class="al-meta-label">Target</div>
+            <div class="al-meta-val">₹2.6L</div>
+            <div class="al-meta-label" style="margin-top:4px">3 months expenses</div>
+          </div>
+        </div>
+        <div class="al-row ani d4">
+          <div class="al-bar"></div>
+          <div>
+            <div class="al-tag">10% APR</div>
+            <div class="al-title">Bad Debt</div>
+            <div class="al-desc">High-interest unsecured debt increasing monthly fees. Prioritise balances with highest APR first.</div>
+            <a href="#" class="al-link">Pay down debt →</a>
+          </div>
+          <div class="al-meta">
+            <div class="al-meta-label">Outstanding</div>
+            <div class="al-meta-val">₹10K</div>
+          </div>
+        </div>
+        <div class="al-row ani d5">
+          <div class="al-bar"></div>
+          <div>
+            <div class="al-tag">Legal Risk — Medium</div>
+            <div class="al-title">No Will</div>
+            <div class="al-desc">Not having a will leaves assets subject to lengthy probate and may impose legal risk on your family.</div>
+            <a href="#" class="al-link">Create Will →</a>
+          </div>
+          <div class="al-meta"></div>
+        </div>
+        <div class="al-row ani d6">
+          <div class="al-bar"></div>
+          <div>
+            <div class="al-tag">Impact — Administrative Delay</div>
+            <div class="al-title">Nominees Not Set</div>
+            <div class="al-desc">Accounts and policies without nominated beneficiaries can delay asset transfer.</div>
+            <a href="#" class="al-link">Set Nominees →</a>
+          </div>
+          <div class="al-meta"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 05 CASHFLOW OUTLOOK -->
+    <section class="section" id="s05">
+      <div class="watermark">05</div>
+      <div class="sec-bar ani d1">
+        <span class="sec-chapter">05 — Cashflow Outlook</span>
+      </div>
+      <div class="content">
+        <div class="cf-title ani d1">Cashflow<br>Outlook</div>
+        <div class="cf-sub ani d2">Where your money goes over the next 3 months</div>
+        <table class="cf-table ani d3">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>3-Month Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Gross Income</td>
+              <td class="cf-positive">+₹3.0L</td>
+            </tr>
+            <tr>
+              <td>Monthly Living Expenses</td>
+              <td class="cf-negative">−₹1.3L</td>
+            </tr>
+            <tr>
+              <td>EMIs</td>
+              <td class="cf-negative">−₹1.5K</td>
+            </tr>
+            <tr>
+              <td>Planned Investments</td>
+              <td class="cf-negative">−₹60.0K</td>
+            </tr>
+            <tr>
+              <td>Insurance Premium Allocation</td>
+              <td class="cf-negative">−₹15.0K</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="cf-total">
+              <td>Net Surplus</td>
+              <td>₹1.1L</td>
+            </tr>
+          </tfoot>
+        </table>
+        <div class="cf-footnote ani d4">You have roughly ₹1.1L of free cash over the next quarter — the action plan below shows the best ways to deploy it.</div>
+      </div>
+    </section>
+
+    <!-- 06 ACTION PLAN -->
+    <section class="section" id="s06">
+      <div class="watermark">06</div>
+      <div class="sec-bar ani d1">
+        <span class="sec-chapter">06 — Action Plan</span>
+      </div>
+      <div class="content">
+        <div class="act-title ani d1">Action Plan</div>
+        <div class="act-sub ani d2">Practical, prioritised actions to boost your financial score</div>
+        <div class="proj-row ani d2">
+          <span class="proj-label">Projected score after actions</span>
+          <span class="proj-num">79</span>
+          <span class="proj-denom">/ 100</span>
+        </div>
+        <div class="proj-track ani d3"><div class="proj-fill"></div></div>
+        <div class="act-item ani d3">
+          <div><div class="act-pts">+15</div><div class="act-pts-label">pts</div></div>
+          <div>
+            <div class="act-name">Build Emergency Fund</div>
+            <div class="act-desc">Set aside a savings buffer so you can weather unexpected expenses without borrowing. Target: 6 months of expenses (₹2,58,000).</div>
+            <div class="act-highlight">₹10.8K / month · For 24 months</div>
+          </div>
+          <button class="act-cta">Start →</button>
+        </div>
+        <div class="act-item ani d4">
+          <div><div class="act-pts">+6</div><div class="act-pts-label">pts</div></div>
+          <div>
+            <div class="act-name">Add Financial Goals</div>
+            <div class="act-desc">Define short- and long-term objectives so investments and savings align with what matters.</div>
+          </div>
+          <button class="act-cta">Plan →</button>
+        </div>
+        <div class="act-item ani d5">
+          <div><div class="act-pts">+4</div><div class="act-pts-label">pts</div></div>
+          <div>
+            <div class="act-name">Improve Financial Habits</div>
+            <div class="act-desc">Set up auto-debit for monthly savings. Create a simple monthly budget and track expenses.</div>
+          </div>
+          <button class="act-cta">Start →</button>
+        </div>
+        <div class="act-item ani d6">
+          <div><div class="act-pts">+3</div><div class="act-pts-label">pts</div></div>
+          <div>
+            <div class="act-name">Rebalance Portfolio</div>
+            <div class="act-desc">Shift 5% from cash into a diversified equity mix to improve long-term growth potential.</div>
+          </div>
+          <button class="act-cta">Schedule →</button>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- end scroll-wrap -->
+</div><!-- end app -->
+
+<script>
+const scrollWrap = document.getElementById('scrollWrap');
+const sidebar    = document.getElementById('sidebar');
+const toggleBtn  = document.getElementById('toggleBtn');
+const navItems   = document.querySelectorAll('#sidebarNav li');
+const sectionIds = ['s01','s02','s03','s04','s05','s06'];
+const sections   = sectionIds.map(id => document.getElementById(id));
+
+const sectionBgs = {
+  s01:'#F2EBE0', s02:'#E4EBF0', s03:'#DDE8DD',
+  s04:'#F0E6DC', s05:'#EDE8DC', s06:'#1A1C1F'
+};
+
+// ── SIDEBAR COLLAPSE ──
+toggleBtn.addEventListener('click', () => {
+  sidebar.classList.toggle('collapsed');
+});
+
+// ── INTERSECTION OBSERVER — trigger animations + sync sidebar ──
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+      const id = entry.target.id;
+
+      // add in-view to trigger CSS animations
+      entry.target.classList.add('in-view');
+
+      // sync nav active state
+      navItems.forEach(li => li.classList.toggle('active', li.dataset.sec === id));
+
+      // sync sidebar bg & theme
+      sidebar.style.background = sectionBgs[id] || '';
+      if (id === 's06') {
+        sidebar.classList.add('dark');
+      } else {
+        sidebar.classList.remove('dark');
+      }
+    }
+  });
+}, { threshold: 0.6 });
+
+sections.forEach(s => io.observe(s));
+
+// ── NAV CLICKS — scroll to section ──
+navItems.forEach(li => {
+  li.querySelector('button').addEventListener('click', () => {
+    const target = document.getElementById(li.dataset.sec);
+    target.scrollIntoView({ behavior: 'smooth' });
+  });
+});
+
+// ── KEYBOARD NAV ──
+document.addEventListener('keydown', e => {
+  const active = sectionIds.findIndex(id =>
+    document.getElementById(id).classList.contains('in-view') &&
+    document.querySelector(`[data-sec="${id}"]`)?.classList.contains('active')
+  );
+  if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+    const next = sections[Math.min(active + 1, sections.length - 1)];
+    if (next) next.scrollIntoView({ behavior: 'smooth' });
+  }
+  if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+    const prev = sections[Math.max(active - 1, 0)];
+    if (prev) prev.scrollIntoView({ behavior: 'smooth' });
+  }
+});
+
+// ── INIT — fire first section immediately ──
+sections[0].classList.add('in-view');
+sidebar.style.background = sectionBgs['s01'];
+</script>
+</body>
+</html>

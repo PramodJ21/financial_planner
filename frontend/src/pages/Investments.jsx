@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { fetchWithAuth } from '../api';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { Link } from 'react-router-dom';
+import '../styles/investments.css';
 import {
     getInvestmentNarrative, getGrowthStatus, getIdealRanges,
     getAssetStatus, getAssetExplanation, getAssetAction,
@@ -9,13 +10,48 @@ import {
 } from '../utils/financialInsights';
 import { fmt, fmtFull } from '../utils/formatCurrency';
 
+/* Flip-capable analysis card */
+function FlipCard({ name, statusPill, sub, value, rangeBar, explanation, action }) {
+    const [flipped, setFlipped] = useState(false);
+    const hasBack = explanation || action;
+    return (
+        <div
+            className={`investments-analysis-item${flipped ? ' investments-flipped' : ''}`}
+            onClick={() => hasBack && setFlipped(f => !f)}
+        >
+            <div className="investments-flip-inner">
+                <div className="investments-flip-front">
+                    <div className="investments-analysis-item-header">
+                        <span className="investments-analysis-item-title">{name}</span>
+                        {statusPill}
+                    </div>
+                    {sub && <div className="investments-analysis-sub">{sub}</div>}
+                    {value}
+                    {rangeBar}
+                    {hasBack && (
+                        <div className="investments-flip-front-link">→ Flip for analytics</div>
+                    )}
+                </div>
+                {hasBack && (
+                    <div className="investments-flip-back">
+                        <div className="investments-flip-back-title">{name}</div>
+                        {explanation && <div className="investments-flip-back-explanation">{explanation}</div>}
+                        {action && <div className="investments-flip-back-action">{action}</div>}
+                        <div className="investments-flip-back-link">← Flip back</div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 /* I1: SectionNote with warm palette (was cold blue-gray) */
 const SectionNote = ({ title, lines }) => (
-    <div className="section-note">
-        <div className="section-note-heading">{title || 'How this is calculated'}</div>
+    <div className="investments-section-note">
+        <div className="investments-section-note-heading">{title || 'How this is calculated'}</div>
         {lines.map((line, i) => (
-            <div key={i} className="section-note-line">
-                <span className="bullet">•</span>
+            <div key={i} className="investments-section-note-line">
+                <span className="investments-bullet">•</span>
                 <span>{line}</span>
             </div>
         ))}
@@ -34,17 +70,17 @@ function Investments() {
 
     /* I11: Branded loading state */
     if (loading) return (
-        <div className="page-loading">
-            <div className="page-loading-box"><span>FH</span></div>
-            <div className="page-loading-text">Loading your investments...</div>
+        <div className="investments-page-loading">
+            <div className="investments-page-loading-box"><span>FH</span></div>
+            <div className="investments-page-loading-text">Loading your investments...</div>
         </div>
     );
 
     /* I11: Branded empty state */
     if (!data) return (
-        <div className="page-empty">
-            <div className="page-empty-title">No investment data available</div>
-            <Link to="/questionnaire" className="page-empty-link">Complete your questionnaire to get started</Link>
+        <div className="investments-page-empty">
+            <div className="investments-page-empty-title">No investment data available</div>
+            <Link to="/questionnaire" className="investments-page-empty-link">Complete your questionnaire to get started</Link>
         </div>
     );
 
@@ -111,27 +147,30 @@ function Investments() {
     ];
 
     return (
-        <div className="page-content">
+        <div className="investments-page-content">
             {/* PAGE HEADER */}
-            <div className="page-header">
-                <h1 className="page-title">Assets</h1>
+            <div className="investments-page-header">
+                <div>
+                    <div className="investments-page-super">Explore — Investments</div>
+                    <h1 className="investments-page-title">Assets</h1>
+                </div>
             </div>
 
             {/* I13: INVESTMENT NARRATIVE — uses CSS class instead of inline styles */}
-            <div className="inv-narrative">
-                <div className="inv-narrative-label">Investment Summary</div>
-                <p className="inv-narrative-text">{investmentNarrative}</p>
+            <div className="investments-narrative">
+                <div className="investments-narrative-label">Investment Summary</div>
+                <p className="investments-narrative-text">{investmentNarrative}</p>
             </div>
 
             {/* ASSET HOLDINGS */}
             <div>
-                <div className="act-label">Portfolio</div>
-                <h2 className="section-heading">Asset Holdings</h2>
-                <div className="holdings-layout">
+                <div className="investments-act-label">Portfolio</div>
+                <h2 className="investments-section-heading">Asset Holdings</h2>
+                <div className="investments-holdings-layout">
 
                     {/* DONUT */}
-                    <div className="donut-wrap">
-                        <div className="donut-canvas">
+                    <div className="investments-donut-wrap">
+                        <div className="investments-donut-canvas">
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
                                     <Pie data={pieData.length > 0 ? pieData : [{ name: 'None', value: 1 }]} innerRadius="70%" outerRadius="100%" paddingAngle={0} dataKey="value" stroke="none">
@@ -141,10 +180,10 @@ function Investments() {
                                 </PieChart>
                             </ResponsiveContainer>
                         </div>
-                        <div className="donut-legend">
+                        <div className="investments-donut-legend">
                             {pieData.map((d, i) => (
-                                <div key={d.name} className="legend-item">
-                                    <span className="legend-dot" style={{ backgroundColor: COLORS[i % COLORS.length] }}></span>
+                                <div key={d.name} className="investments-legend-item">
+                                    <span className="investments-legend-dot" style={{ backgroundColor: COLORS[i % COLORS.length] }}></span>
                                     {d.name} ({d.pct}%)
                                 </div>
                             ))}
@@ -153,7 +192,7 @@ function Investments() {
 
                     {/* TABLE */}
                     <div style={{ overflowX: 'auto' }}>
-                        <table className="holdings-table">
+                        <table className="investments-holdings-table">
                             <thead>
                                 <tr>
                                     {['Assets', '%', 'Asset Class', 'Growth (%)', 'Market Value'].map(h => (
@@ -167,22 +206,22 @@ function Investments() {
                                     const growthClass = growthStatus === 'above_inflation' ? 'above' : growthStatus === 'near_inflation' ? 'near' : 'below';
                                     return (
                                         <tr key={idx}>
-                                            <td><span className="asset-name">{item.name}</span></td>
+                                            <td><span className="investments-asset-name">{item.name}</span></td>
                                             <td>{assets.total ? (item.value / assets.total * 100).toFixed(1) + '%' : '0%'}</td>
-                                            <td><span className="asset-class-badge">{item.assetClass}</span></td>
+                                            <td><span className="investments-asset-class-badge">{item.assetClass}</span></td>
                                             <td>
                                                 {/* I9: growth colors via CSS classes */}
-                                                <span className={`growth-text ${growthClass}`}>{item.growth}%</span>
+                                                <span className={`investments-growth-text investments-${growthClass}`}>{item.growth}%</span>
                                                 {/* I10: below inflation badge via CSS class */}
                                                 {growthStatus === 'below_inflation' && (
-                                                    <span className="growth-badge">below inflation</span>
+                                                    <span className="investments-growth-badge">below inflation</span>
                                                 )}
                                             </td>
                                             <td>{fmt(item.value)}</td>
                                         </tr>
                                     );
                                 })}
-                                <tr className="total-row">
+                                <tr className="investments-total-row">
                                     <td colSpan={4}>Total</td>
                                     <td>{fmt(assets.total)}</td>
                                 </tr>
@@ -194,10 +233,10 @@ function Investments() {
 
             {/* FINANCIAL ANALYSIS */}
             <div>
-                <div className="act-label">Analysis</div>
-                <h2 className="section-heading">Financial Analysis - Asset Allocation</h2>
+                <div className="investments-act-label">Analysis</div>
+                <h2 className="investments-section-heading">Financial Analysis - Asset Allocation</h2>
 
-                <div className="analysis-grid">
+                <div className="investments-analysis-grid">
                     {allocationCards.map((card) => {
                         const ideal = idealMap[card.name] || { min: 0, max: 0 };
                         const inRange = card.actual >= ideal.min && card.actual <= ideal.max;
@@ -210,65 +249,65 @@ function Investments() {
                         const barMin  = Math.max(0, Math.min(100, rangeMin));
                         const barMax  = Math.max(0, Math.min(100, rangeMax));
                         const barCurr = Math.max(0, Math.min(100, currentPct));
+                        const idealWidth = Math.max(0, barMax - barMin);
+                        const rangeBar = (
+                                            <div className="investments-range-bar">
+                                                <div className="investments-range-bar-labels">
+                                                <span>0%</span>
+                                                <span>Current: {currentPct.toFixed(1)}%</span>
+                                                <span>100%</span>
+                                                </div>
+                                                <div className="investments-range-bar-track">
+                                                <div className="investments-range-bar-ideal" style={{ left: `${barMin}%`, width: `${idealWidth}%` }} />
+                                                <div className="investments-range-bar-fill" style={{ width: `${barCurr}%` }} />
+                                                </div>
+                                                <div className="investments-range-legend">
+                                                    <span className="investments-range-legend-swatch"></span>
+                                                    Ideal range
+                                                </div>
+                                                <div className="investments-range-bar-ticks">
+                                                    <span className="investments-range-tick-min" style={{ left: `${barMin}%` }}>
+                                                        ↑+{rangeMin.toFixed(0)}%
+                                                    </span>
+                                                    <span className="investments-range-tick-max" style={{ left: `${barMax}%` }}>
+                                                        {rangeMax.toFixed(0)}%↑
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            );
                         return (
-                            <div key={card.name} className="analysis-item">
-                                <div className="analysis-item-header">
-                                    <span className="analysis-item-title">{card.name}</span>
-                                    <span className={`status-pill ${inRange ? 'on' : 'outside'}`}>{inRange ? 'On track' : 'Outside range'}</span>
-                                </div>
-                                <div className="analysis-sub">Actual Value</div>
-                                <div className={`analysis-value ${inRange ? 'ok' : 'warn'}`}>{fmt(card.actual)}</div>
-                                <div className="analysis-ideal">Ideal: {fmt(ideal.min)} – {fmt(ideal.max)}</div>
-
-                                {/* I4: Range bar — inline styles replaced with CSS classes */}
-                                <div className="range-bar">
-                                    <div className="range-bar-labels">
-                                        <span>0%</span>
-                                        <span>Current: {currentPct.toFixed(1)}%</span>
-                                        <span>100%</span>
-                                    </div>
-                                    <div className="range-bar-track">
-                                        <div className="range-bar-ideal" style={{ left: `${barMin}%`, width: `${barMax - barMin}%` }} />
-                                        <div className={`range-bar-marker ${inRange ? 'ok' : 'warn'}`} style={{ left: `${barCurr}%` }} />
-                                    </div>
-                                    <div className="range-bar-ticks">
-                                        <span style={{ marginLeft: `${barMin}%` }}>↑{rangeMin}%</span>
-                                        <span style={{ marginRight: `${100 - barMax}%` }}>{rangeMax}%↑</span>
-                                    </div>
-                                </div>
-
-                                {/* Explanation */}
-                                {explanation && (
-                                    <div className="analysis-explanation">{explanation}</div>
-                                )}
-
-                                {/* I5: Action — CSS class instead of inline styles */}
-                                {action && status !== 'on_track' && (
-                                    <div className="analysis-action">{action}</div>
-                                )}
-                            </div>
+                            <FlipCard
+                                key={card.name}
+                                name={card.name}
+                                statusPill={<span className={`investments-status-pill ${inRange ? 'investments-on' : 'investments-outside'}`}>{inRange ? 'On Track' : 'Needs Work'}</span>}
+                                sub="Actual Value"
+                                value={<div className={`investments-analysis-value ${inRange ? 'investments-ok' : 'investments-warn'}`}>{fmt(card.actual)}</div>}
+                                rangeBar={rangeBar}
+                                explanation={explanation}
+                                action={status !== 'on_track' ? action : null}
+                            />
                         );
                     })}
                 </div>
             </div>
 
             {/* I7: GOAL PLANNER CTA — CSS classes instead of inline styles */}
-            <div className="inv-cta">
+            <div className="investments-cta">
                 <div>
-                    <div className="inv-cta-title">Planning a big goal?</div>
-                    <div className="inv-cta-desc">See how much you need to save monthly to reach your goals — car, house, education, or retirement.</div>
+                    <div className="investments-cta-title">Planning a big goal?</div>
+                    <div className="investments-cta-desc">See how much you need to save monthly to reach your goals — car, house, education, or retirement.</div>
                 </div>
-                <Link to="/goal-planner" className="inv-cta-link">Open Goal Planner ↗</Link>
+                <Link to="/goal-planner" className="investments-cta-link">Open Goal Planner ↗</Link>
             </div>
 
             {/* I6: UNDERSTANDING — dynamic content from actual user data */}
-            <div className="understanding">
-                <div className="understanding-title">Understanding Asset Allocation & Ideal Ranges</div>
-                <div className="understanding-grid">
+            <div className="investments-understanding">
+                <div className="investments-understanding-title">Understanding Asset Allocation & Ideal Ranges</div>
+                <div className="investments-understanding-grid">
                     {understandingItems.map((item) => (
-                        <div key={item.title} className="understanding-item">
-                            <div className="understanding-item-title">{item.title}</div>
-                            <div className="understanding-item-desc">{item.desc}</div>
+                        <div key={item.title} className="investments-understanding-item">
+                            <div className="investments-understanding-item-title">{item.title}</div>
+                            <div className="investments-understanding-item-desc">{item.desc}</div>
                         </div>
                     ))}
                 </div>

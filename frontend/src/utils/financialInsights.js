@@ -113,29 +113,27 @@ export function getGrowthStatus(growthRate) {
  * @param {number} score — 0-100
  * @returns {{ range: string, message: string, benchmark: string }}
  */
-export function getFBSContext(score) {
-    let range, message, benchmark;
+export function getFBSContext(score, lifeStage) {
+    let range, message;
     if (score <= 20) {
         range = 'Critical';
         message = 'Your financial health needs immediate attention. Focus on the action items below.';
-        benchmark = 'Most users starting out score in the 30–50 range.';
     } else if (score <= 40) {
         range = 'Poor';
         message = 'You have a foundation to build on. A few targeted actions can move the needle quickly.';
-        benchmark = 'Users in your income range typically score between 35–55.';
     } else if (score <= 60) {
         range = 'Moderate';
         message = 'You\'re on the right track. Strengthening a few key areas will push you into the Good range.';
-        benchmark = 'Most users in your income bracket score between 40–60.';
     } else if (score <= 80) {
         range = 'Good';
         message = 'Strong financial habits. Keep optimising and you\'ll reach Excellent.';
-        benchmark = 'Users in your income range typically score between 50–70.';
     } else {
         range = 'Excellent';
         message = 'Your financial health is in excellent shape. Keep maintaining these habits.';
-        benchmark = 'You\'re in the top tier — most users in your bracket score 50–70.';
     }
+    const stageLabel = lifeStage?.label || 'your life stage';
+    const stageDesc = lifeStage?.description || '';
+    const benchmark = `Scored for ${stageLabel} — ${stageDesc}.`;
     return { range, message, benchmark };
 }
 
@@ -149,7 +147,7 @@ export function getFBSContext(score) {
  * @param {Function} fmt
  * @returns {string|null}
  */
-export function getNetWorthContext(netWorth, totalLiabilities, goodLiability, fmt) {
+export function getNetWorthContext(netWorth, totalLiabilities, goodLiability) {
     if (netWorth >= 0) return null;
     const goodPct = totalLiabilities > 0 ? Math.round(goodLiability / totalLiabilities * 100) : 0;
     if (goodPct >= 60) {
@@ -199,7 +197,7 @@ const MONEY_SIGN_SHORTHAND = {
  * @param {object} d — full /dashboard/full response
  * @returns {string}
  */
-export function getBiggestStrength(d) {
+export function getBiggestStrength(d, fmt) {
     const em = d.overview?.emergency?.emergencyFunds;
     if (em && em.actual >= em.ideal && em.ideal > 0) return 'a fully-funded emergency reserve';
     const bad = d.overview?.liabilities?.badLiability?.outstanding ?? 0;
@@ -212,7 +210,7 @@ export function getBiggestStrength(d) {
     const idealHealth = d.insurance?.idealHealth ?? 0;
     if (health > 0 && idealHealth > 0 && health >= idealHealth) return 'solid health insurance coverage';
     const surplus = d.overview?.surplus?.monthly ?? 0;
-    if (surplus > 0) return `a positive monthly surplus of ${String(surplus)}`; // fmt not available here — caller should use getBiggestStrengthFmt
+    if (surplus > 0) return `a positive monthly surplus of ${fmt ? fmt(surplus) : surplus}`;
     return 'a regular savings habit';
 }
 
@@ -320,7 +318,7 @@ export function getOverviewNarrative(d, fmt, userAge, actionPlan) {
     };
     const stageText = stageMap[stage] ?? 'building your financial foundation';
 
-    const strength = getBiggestStrength(d);
+    const strength = getBiggestStrength(d, fmt);
     const gap = getBiggestGap(d, fmt, userAge);
     const topAction = getTopPriorityActionTitle(actionPlan);
     const signHint = moneySign ? MONEY_SIGN_SHORTHAND[moneySign] : null;
@@ -342,7 +340,7 @@ export function getOverviewNarrative(d, fmt, userAge, actionPlan) {
  * @param {Function} fmt
  * @returns {string}
  */
-export function getInvestmentNarrative(userAge, allocations, holdings, fmt) {
+export function getInvestmentNarrative(userAge, allocations, holdings) {
     const age = userAge ?? 30;
     const equity = allocations?.equity ?? 0;
     const { status: equityStatus } = getAssetStatus('equity', equity, age);
@@ -363,4 +361,443 @@ export function getInvestmentNarrative(userAge, allocations, holdings, fmt) {
         : '';
 
     return `${equityLine}${holdingsLine} Use the allocation cards below to see where your portfolio stands versus age-appropriate benchmarks.`;
+}
+
+// ─── Strengths & Gaps (Chapters 03 / 04) ────────────────────────────────────
+
+/**
+ * Returns an array of strength objects derived from dashboard data.
+ * Each: { title, value, explanation, link }
+ * Shows top 5 strengths max — ordered by importance.
+ * @param {object} d — full /dashboard/full response
+ * @param {Function} fmt — currency formatter
+ * @returns {Array<{ title: string, value: string, explanation: string, link: string }>}
+ */
+export function getStrengths(d, fmt) {
+    const strengths = [];
+    const age = d.overview?.profile?.age ?? 30;
+
+    // 1. Emergency fund adequate
+    const em = d.overview?.emergency?.emergencyFunds;
+    if (em && em.ideal > 0 && em.actual >= em.ideal) {
+        const months = Math.round(em.actual / (em.ideal / 6));
+        strengths.push({
+            title: 'Emergency Fund',
+            value: `${months} months covered`,
+            explanation: `Your emergency fund of ${fmt(em.actual)} covers ${months} months of expenses — well above the 6-month target.`,
+            link: '/investments',
+        });
+    }
+
+    // 2. No bad debt
+    const badOutstanding = d.overview?.liabilities?.badLiability?.outstanding ?? 0;
+    const hasLiabilities = d.overview?.liabilities?.hasLiabilities;
+    if (badOutstanding === 0) {
+        if (hasLiabilities) {
+            strengths.push({
+                title: 'No Bad Debt',
+                value: 'Zero high-interest debt',
+                explanation: 'You have no high-interest debt — all your liabilities are "good" debt (home/education loans) that build assets over time.',
+                link: '/liabilities',
+            });
+        } else {
+            strengths.push({
+                title: 'Debt-Free',
+                value: 'No outstanding liabilities',
+                explanation: 'You have no outstanding loans or credit card debt — a clean balance sheet.',
+                link: '/liabilities',
+            });
+        }
+    }
+
+    // 3. SIP consistency
+    const sipMonths = d.overview?.fbsBreakdown?.investmentRegularity;
+    const sipMax = d.overview?.fbsWeights?.investmentRegularity;
+    const monthlySip = d.investments?.assets?.monthlySip ?? 0;
+    if (sipMax && sipMonths >= sipMax * 0.7 && monthlySip > 0) {
+        strengths.push({
+            title: 'Regular Investments',
+            value: `${fmt(monthlySip)}/month SIP`,
+            explanation: `You invest ${fmt(monthlySip)} monthly via SIP — consistent investing is the strongest wealth-building habit.`,
+            link: '/investments',
+        });
+    }
+
+    // 4. Health insurance adequate
+    const healthCover = d.overview?.insurance?.healthCover ?? 0;
+    const idealHealth = d.insurance?.idealHealth ?? 0;
+    if (healthCover > 0 && idealHealth > 0 && healthCover >= idealHealth) {
+        strengths.push({
+            title: 'Health Insurance',
+            value: fmt(healthCover),
+            explanation: `Your health cover of ${fmt(healthCover)} meets the recommended ${fmt(idealHealth)} — you're protected against medical emergencies.`,
+            link: '/insurance',
+        });
+    }
+
+    // 5. Life insurance adequate
+    const lifeCover = d.overview?.insurance?.lifeCover ?? 0;
+    const idealLife = d.insurance?.idealTermCover ?? 0;
+    if (lifeCover > 0 && idealLife > 0 && lifeCover >= idealLife) {
+        strengths.push({
+            title: 'Life Insurance',
+            value: fmt(lifeCover),
+            explanation: `Your term cover of ${fmt(lifeCover)} meets the recommended ${fmt(idealLife)} — your dependents are financially protected.`,
+            link: '/insurance',
+        });
+    }
+
+    // 6. Good expense ratio
+    const totalExpenses = d.overview?.expenses?.effectiveMonthly ?? 0;
+    const monthlyIncome = d.overview?.income?.total ? d.overview.income.total / 12 : 0;
+    if (monthlyIncome > 0) {
+        const ratio = Math.round((totalExpenses / monthlyIncome) * 100);
+        if (ratio < 50) {
+            strengths.push({
+                title: 'Healthy Expense Ratio',
+                value: `${ratio}% of income`,
+                explanation: `You spend ${ratio}% of your monthly income — well within the healthy range, leaving strong room to save and invest.`,
+                link: '/dashboard',
+            });
+        }
+    }
+
+    // 7. Credit score 750+
+    const creditScore = d.overview?.creditScore ?? 0;
+    if (creditScore >= 750) {
+        strengths.push({
+            title: 'Credit Score',
+            value: `${creditScore}`,
+            explanation: `Your credit score of ${creditScore} is excellent — you'll get the best rates on loans and credit products.`,
+            link: '/liabilities',
+        });
+    }
+
+    // 8. Estate planning in order
+    const willEstate = d.overview?.willEstate;
+    if (willEstate?.hasWill && willEstate?.nomineesSet === 'Yes') {
+        strengths.push({
+            title: 'Estate Planning',
+            value: 'Will + nominees set',
+            explanation: 'You have a will in place and nominees set on your accounts — your assets are legally protected.',
+            link: '/estate',
+        });
+    }
+
+    // 9. Tax-optimized
+    const taxRegime = d.tax?.recommended;
+    const potentialSavings = d.tax?.potentialSavings ?? 0;
+    if (taxRegime && potentialSavings === 0) {
+        strengths.push({
+            title: 'Tax Optimised',
+            value: `On ${taxRegime}`,
+            explanation: `You're already on the optimal tax regime — no additional savings available from switching.`,
+            link: '/tax',
+        });
+    }
+
+    // 10. Asset allocation on track
+    const equityPct = d.overview?.investments?.allocation?.equity ?? 0;
+    const { status: eqStatus } = getAssetStatus('equity', equityPct, age);
+    const debtPct = d.overview?.investments?.allocation?.debt ?? 0;
+    const { status: debtStatus } = getAssetStatus('debt', debtPct, age);
+    if (eqStatus === 'on_track' && debtStatus === 'on_track' && d.overview?.investments?.total > 0) {
+        strengths.push({
+            title: 'Balanced Portfolio',
+            value: `${equityPct}% equity, ${debtPct}% debt`,
+            explanation: 'Your equity and debt allocation are both within the ideal range for your age — a well-balanced portfolio.',
+            link: '/investments',
+        });
+    }
+
+    // 11. Positive monthly surplus
+    const surplus = d.overview?.surplus?.monthly ?? 0;
+    if (surplus > 0 && !strengths.some(s => s.title === 'Healthy Expense Ratio')) {
+        strengths.push({
+            title: 'Positive Surplus',
+            value: `${fmt(surplus)}/month`,
+            explanation: `You have a monthly surplus of ${fmt(surplus)} after all expenses, EMIs, and investments — room to grow your wealth.`,
+            link: '/dashboard',
+        });
+    }
+
+    return strengths.slice(0, 5);
+}
+
+/**
+ * Returns an array of gap objects derived from dashboard data.
+ * Each: { title, current, target, explanation, link, explorePage }
+ * Shows ALL gaps — the dashboard will collapse beyond 4.
+ * @param {object} d — full /dashboard/full response
+ * @param {Function} fmt — currency formatter
+ * @returns {Array<{ title: string, current: string, target: string, explanation: string, link: string, explorePage: string }>}
+ */
+export function getGaps(d, fmt) {
+    const gaps = [];
+    const age = d.overview?.profile?.age ?? 30;
+
+    // 1. No/low emergency fund
+    const em = d.overview?.emergency?.emergencyFunds;
+    if (em && em.ideal > 0 && em.actual < em.ideal) {
+        const months = em.actual > 0 ? Math.round(em.actual / (em.ideal / 6)) : 0;
+        gaps.push({
+            title: 'Emergency Fund',
+            current: months > 0 ? `${months} months` : 'None',
+            target: '6 months of expenses',
+            explanation: em.actual === 0
+                ? `No emergency fund set aside. Target: ${fmt(em.ideal)} (6 months of expenses).`
+                : `Your emergency fund covers only ${months} months — target is 6 months (${fmt(em.ideal)}).`,
+            link: '/investments',
+            explorePage: 'Investments',
+        });
+    }
+
+    // 2. Missing health insurance
+    const healthCover = d.overview?.insurance?.healthCover ?? 0;
+    const idealHealth = d.insurance?.idealHealth ?? 0;
+    if (idealHealth > 0 && healthCover < idealHealth) {
+        gaps.push({
+            title: 'Health Insurance',
+            current: healthCover > 0 ? fmt(healthCover) : 'None',
+            target: fmt(idealHealth),
+            explanation: healthCover === 0
+                ? `No health insurance — this is a critical gap. Target: ${fmt(idealHealth)} sum insured.`
+                : `Your health cover of ${fmt(healthCover)} is below the recommended ${fmt(idealHealth)}.`,
+            link: '/insurance',
+            explorePage: 'Insurance',
+        });
+    }
+
+    // 3. Missing life insurance (only if dependents)
+    const lifeCover = d.overview?.insurance?.lifeCover ?? 0;
+    const idealLife = d.insurance?.idealTermCover ?? 0;
+    if (idealLife > 0 && lifeCover < idealLife) {
+        gaps.push({
+            title: 'Life Insurance',
+            current: lifeCover > 0 ? fmt(lifeCover) : 'None',
+            target: fmt(idealLife),
+            explanation: lifeCover === 0
+                ? `No term life cover — your dependents are financially unprotected. Target: ${fmt(idealLife)}.`
+                : `Your life cover of ${fmt(lifeCover)} is below the recommended ${fmt(idealLife)}.`,
+            link: '/insurance',
+            explorePage: 'Insurance',
+        });
+    }
+
+    // 4. High bad debt
+    const badOutstanding = d.overview?.liabilities?.badLiability?.outstanding ?? 0;
+    if (badOutstanding > 0) {
+        const annualIncome = d.overview?.income?.total ?? 0;
+        const severity = annualIncome > 0 && badOutstanding > annualIncome * 0.2 ? 'high' : 'moderate';
+        gaps.push({
+            title: 'Bad Debt',
+            current: fmt(badOutstanding),
+            target: '₹0',
+            explanation: severity === 'high'
+                ? `${fmt(badOutstanding)} in high-interest debt — this is eroding your net worth. Prioritise paying this down.`
+                : `${fmt(badOutstanding)} in high-interest debt. Pay this off before increasing investments.`,
+            link: '/liabilities',
+            explorePage: 'Liabilities',
+        });
+    }
+
+    // 5. No SIP / investments
+    const monthlySip = d.investments?.assets?.monthlySip ?? 0;
+    const totalInvestments = d.overview?.investments?.total ?? 0;
+    if (monthlySip === 0 && totalInvestments === 0) {
+        gaps.push({
+            title: 'No Investments',
+            current: 'None',
+            target: 'Start a SIP',
+            explanation: 'You have no investments or SIPs. Even a small monthly SIP can build significant wealth over time.',
+            link: '/investments',
+            explorePage: 'Investments',
+        });
+    } else if (monthlySip === 0 && totalInvestments > 0) {
+        gaps.push({
+            title: 'No Regular Investment',
+            current: 'No SIP',
+            target: 'Start a SIP',
+            explanation: `You have ${fmt(totalInvestments)} in assets but no regular monthly investment. A SIP builds the discipline of consistent investing.`,
+            link: '/investments',
+            explorePage: 'Investments',
+        });
+    }
+
+    // 6. Poor asset allocation
+    const equityPct = d.overview?.investments?.allocation?.equity ?? 0;
+    const { status: eqStatus } = getAssetStatus('equity', equityPct, age);
+    if (totalInvestments > 0 && eqStatus !== 'on_track') {
+        const ranges = getIdealRanges(age);
+        gaps.push({
+            title: 'Asset Allocation',
+            current: `${equityPct}% equity`,
+            target: `${ranges.equity[0]}–${ranges.equity[1]}%`,
+            explanation: eqStatus === 'too_low'
+                ? `Equity allocation of ${equityPct}% is below the ${ranges.equity[0]}–${ranges.equity[1]}% range for your age — limiting long-term growth.`
+                : `Equity allocation of ${equityPct}% exceeds the ${ranges.equity[0]}–${ranges.equity[1]}% range — adding volatility risk.`,
+            link: '/investments',
+            explorePage: 'Investments',
+        });
+    }
+
+    // 7. Tax inefficiency
+    const taxRegime = d.tax?.recommended;
+    const potentialSavings = d.tax?.potentialSavings ?? 0;
+    if (potentialSavings > 5000) {
+        gaps.push({
+            title: 'Tax Optimisation',
+            current: `Potential savings: ${fmt(potentialSavings)}/year`,
+            target: `Switch to ${taxRegime}`,
+            explanation: `Switching to the ${taxRegime} could save you ${fmt(potentialSavings)} per year in taxes.`,
+            link: '/tax',
+            explorePage: 'Tax',
+        });
+    }
+
+    // 8. No will / nominees
+    const willEstate = d.overview?.willEstate;
+    if (willEstate && !willEstate.hasWill) {
+        gaps.push({
+            title: 'No Will',
+            current: willEstate.willInProgress ? 'In progress' : 'Not created',
+            target: 'Create a will',
+            explanation: 'Without a will, your assets are subject to legal delays and intestacy laws. Creating a will is straightforward and protects your family.',
+            link: '/estate',
+            explorePage: 'Estate & Will',
+        });
+    }
+    if (willEstate && willEstate.nomineesSet !== 'Yes') {
+        gaps.push({
+            title: 'Nominees Not Set',
+            current: 'Not configured',
+            target: 'Set nominees on all accounts',
+            explanation: 'Nominees are not set on your financial accounts. Without them, accessing funds after a death requires lengthy legal processes.',
+            link: '/estate',
+            explorePage: 'Estate & Will',
+        });
+    }
+
+    // 9. Low credit score
+    const creditScore = d.overview?.creditScore ?? 0;
+    if (creditScore > 0 && creditScore < 750) {
+        gaps.push({
+            title: 'Credit Score',
+            current: `${creditScore}`,
+            target: '750+',
+            explanation: `Your credit score of ${creditScore} is below the ideal 750. Improving it will get you better loan rates and credit terms.`,
+            link: '/liabilities',
+            explorePage: 'Liabilities',
+        });
+    }
+
+    // 10. No goals defined
+    const goalClarity = d.overview?.fbsBreakdown?.goalClarity ?? 0;
+    if (goalClarity === 0) {
+        gaps.push({
+            title: 'No Financial Goals',
+            current: 'None set',
+            target: 'Define 2-3 goals',
+            explanation: 'No financial goals defined. Goal-based investing gives your money a purpose and timeline — improving both clarity and returns.',
+            link: '/goal-planner',
+            explorePage: 'Goal Planner',
+        });
+    }
+
+    return gaps;
+}
+
+// ─── Dashboard Layout Helpers ────────────────────────────────────────────────
+
+/**
+ * Maps life stage string to a normalized key.
+ */
+function normalizeStage(stage) {
+    if (!stage) return 'building';
+    const s = stage.toLowerCase();
+    if (s.includes('foundation')) return 'foundation';
+    if (s.includes('building'))   return 'building';
+    if (s.includes('accumulation')) return 'accumulation';
+    if (s.includes('pre-retirement') || s.includes('pre retirement')) return 'preRetirement';
+    if (s.includes('retirement')) return 'retirement';
+    return 'building';
+}
+
+/**
+ * Returns ordered section config for the dashboard based on user's life stage.
+ * Each entry: { key, defaultExpanded, emphasis }
+ * @param {string} lifeStage — e.g. "Building Phase"
+ * @returns {Array<{ key: string, defaultExpanded: boolean, emphasis: string }>}
+ */
+export function getSectionOrder(lifeStage) {
+    const stage = normalizeStage(lifeStage);
+    const always = [
+        { key: 'greeting',  defaultExpanded: true,  emphasis: 'high' },
+        { key: 'fbs',       defaultExpanded: true,  emphasis: 'high' },
+        { key: 'actions',   defaultExpanded: true,  emphasis: 'high' },
+    ];
+
+    const orders = {
+        foundation: [
+            { key: 'snapshot',  defaultExpanded: true,  emphasis: 'high' },
+            { key: 'portfolio', defaultExpanded: false, emphasis: 'normal' },
+            { key: 'planning',  defaultExpanded: true,  emphasis: 'normal' },
+        ],
+        building: [
+            { key: 'snapshot',  defaultExpanded: true,  emphasis: 'high' },
+            { key: 'portfolio', defaultExpanded: true,  emphasis: 'normal' },
+            { key: 'planning',  defaultExpanded: true,  emphasis: 'normal' },
+        ],
+        accumulation: [
+            { key: 'snapshot',  defaultExpanded: true,  emphasis: 'normal' },
+            { key: 'portfolio', defaultExpanded: true,  emphasis: 'high' },
+            { key: 'planning',  defaultExpanded: true,  emphasis: 'normal' },
+        ],
+        preRetirement: [
+            { key: 'portfolio', defaultExpanded: true,  emphasis: 'high' },
+            { key: 'snapshot',  defaultExpanded: true,  emphasis: 'normal' },
+            { key: 'planning',  defaultExpanded: true,  emphasis: 'high' },
+        ],
+        retirement: [
+            { key: 'portfolio', defaultExpanded: true,  emphasis: 'high' },
+            { key: 'snapshot',  defaultExpanded: true,  emphasis: 'normal' },
+            { key: 'planning',  defaultExpanded: true,  emphasis: 'high' },
+        ],
+    };
+
+    return [...always, ...(orders[stage] || orders.building)];
+}
+
+/**
+ * Returns the 3 most relevant KPI keys for a given life stage.
+ * @param {string} lifeStage
+ * @returns {string[]} — keys from: 'netWorth','totalAssets','totalLiabilities','monthlySurplus','creditScore'
+ */
+export function getRelevantKPIs(lifeStage) {
+    const stage = normalizeStage(lifeStage);
+    const map = {
+        foundation:    ['netWorth', 'monthlySurplus', 'creditScore'],
+        building:      ['netWorth', 'monthlySurplus', 'creditScore'],
+        accumulation:  ['netWorth', 'monthlySurplus', 'totalAssets'],
+        preRetirement: ['netWorth', 'totalAssets', 'totalLiabilities'],
+        retirement:    ['netWorth', 'totalAssets', 'totalLiabilities'],
+    };
+    return map[stage] || map.building;
+}
+
+/**
+ * Returns the default active tab for the Planning section.
+ * @param {string} lifeStage
+ * @returns {'cashflow'|'persona'|'estate'}
+ */
+export function getDefaultPlanningTab(lifeStage) {
+    const stage = normalizeStage(lifeStage);
+    const map = {
+        foundation:    'persona',
+        building:      'persona',
+        accumulation:  'cashflow',
+        preRetirement: 'estate',
+        retirement:    'estate',
+    };
+    return map[stage] || 'persona';
 }

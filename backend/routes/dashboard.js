@@ -17,7 +17,7 @@ router.get('/full', auth, async (req, res) => {
 
         // Fetch user goals and attach to profile for Goal Clarity scoring
         const goalsResult = await pool.query(
-            'SELECT id, name, target, years, priority_weight FROM user_goals WHERE user_id = $1 ORDER BY created_at ASC',
+            'SELECT id, name, target, years, priority_weight, is_saving FROM user_goals WHERE user_id = $1 ORDER BY created_at ASC',
             [req.userId]
         );
         const profile = profileResult.rows[0];
@@ -74,7 +74,7 @@ router.put('/action-plan/status', auth, async (req, res) => {
         // Recalculate FBS with completion bonus
         const profileResult = await pool.query('SELECT * FROM financial_profiles WHERE user_id = $1', [req.userId]);
         const goalsResult = await pool.query(
-            'SELECT id, name, target, years, priority_weight FROM user_goals WHERE user_id = $1 ORDER BY created_at ASC',
+            'SELECT id, name, target, years, priority_weight, is_saving FROM user_goals WHERE user_id = $1 ORDER BY created_at ASC',
             [req.userId]
         );
 

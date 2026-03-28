@@ -14,24 +14,24 @@ function Welcome() {
                 </Link>
                 
                 <div className="auth-left-container">
-                    <div className="landing-eyebrow">Wealth Analytics</div>
-                    <h1 className="landing-title">Build Your Complete Financial Health Profile</h1>
+                    <div className="landing-eyebrow">Free · No advisor calls · Your data stays private</div>
+                    <h1 className="landing-title">Know Exactly Where Your Money Stands</h1>
                     <div className="landing-desc">
-                        Answer a few questions about your finances. We'll generate a comprehensive health score, identify gaps, and create a personalised action plan.
+                        Answer questions about your income, savings, investments, loans, and insurance. We compute a <strong>Financial Behaviour Score (FBS)</strong> out of 100 — then generate a ranked action plan showing exactly what to fix and by how much.
                     </div>
-                    
+
                     <div className="landing-meta">
-                        <div className="landing-meta-item"><div className="meta-dot"></div>10 sections to complete</div>
-                        <div className="landing-meta-item"><div className="meta-dot"></div>8–12 minutes to finish</div>
-                        <div className="landing-meta-item"><div className="meta-dot"></div>Save & resume anytime</div>
+                        <div className="landing-meta-item"><div className="meta-dot"></div>13 steps — income, expenses, investments, loans, insurance, tax, and more</div>
+                        <div className="landing-meta-item"><div className="meta-dot"></div>8–12 minutes · save and resume anytime, no time pressure</div>
+                        <div className="landing-meta-item"><div className="meta-dot"></div>Instant results — no waiting, no advisor, no sales calls</div>
                     </div>
 
                     <Link to="/register" className="btn-primary">
                         Start Assessment <ArrowRight size={16} />
                     </Link>
-                    
+
                     <div className="link-small">
-                        Already have an account? <Link to="/login">Log in →</Link>
+                        Already have an account? <Link to="/login">Log in to your dashboard</Link>
                     </div>
                 </div>
             </div>
