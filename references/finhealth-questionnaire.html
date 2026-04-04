@@ -1,0 +1,1331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FinHealth — Questionnaire</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --cream:    #F4EFE6;
+  --cream-2:  #EDE6D8;
+  --cream-3:  #E4DCCB;
+  --ink:      #1A1814;
+  --ink-2:    #3E3A33;
+  --ink-3:    #7A7468;
+  --ink-4:    #B0A99C;
+  --terra:    #C4522A;
+  --terra-pale: rgba(196,82,42,0.10);
+  --gold-bg:  #FDF3DC;
+  --gold-ink: #7A5800;
+  --teal-bg:  #E6F3EE;
+  --teal-ink: #1E5C42;
+  --sidebar:  212px;
+  --topbar:   48px;
+  --bottombar:64px;
+  --radius:   10px;
+}
+
+html, body { height: 100%; overflow: hidden; background: var(--cream); color: var(--ink); font-family: 'DM Sans', sans-serif; font-size: 13px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+
+/* ══════════════════════════════════════
+   SIDEBAR
+══════════════════════════════════════ */
+.sidebar {
+  position: fixed; top: 0; left: 0; bottom: 0;
+  width: var(--sidebar);
+  background: var(--ink);
+  display: flex; flex-direction: column;
+  z-index: 30; overflow: hidden;
+}
+.sidebar-logo {
+  padding: 20px 20px 16px;
+  display: flex; align-items: center; gap: 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  flex-shrink: 0;
+}
+.logo-mark {
+  width: 28px; height: 28px; border-radius: 6px;
+  background: var(--terra);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 500; color: #fff;
+}
+.logo-text { font-size: 15px; font-weight: 500; color: #fff; letter-spacing: -0.02em; }
+.logo-text b { color: var(--terra); font-weight: 500; }
+
+.sidebar-steps {
+  flex: 1; overflow-y: auto; padding: 10px 0 10px;
+  scrollbar-width: none;
+}
+.sidebar-steps::-webkit-scrollbar { display: none; }
+
+.step-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 16px;
+  cursor: pointer; transition: background 0.12s;
+  position: relative;
+}
+.step-item:hover { background: rgba(255,255,255,0.03); }
+.step-item.active { background: rgba(255,255,255,0.05); }
+.step-item.active::before {
+  content: '';
+  position: absolute; left: 0; top: 4px; bottom: 4px;
+  width: 2px; background: var(--terra);
+}
+
+.step-bubble {
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; font-size: 9px; font-weight: 500;
+  transition: all 0.2s;
+}
+.step-bubble.done     { background: var(--terra); color: #fff; }
+.step-bubble.current  { background: #fff; color: var(--ink); }
+.step-bubble.upcoming { background: rgba(255,255,255,0.06); color: #4A4640; border: 1px solid rgba(255,255,255,0.08); }
+
+.step-label { font-size: 11px; line-height: 1.3; }
+.step-label .s-title { color: #9A9490; }
+.step-item.active .step-label .s-title { color: #fff; font-weight: 500; }
+.step-item.done   .step-label .s-title { color: #6A6460; }
+.step-label .s-opt { font-size: 9px; color: #3A3830; margin-left: 3px; }
+
+.step-icon { font-size: 10px; color: #3A3830; flex-shrink: 0; }
+
+/* ══════════════════════════════════════
+   TOPBAR
+══════════════════════════════════════ */
+.topbar {
+  position: fixed; top: 0; left: var(--sidebar); right: 0;
+  height: var(--topbar);
+  background: var(--cream);
+  border-bottom: 1px solid rgba(26,24,20,0.08);
+  display: flex; align-items: center; padding: 0 36px;
+  gap: 12px; z-index: 20;
+}
+.tb-step { font-size: 10px; color: var(--ink-3); font-weight: 400; white-space: nowrap; }
+.tb-step b { color: var(--terra); font-weight: 500; }
+.tb-bar-wrap { flex: 1; height: 3px; background: var(--cream-3); border-radius: 100px; overflow: hidden; }
+.tb-bar-fill { height: 100%; background: var(--terra); border-radius: 100px; transition: width 0.4s ease; }
+.tb-pct { font-size: 10px; color: var(--ink-3); font-weight: 500; min-width: 28px; text-align: right; }
+.tb-saved { font-size: 10px; color: var(--teal-ink); display: flex; align-items: center; gap: 4px; }
+.tb-saved::before { content: '✓'; font-weight: 600; }
+
+/* ══════════════════════════════════════
+   BOTTOM BAR
+══════════════════════════════════════ */
+.bottombar {
+  position: fixed; bottom: 0; left: var(--sidebar); right: 0;
+  height: var(--bottombar);
+  background: var(--cream);
+  border-top: 1px solid rgba(26,24,20,0.08);
+  display: flex; align-items: center;
+  padding: 0 36px;
+  justify-content: space-between;
+  z-index: 20;
+}
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 20px; border-radius: var(--radius);
+  font-size: 12px; font-weight: 500; font-family: 'DM Sans', sans-serif;
+  cursor: pointer; border: none; transition: all 0.15s;
+  text-decoration: none; white-space: nowrap;
+}
+.btn-ghost {
+  background: transparent;
+  border: 1px solid rgba(26,24,20,0.15);
+  color: var(--ink-2);
+}
+.btn-ghost:hover { background: var(--cream-2); }
+.btn-primary {
+  background: var(--ink);
+  color: #fff;
+}
+.btn-primary:hover { background: var(--terra); }
+.btn-review {
+  background: transparent;
+  color: var(--ink-3);
+  font-size: 11px; padding: 6px 0;
+  border: none;
+}
+.btn-review:hover { color: var(--terra); }
+.btn-disabled { opacity: 0.35; pointer-events: none; }
+
+/* ══════════════════════════════════════
+   MAIN CONTENT AREA
+══════════════════════════════════════ */
+.main {
+  position: fixed;
+  top: var(--topbar);
+  bottom: var(--bottombar);
+  left: var(--sidebar);
+  right: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.step-panel {
+  display: none;
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  flex-direction: row;
+}
+.step-panel.visible { display: flex; }
+
+
+/* LEFT: heading column — fixed width, full height, vertically centered content */
+.step-head {
+  width: 240px;
+  flex-shrink: 0;
+  padding: 28px 24px 28px 36px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  border-right: 1px solid rgba(26,24,20,0.07);
+  overflow: hidden;
+}
+.step-eyebrow {
+  font-size: 9px; font-weight: 500; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--terra);
+  margin-bottom: 10px;
+  display: flex; align-items: center; gap: 6px;
+}
+.step-icon-head { width: 16px; height: 16px; }
+.step-icon-head svg { width: 16px; height: 16px; }
+
+.step-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 32px; font-weight: 500; line-height: 1.05;
+  letter-spacing: -0.02em; color: var(--ink);
+}
+.step-sub {
+  font-size: 11px; color: var(--ink-4); margin-top: 8px;
+  font-weight: 300; line-height: 1.5;
+}
+
+/* RIGHT: content column — fills remaining space, scrolls only if truly needed */
+.step-body {
+  flex: 1;
+  min-width: 0;
+  padding: 24px 36px 24px 28px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+/* ══════════════════════════════════════
+   FORM PRIMITIVES
+══════════════════════════════════════ */
+.field-grid {
+  display: grid;
+  gap: 10px 16px;
+}
+.fg-2 { grid-template-columns: 1fr 1fr; }
+.fg-3 { grid-template-columns: 1fr 1fr 1fr; }
+.fg-1 { grid-template-columns: 1fr; }
+
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field-label {
+  font-size: 11px; font-weight: 500; color: var(--ink-2);
+  display: flex; align-items: center; gap: 5px;
+}
+.field-hint { font-size: 10px; color: var(--ink-4); font-weight: 300; }
+
+.inp {
+  height: 36px;
+  background: #fff;
+  border: 1px solid rgba(26,24,20,0.12);
+  border-radius: var(--radius);
+  padding: 0 10px;
+  font-size: 13px; font-family: 'DM Sans', sans-serif;
+  color: var(--ink);
+  transition: border-color 0.15s;
+  width: 100%;
+  outline: none;
+}
+.inp:focus { border-color: var(--terra); }
+
+.inp-rupee-wrap {
+  position: relative; display: flex; align-items: center;
+}
+.inp-rupee-wrap .rupee {
+  position: absolute; left: 10px;
+  font-size: 12px; color: var(--ink-3); pointer-events: none;
+}
+.inp-rupee-wrap input { padding-left: 22px; }
+.inp-pct-wrap { position: relative; }
+.inp-pct-wrap .pct {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  font-size: 11px; color: var(--ink-3); pointer-events: none;
+}
+
+select.inp { appearance: none; background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%237A7468' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px; cursor: pointer; }
+
+input[type="date"].inp { cursor: pointer; }
+
+/* toggle yes/not yet */
+.toggle-group { display: flex; gap: 0; }
+.toggle-btn {
+  padding: 7px 18px;
+  border: 1px solid rgba(26,24,20,0.15);
+  background: #fff;
+  font-size: 12px; font-weight: 400; font-family: 'DM Sans', sans-serif;
+  color: var(--ink-2); cursor: pointer; transition: all 0.14s;
+}
+.toggle-btn:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+.toggle-btn:last-child  { border-radius: 0 var(--radius) var(--radius) 0; border-left: none; }
+.toggle-btn.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+/* pill scale (1-5) */
+.scale-group { display: flex; gap: 4px; }
+.scale-btn {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 8px 4px; gap: 3px;
+  border: 1px solid rgba(26,24,20,0.12);
+  border-radius: var(--radius);
+  background: #fff; cursor: pointer;
+  transition: all 0.14s;
+  font-family: 'DM Sans', sans-serif;
+}
+.scale-btn .s-num { font-size: 14px; font-weight: 500; color: var(--ink); }
+.scale-btn .s-lbl { font-size: 9px; color: var(--ink-4); text-align: center; line-height: 1.2; }
+.scale-btn:hover  { border-color: var(--terra); background: var(--terra-pale); }
+.scale-btn.active { background: var(--ink); border-color: var(--ink); }
+.scale-btn.active .s-num { color: #fff; }
+.scale-btn.active .s-lbl { color: rgba(255,255,255,0.5); }
+
+/* notice banners */
+.notice {
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-size: 11px; line-height: 1.55;
+  display: flex; align-items: flex-start; gap: 8px;
+  flex-shrink: 0;
+}
+.notice-gold  { background: var(--gold-bg); color: var(--gold-ink); border-left: 2px solid #C49A00; }
+.notice-teal  { background: var(--teal-bg); color: var(--teal-ink); border-left: 2px solid #2A7A54; border-radius: 0; }
+.notice-cream { background: var(--cream-2); color: var(--ink-3); border-left: 2px solid var(--ink-4); border-radius: 0; }
+.notice b { font-weight: 500; }
+
+/* tab switcher */
+.tab-bar {
+  display: flex; gap: 0;
+  border-bottom: 1px solid rgba(26,24,20,0.1);
+  flex-shrink: 0; margin-bottom: 14px;
+}
+.tab-btn {
+  padding: 7px 16px;
+  font-size: 12px; font-family: 'DM Sans', sans-serif;
+  font-weight: 400; color: var(--ink-3);
+  background: none; border: none; border-bottom: 2px solid transparent;
+  cursor: pointer; transition: all 0.14s; margin-bottom: -1px;
+}
+.tab-btn.active { color: var(--terra); border-bottom-color: var(--terra); font-weight: 500; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* accordion expand */
+.accordion-toggle {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid rgba(26,24,20,0.12);
+  border-radius: var(--radius);
+  background: #fff; cursor: pointer;
+  font-size: 12px; color: var(--ink-2);
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.14s; width: auto;
+}
+.accordion-toggle:hover { border-color: var(--terra); }
+.accordion-toggle .acc-arrow { transition: transform 0.2s; font-size: 10px; }
+.accordion-toggle.open .acc-arrow { transform: rotate(180deg); }
+.accordion-body { display: none; margin-top: 10px; }
+.accordion-body.open { display: block; }
+
+/* info tooltip icon */
+.ico-info {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 13px; height: 13px; border-radius: 50%;
+  border: 1px solid var(--ink-4); color: var(--ink-4);
+  font-size: 8px; cursor: help; flex-shrink: 0;
+}
+
+/* divider */
+.divider { border: none; border-top: 1px solid rgba(26,24,20,0.07); margin: 4px 0; flex-shrink: 0; }
+
+/* section sub-heading */
+.sub-heading {
+  font-size: 11px; font-weight: 500; color: var(--ink-2);
+  letter-spacing: 0.04em; text-transform: uppercase;
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* empty state */
+.empty-state {
+  border: 1px dashed rgba(26,24,20,0.15);
+  border-radius: var(--radius);
+  padding: 20px; text-align: center;
+  color: var(--ink-3); font-size: 12px;
+}
+.empty-state b { font-weight: 500; color: var(--ink-2); }
+
+/* add button inline */
+.btn-add {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 7px 14px; border-radius: var(--radius);
+  border: 1px dashed rgba(26,24,20,0.2);
+  background: transparent; color: var(--ink-2);
+  font-size: 11px; font-family: 'DM Sans', sans-serif;
+  cursor: pointer; transition: all 0.14s;
+}
+.btn-add:hover { border-color: var(--terra); color: var(--terra); background: var(--terra-pale); }
+
+/* two-col layout helper */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+
+/* step number shown at bottom of heading col */
+.step-head-num {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 72px; font-weight: 600;
+  color: rgba(26,24,20,0.07);
+  line-height: 1;
+  margin-top: auto;
+  padding-top: 20px;
+  user-select: none;
+}
+#s1  .step-head { background: #EDE8DF; }
+#s2  .step-head { background: #EDE8DF; }
+#s3  .step-head { background: #E8EDEA; }
+#s4  .step-head { background: #EDE8DF; }
+#s5  .step-head { background: #E8EDEA; }
+#s6  .step-head { background: #E8EDEA; }
+#s7  .step-head { background: #EDE8DF; }
+#s8  .step-head { background: #EDE8DF; }
+#s9  .step-head { background: #E8EDEA; }
+#s10 .step-head { background: #EDE8DF; }
+#s11 .step-head { background: #EDE8DF; }
+#s12 .step-head { background: #EAE8ED; }
+#s13 .step-head { background: #E8EDEA; }
+
+/* ══════════════════════════════════════
+   ANIMATIONS
+══════════════════════════════════════ */
+@keyframes stepIn {
+  from { opacity: 0; transform: translateX(12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.step-panel.visible .step-body { animation: stepIn 0.28s ease forwards; }
+</style>
+</head>
+<body>
+
+<!-- ═══ SIDEBAR ═══ -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">FH</div>
+    <div class="logo-text">Fin<b>Health</b></div>
+  </div>
+  <div class="sidebar-steps" id="sidebarSteps"></div>
+</aside>
+
+<!-- ═══ TOPBAR ═══ -->
+<div class="topbar">
+  <span class="tb-step">Step <b id="tbStepNum">1</b> of 13</span>
+  <div class="tb-bar-wrap"><div class="tb-bar-fill" id="tbBar" style="width:0%"></div></div>
+  <span class="tb-pct" id="tbPct">0%</span>
+  <span class="tb-saved" id="tbSaved" style="display:none">Saved</span>
+</div>
+
+<!-- ═══ MAIN ═══ -->
+<div class="main">
+
+<!-- ── STEP 1: Profile & Family ── -->
+<div class="step-panel" id="s1">
+  <div class="step-head">
+    <div class="step-eyebrow">
+      <svg class="step-icon-head" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="6" r="3" stroke="#C4522A" stroke-width="1.3"/><path d="M3 15c0-3.314 2.686-6 6-6s6 2.686 6 6" stroke="#C4522A" stroke-width="1.3" stroke-linecap="round"/></svg>
+      Profile & Family
+    </div>
+    <div class="step-title">Tell us about yourself</div>
+    <div class="step-sub">So we can personalise your financial plan.</div>
+    <div class="step-head-num">01</div>
+  </div>
+  <div class="step-body">
+    <div class="field-grid fg-2">
+      <div class="field">
+        <div class="field-label">Date of Birth <span style="color:var(--terra)">*</span></div>
+        <input type="date" class="inp" value="2003-12-18">
+      </div>
+      <div class="field">
+        <div class="field-label">City <span style="color:var(--terra)">*</span></div>
+        <select class="inp">
+          <option>Delhi</option><option>Mumbai</option><option>Bangalore</option>
+          <option>Chennai</option><option>Hyderabad</option><option>Pune</option><option>Other</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="field-label">Marital Status <span style="color:var(--terra)">*</span></div>
+        <select class="inp">
+          <option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="field-label">Dependents <span style="color:var(--terra)">*</span> <span class="ico-info">i</span></div>
+        <input type="number" class="inp" value="0" min="0" max="20">
+      </div>
+      <div class="field" style="grid-column:1/-1;">
+        <div class="field-label">Employment Type <span style="color:var(--terra)">*</span></div>
+        <select class="inp">
+          <option>Salaried</option><option>Self-employed</option><option>Business owner</option>
+          <option>Freelancer</option><option>Student</option><option>Not employed</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="field-label">Risk Comfort <span style="color:var(--terra)">*</span> <span class="ico-info">i</span></div>
+        <select class="inp">
+          <option value="1">1 — Very Low</option><option value="2">2</option><option value="3">3</option>
+          <option value="4">4</option><option value="5">5 — Moderate</option><option value="6">6</option>
+          <option value="7">7</option><option value="8">8</option><option value="9" selected>9</option>
+          <option value="10">10 — Very High</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="field-label">Investment Experience <span style="color:var(--terra)">*</span></div>
+        <select class="inp">
+          <option selected>None</option><option>&lt; 1 year</option><option>1–3 years</option>
+          <option>3–7 years</option><option>7+ years</option>
+        </select>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── STEP 2: Financial Background ── -->
+<div class="step-panel" id="s2">
+  <div class="step-head">
+    <div class="step-eyebrow">
+      <svg class="step-icon-head" viewBox="0 0 18 18" fill="none"><rect x="2" y="3" width="14" height="12" rx="2" stroke="#C4522A" stroke-width="1.3"/><path d="M6 3V2M12 3V2M2 7h14" stroke="#C4522A" stroke-width="1.3" stroke-linecap="round"/></svg>
+      Financial Background
+    </div>
+    <div class="step-title">Your financial roots</div>
+    <div class="step-sub">Your family's financial history helps us understand your starting point.</div>
+    <div class="step-head-num">02</div>
+  </div>
+  <div class="step-body">
+    <div class="notice notice-cream">These questions are optional — skip any you'd rather not answer. Your answers are private and help us personalise your plan.</div>
+    <div class="field">
+      <div class="field-label">Q1. Growing up, how would you describe your family's financial situation? <span style="color:var(--terra)">*</span></div>
+      <div class="scale-group" style="margin-top:4px;">
+        <div class="scale-btn" onclick="pickScale(this,'q1')"><span class="s-num">1</span><span class="s-lbl">Struggled</span></div>
+        <div class="scale-btn" onclick="pickScale(this,'q1')"><span class="s-num">2</span><span class="s-lbl">Tight</span></div>
+        <div class="scale-btn" onclick="pickScale(this,'q1')"><span class="s-num">3</span><span class="s-lbl">Comfortable</span></div>
+        <div class="scale-btn" onclick="pickScale(this,'q1')"><span class="s-num">4</span><span class="s-lbl">Well-off</span></div>
+        <div class="scale-btn" onclick="pickScale(this,'q1')"><span class="s-num">5</span><span class="s-lbl">Wealthy</span></div>
+      </div>
+    </div>
+    <div class="field">
+      <div class="field-label">Q2. Did or will you receive any inheritance from your parents? <span style="color:var(--terra)">*</span></div>
+      <div class="scale-group" style="margin-top:4px;">
+        <div class="scale-btn" onclick="pickScale(this,'q2')"><span class="s-num">1</span><span class="s-lbl">None</span></div>
+        <div class="scale-btn" onclick="pickScale(this,'q2')"><span class="s-num">2</span><span class="s-lbl">Minimal</span></div>
+        <div class="scale-btn" onclick="pickScale(this,'q2')"><span class="s-num">3</span><span class="s-lbl">Modest &lt;₹50L</span></div>
+        <div class="scale-btn" onclick="pickScale(this,'q2')"><span class="s-num">4</span><span class="s-lbl">Meaningful &lt;₹5Cr</span></div>
+        <div class="scale-btn" onclick="pickScale(this,'q2')"><span class="s-num">5</span><span class="s-lbl">Substantial ₹5Cr+</span></div>
+      </div>
+    </div>
+    <div class="field">
+      <div class="field-label">Q3. If you lost your job or faced a crisis, could your family provide meaningful financial support? <span style="color:var(--terra)">*</span></div>
+      <div class="scale-group" style="margin-top:4px;">
+        <div class="scale-btn" onclick="pickScale(this,'q3')"><span class="s-num">1</span><span class="s-lbl">Not at all</span></div>
+        <div class="scale-btn" onclick="pickScale(this,'q3')"><span class="s-num">2</span><span class="s-lbl">Unlikely</span></div>
+        <div class="scale-btn" onclick="pickScale(this,'q3')"><span class="s-num">3</span><span class="s-lbl">Maybe</span></div>
+        <div class="scale-btn" onclick="pickScale(this,'q3')"><span class="s-num">4</span><span class="s-lbl">Likely</span></div>
+        <div class="scale-btn" onclick="pickScale(this,'q3')"><span class="s-num">5</span><span class="s-lbl">Definitely</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── STEP 3: Income ── -->
+<div class="step-panel" id="s3">
+  <div class="step-head">
+    <div class="step-eyebrow">
+      <svg class="step-icon-head" viewBox="0 0 18 18" fill="none"><rect x="1" y="4" width="16" height="11" rx="2" stroke="#C4522A" stroke-width="1.3"/><path d="M1 8h16" stroke="#C4522A" stroke-width="1.3"/><circle cx="9" cy="12" r="1.5" fill="#C4522A"/></svg>
+      Income
+    </div>
+    <div class="step-title">Your income streams</div>
+    <div class="step-sub">Assess savings potential and income streams.</div>
+    <div class="step-head-num">03</div>
+  </div>
+  <div class="step-body">
+    <div class="field">
+      <div class="field-label">Do you have income?</div>
+      <div class="toggle-group" style="margin-top:2px;">
+        <button class="toggle-btn active" onclick="toggleBtn(this)">Yes</button>
+        <button class="toggle-btn" onclick="toggleBtn(this)">Not yet</button>
+      </div>
+    </div>
+    <div class="field">
+      <div class="field-label">Monthly Take-Home Income <span style="color:var(--terra)">*</span> <span class="ico-info">i</span></div>
+      <div class="inp-rupee-wrap"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+    </div>
+    <div class="field-grid fg-2">
+      <div class="field">
+        <div class="field-label">Annual Salary <span class="ico-info">i</span></div>
+        <div class="inp-rupee-wrap"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+      </div>
+      <div class="field">
+        <div class="field-label">Business Income <span class="ico-info">i</span></div>
+        <div class="inp-rupee-wrap"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+      </div>
+      <div class="field">
+        <div class="field-label">Annual Bonus</div>
+        <div class="inp-rupee-wrap"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+      </div>
+      <div class="field">
+        <div class="field-label">Other Income (yearly) <span class="ico-info">i</span></div>
+        <div class="inp-rupee-wrap"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+      </div>
+    </div>
+    <div class="field">
+      <div class="field-label">Expected Income Growth</div>
+      <select class="inp" style="max-width:320px;">
+        <option>Stable / no growth expected</option>
+        <option>Slow (&lt;5% per year)</option>
+        <option>Moderate (5–10% per year)</option>
+        <option>Fast (10–20% per year)</option>
+        <option>Very fast (20%+ per year)</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- ── STEP 4: Expenses ── -->
+<div class="step-panel" id="s4">
+  <div class="step-head">
+    <div class="step-eyebrow">
+      <svg class="step-icon-head" viewBox="0 0 18 18" fill="none"><rect x="2" y="2" width="14" height="14" rx="2" stroke="#C4522A" stroke-width="1.3"/><path d="M6 9h6M9 6v6" stroke="#C4522A" stroke-width="1.3" stroke-linecap="round"/></svg>
+      Expenses
+    </div>
+    <div class="step-title">Your spending patterns</div>
+    <div class="step-sub">We combine monthly and annual to calculate your true monthly surplus.</div>
+    <div class="step-head-num">04</div>
+  </div>
+  <div class="step-body">
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab(this,'exp-monthly','exp-tabs')">Monthly</button>
+      <button class="tab-btn" onclick="switchTab(this,'exp-annual','exp-tabs')">Annual</button>
+    </div>
+    <div id="exp-tabs">
+      <div class="tab-panel active" id="exp-monthly">
+        <div class="field-grid fg-2" style="gap:10px 16px;">
+          <div class="field">
+            <div class="field-label">Household &amp; Lifestyle</div>
+            <div class="field-hint">Groceries, maid, maintenance, clothing, personal care</div>
+            <div class="inp-rupee-wrap" style="margin-top:4px;"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+          </div>
+          <div class="field">
+            <div class="field-label">Rent / Home EMI</div>
+            <div class="field-hint">House rent or EMI for your primary residence</div>
+            <div class="inp-rupee-wrap" style="margin-top:4px;"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+          </div>
+          <div class="field">
+            <div class="field-label">Utilities</div>
+            <div class="field-hint">Electricity, water, gas, internet, mobile bills</div>
+            <div class="inp-rupee-wrap" style="margin-top:4px;"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+          </div>
+          <div class="field">
+            <div class="field-label">Transport</div>
+            <div class="field-hint">Fuel, public transit, cab fares, vehicle maintenance</div>
+            <div class="inp-rupee-wrap" style="margin-top:4px;"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+          </div>
+          <div class="field">
+            <div class="field-label">Food &amp; Dining</div>
+            <div class="field-hint">Eating out, ordering in, coffee shop visits</div>
+            <div class="inp-rupee-wrap" style="margin-top:4px;"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+          </div>
+          <div class="field">
+            <div class="field-label">Subscriptions</div>
+            <div class="field-hint">Netflix, gym, Amazon Prime, software</div>
+            <div class="inp-rupee-wrap" style="margin-top:4px;"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+          </div>
+          <div class="field">
+            <div class="field-label">Discretionary</div>
+            <div class="field-hint">Shopping, entertainment, travel, hobbies</div>
+            <div class="inp-rupee-wrap" style="margin-top:4px;"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+          </div>
+          <div class="field">
+            <div class="field-label">Other Monthly</div>
+            <div class="field-hint">Anything else not listed above</div>
+            <div class="inp-rupee-wrap" style="margin-top:4px;"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+          </div>
+        </div>
+      </div>
+      <div class="tab-panel" id="exp-annual">
+        <div class="field-grid fg-2" style="gap:10px 16px;">
+          <div class="field">
+            <div class="field-label">Annual Insurance Premiums</div>
+            <div class="field-hint">Health, term, vehicle, etc.</div>
+            <div class="inp-rupee-wrap" style="margin-top:4px;"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+          </div>
+          <div class="field">
+            <div class="field-label">Annual Travel / Holidays</div>
+            <div class="field-hint">Flights, hotels, vacations per year</div>
+            <div class="inp-rupee-wrap" style="margin-top:4px;"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+          </div>
+          <div class="field">
+            <div class="field-label">Annual Medical / Health</div>
+            <div class="field-hint">Out-of-pocket healthcare costs</div>
+            <div class="inp-rupee-wrap" style="margin-top:4px;"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+          </div>
+          <div class="field">
+            <div class="field-label">Other Annual</div>
+            <div class="field-hint">Education, gifts, charity, misc</div>
+            <div class="inp-rupee-wrap" style="margin-top:4px;"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── STEP 5: Assets & Banking ── -->
+<div class="step-panel" id="s5">
+  <div class="step-head">
+    <div class="step-eyebrow">
+      <svg class="step-icon-head" viewBox="0 0 18 18" fill="none"><path d="M2 7l7-5 7 5v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V7z" stroke="#C4522A" stroke-width="1.3" stroke-linejoin="round"/><path d="M7 17V11h4v6" stroke="#C4522A" stroke-width="1.3" stroke-linejoin="round"/></svg>
+      Assets &amp; Banking
+    </div>
+    <div class="step-title">Your cash reserves</div>
+    <div class="step-sub">Your cash reserves and banking holdings.</div>
+    <div class="step-head-num">05</div>
+  </div>
+  <div class="step-body">
+    <div class="notice notice-gold"><b>Not sure about exact numbers?</b> Rough estimates are totally fine — leave any field blank and we'll still generate a complete plan.</div>
+    <div class="field-grid fg-2">
+      <div class="field" style="grid-column:1/-1;">
+        <div class="field-label">Savings Account Balance <span class="ico-info">i</span></div>
+        <div class="inp-rupee-wrap"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+      </div>
+      <div class="field">
+        <div class="field-label">Fixed Deposits Balance <span class="ico-info">i</span></div>
+        <div class="inp-rupee-wrap"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+      </div>
+      <div class="field">
+        <div class="field-label">FD Average Rate <span class="ico-info">i</span></div>
+        <div class="inp-pct-wrap"><input type="number" class="inp" placeholder="0.00" step="0.1"><span class="pct">%</span></div>
+      </div>
+      <div class="field" style="grid-column:1/-1;">
+        <div class="field-label">Emergency Fund Set Aside <span class="ico-info">i</span></div>
+        <div class="inp-rupee-wrap"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── STEP 6: Investments ── -->
+<div class="step-panel" id="s6">
+  <div class="step-head">
+    <div class="step-eyebrow">
+      <svg class="step-icon-head" viewBox="0 0 18 18" fill="none"><path d="M3 13l4-5 3 3 5-7" stroke="#C4522A" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="15" cy="4" r="1.5" fill="#C4522A"/></svg>
+      Investments
+    </div>
+    <div class="step-title">Your portfolio</div>
+    <div class="step-sub">Your current investment holdings.</div>
+    <div class="step-head-num">06</div>
+  </div>
+  <div class="step-body">
+    <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+      <div class="field-label">Do you currently invest?</div>
+      <div class="toggle-group">
+        <button class="toggle-btn active" onclick="toggleBtn(this)">Yes</button>
+        <button class="toggle-btn" onclick="toggleBtn(this)">Not yet</button>
+      </div>
+    </div>
+    <div class="notice notice-gold" style="flex-shrink:0;"><b>Just starting out?</b> It's okay if you haven't invested yet — leave fields blank or select "Not yet".</div>
+    <div class="field-grid fg-2" style="flex-shrink:0;">
+      <div class="field">
+        <div class="field-label">Direct Stocks <span class="ico-info">i</span></div>
+        <div class="inp-rupee-wrap"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+      </div>
+      <div class="field">
+        <div class="field-label">Equity Mutual Funds <span class="ico-info">i</span></div>
+        <div class="inp-rupee-wrap"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+      </div>
+      <div class="field">
+        <div class="field-label">Gold / Commodities <span class="ico-info">i</span></div>
+        <div class="inp-rupee-wrap"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+      </div>
+      <div class="field">
+        <div class="field-label">Debt Funds &amp; Bonds <span class="ico-info">i</span></div>
+        <div class="inp-rupee-wrap"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+      </div>
+    </div>
+    <div style="flex-shrink:0;">
+      <button class="accordion-toggle" id="moreInvBtn" onclick="toggleAccordion('moreInvBody','moreInvBtn')">
+        + More investments <span class="acc-arrow">▾</span>
+      </button>
+      <div class="accordion-body" id="moreInvBody">
+        <div class="field-grid fg-2" style="margin-top:4px;">
+          <div class="field">
+            <div class="field-label">EPF / PPF / NPS <span class="ico-info">i</span></div>
+            <div class="inp-rupee-wrap"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+          </div>
+          <div class="field">
+            <div class="field-label">Real Estate (investment) <span class="ico-info">i</span></div>
+            <div class="inp-rupee-wrap"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+          </div>
+          <div class="field">
+            <div class="field-label">Crypto <span class="ico-info">i</span></div>
+            <div class="inp-rupee-wrap"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+          </div>
+          <div class="field">
+            <div class="field-label">Other Investments</div>
+            <div class="inp-rupee-wrap"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── STEP 7: Goals ── -->
+<div class="step-panel" id="s7">
+  <div class="step-head">
+    <div class="step-eyebrow">
+      <svg class="step-icon-head" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="#C4522A" stroke-width="1.3"/><circle cx="9" cy="9" r="3.5" stroke="#C4522A" stroke-width="1.3"/><circle cx="9" cy="9" r="1" fill="#C4522A"/></svg>
+      Goals <span style="font-size:9px;color:var(--ink-4);font-weight:400;margin-left:4px;">(optional)</span>
+    </div>
+    <div class="step-title">What are you saving for?</div>
+    <div class="step-sub">Having clear goals significantly improves your financial health score.</div>
+    <div class="step-head-num">07</div>
+  </div>
+  <div class="step-body">
+    <div class="notice notice-teal">Halfway there — you're doing great!</div>
+    <div class="empty-state" id="goalsEmpty">
+      No goals added yet — click <b>+ Add Goal</b> below to get started. This step is optional, but having goals significantly improves your financial health score.
+    </div>
+    <div id="goalsList"></div>
+    <div style="flex-shrink:0;">
+      <button class="btn-add" onclick="addGoal()">+ Add Goal</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── STEP 8: Liabilities ── -->
+<div class="step-panel" id="s8">
+  <div class="step-head">
+    <div class="step-eyebrow">
+      <svg class="step-icon-head" viewBox="0 0 18 18" fill="none"><rect x="1" y="4" width="16" height="11" rx="1.5" stroke="#C4522A" stroke-width="1.3"/><path d="M1 8h16M5 12h3" stroke="#C4522A" stroke-width="1.3" stroke-linecap="round"/></svg>
+      Liabilities <span style="font-size:9px;color:var(--ink-4);font-weight:400;margin-left:4px;">(optional)</span>
+    </div>
+    <div class="step-title">Active loans &amp; cards</div>
+    <div class="step-sub">EMIs, credit cards and any outstanding debt.</div>
+    <div class="step-head-num">08</div>
+  </div>
+  <div class="step-body">
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab(this,'liab-loans','liab-tabs')">Loans</button>
+      <button class="tab-btn" onclick="switchTab(this,'liab-cards','liab-tabs')">Credit Cards</button>
+    </div>
+    <div id="liab-tabs">
+      <div class="tab-panel active" id="liab-loans">
+        <div class="empty-state" id="loansEmpty">No loans added — click <b>+ Add Loan</b> if you have an active loan or EMI.</div>
+        <div id="loansList"></div>
+        <button class="btn-add" onclick="addLoan()" style="margin-top:10px;">+ Add Loan</button>
+      </div>
+      <div class="tab-panel" id="liab-cards">
+        <div class="empty-state">No credit cards added — click <b>+ Add Card</b> if you carry a credit card balance.</div>
+        <button class="btn-add" style="margin-top:10px;">+ Add Card</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── STEP 9: Insurance ── -->
+<div class="step-panel" id="s9">
+  <div class="step-head">
+    <div class="step-eyebrow">
+      <svg class="step-icon-head" viewBox="0 0 18 18" fill="none"><path d="M9 2L3 5v5c0 3.87 2.58 7.5 6 8.5 3.42-1 6-4.63 6-8.5V5L9 2z" stroke="#C4522A" stroke-width="1.3" stroke-linejoin="round"/><path d="M6.5 9.5l2 2 3-3" stroke="#C4522A" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Insurance <span style="font-size:9px;color:var(--ink-4);font-weight:400;margin-left:4px;">(optional)</span>
+    </div>
+    <div class="step-title">Your coverage</div>
+    <div class="step-sub">Evaluate your health and life coverage.</div>
+    <div class="step-head-num">09</div>
+  </div>
+  <div class="step-body">
+    <div class="two-col" style="flex:unset; gap:20px;">
+      <div style="background:#fff; border:1px solid rgba(26,24,20,0.1); border-radius:var(--radius); padding:16px 18px;">
+        <div class="sub-heading" style="margin-bottom:12px;">Health Insurance</div>
+        <div class="field">
+          <div class="field-label">Health Cover Amount <span class="ico-info">i</span></div>
+          <div class="inp-rupee-wrap" style="margin-top:4px;"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+        </div>
+      </div>
+      <div style="background:#fff; border:1px solid rgba(26,24,20,0.1); border-radius:var(--radius); padding:16px 18px;">
+        <div class="sub-heading" style="margin-bottom:12px;">Life Insurance</div>
+        <div class="field">
+          <div class="field-label">Term Cover Amount <span class="ico-info">i</span></div>
+          <div class="inp-rupee-wrap" style="margin-top:4px;"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+        </div>
+      </div>
+    </div>
+    <div class="notice notice-cream">Insurance premiums (health, term, vehicle, etc.) should be included in the annual Insurance Premiums field under the Expenses step.</div>
+  </div>
+</div>
+
+<!-- ── STEP 10: Tax ── -->
+<div class="step-panel" id="s10">
+  <div class="step-head">
+    <div class="step-eyebrow">
+      <svg class="step-icon-head" viewBox="0 0 18 18" fill="none"><rect x="3" y="2" width="12" height="15" rx="1.5" stroke="#C4522A" stroke-width="1.3"/><path d="M6 6h6M6 9h6M6 12h4" stroke="#C4522A" stroke-width="1.3" stroke-linecap="round"/></svg>
+      Tax
+    </div>
+    <div class="step-title">Your tax regime</div>
+    <div class="step-sub">Current tax regime and deductions claimed.</div>
+    <div class="step-head-num">10</div>
+  </div>
+  <div class="step-body">
+    <div class="notice notice-gold"><b>Not sure about tax?</b> Select <em>New Regime</em> below and leave the rest blank — we'll still give you a complete financial plan. Fields below only apply if you're on the Old Regime.</div>
+    <div class="field" style="flex-shrink:0;">
+      <div class="field-label">Current Tax Regime <span class="ico-info">i</span></div>
+      <select class="inp" style="max-width:280px;">
+        <option value="">Select</option>
+        <option>New Regime</option>
+        <option>Old Regime</option>
+      </select>
+    </div>
+    <hr class="divider">
+    <div class="field-grid fg-2">
+      <div class="field">
+        <div class="field-label">80C Used (PPF, ELSS, etc.) <span class="ico-info">i</span></div>
+        <div class="inp-rupee-wrap"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+      </div>
+      <div class="field">
+        <div class="field-label">NPS 80CCD(1B) <span class="ico-info">i</span></div>
+        <div class="inp-rupee-wrap"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+      </div>
+      <div class="field">
+        <div class="field-label">HRA Used <span class="ico-info">i</span></div>
+        <div class="inp-rupee-wrap"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+      </div>
+      <div class="field">
+        <div class="field-label">Home Loan Interest <span class="ico-info">i</span></div>
+        <div class="inp-rupee-wrap"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+      </div>
+      <div class="field">
+        <div class="field-label">Health Insurance 80D <span class="ico-info">i</span></div>
+        <div class="inp-rupee-wrap"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── STEP 11: Nominations & Will ── -->
+<div class="step-panel" id="s11">
+  <div class="step-head">
+    <div class="step-eyebrow">
+      <svg class="step-icon-head" viewBox="0 0 18 18" fill="none"><circle cx="7" cy="6" r="2.5" stroke="#C4522A" stroke-width="1.3"/><path d="M2 15c0-2.76 2.24-5 5-5" stroke="#C4522A" stroke-width="1.3" stroke-linecap="round"/><path d="M13 10l1.5 1.5L17 9" stroke="#C4522A" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="13" cy="14" r="3" stroke="#C4522A" stroke-width="1.3"/></svg>
+      Nominations &amp; Will
+    </div>
+    <div class="step-title">Protecting what's yours</div>
+    <div class="step-sub">Will, nominations and succession plan.</div>
+    <div class="step-head-num">11</div>
+  </div>
+  <div class="step-body">
+    <div class="notice notice-teal">Almost done — just a couple more steps.</div>
+    <div class="notice notice-gold"><b>Don't have a will yet?</b> That's okay — even setting nominees on your bank, demat, insurance, PF, and mutual fund accounts takes just 5 minutes and protects your family from legal delays.</div>
+    <div class="field-grid fg-2" style="flex-shrink:0;">
+      <div class="field">
+        <div class="field-label">Do you have a Will? <span class="ico-info">i</span></div>
+        <select class="inp">
+          <option>No</option>
+          <option>Yes</option>
+          <option>In progress</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="field-label">Nominees set for major accounts? <span class="ico-info">i</span></div>
+        <select class="inp">
+          <option>No</option>
+          <option>Yes — all accounts</option>
+          <option>Yes — some accounts</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="field-label">Number of Nominees Assigned <span class="ico-info">i</span></div>
+        <input type="number" class="inp" value="0" min="0">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── STEP 12: Financial Behavior ── -->
+<div class="step-panel" id="s12">
+  <div class="step-head">
+    <div class="step-eyebrow">
+      <svg class="step-icon-head" viewBox="0 0 18 18" fill="none"><ellipse cx="9" cy="9" rx="7" ry="5.5" stroke="#C4522A" stroke-width="1.3"/><path d="M6 7c1-1.5 5-1.5 6 0M6.5 11c.8.8 4.2.8 5 0" stroke="#C4522A" stroke-width="1.3" stroke-linecap="round"/></svg>
+      Financial Behavior
+    </div>
+    <div class="step-title">Your habits &amp; tendencies</div>
+    <div class="step-sub">Rate each statement 1–5 based on how strongly you agree.</div>
+    <div class="step-head-num">12</div>
+  </div>
+  <div class="step-body">
+    <div class="notice notice-cream" style="flex-shrink:0;"><b>How to answer:</b> 1 = Strongly Disagree &nbsp;·&nbsp; 2 = Disagree &nbsp;·&nbsp; 3 = Neutral &nbsp;·&nbsp; 4 = Agree &nbsp;·&nbsp; 5 = Strongly Agree</div>
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab(this,'beh-spending','beh-tabs')">Spending</button>
+      <button class="tab-btn" onclick="switchTab(this,'beh-investing','beh-tabs')">Investing</button>
+      <button class="tab-btn" onclick="switchTab(this,'beh-mindset','beh-tabs')">Mindset</button>
+    </div>
+    <div id="beh-tabs">
+      <div class="tab-panel active" id="beh-spending">
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div class="field">
+            <div class="field-label" style="margin-bottom:6px;">I review my finances at least once a month <span style="color:var(--terra)">*</span></div>
+            <div class="scale-group">
+              <div class="scale-btn" onclick="pickScale(this,'b1')"><span class="s-num">1</span><span class="s-lbl">Strongly Disagree</span></div>
+              <div class="scale-btn" onclick="pickScale(this,'b1')"><span class="s-num">2</span><span class="s-lbl">Disagree</span></div>
+              <div class="scale-btn active" onclick="pickScale(this,'b1')"><span class="s-num">3</span><span class="s-lbl">Neutral</span></div>
+              <div class="scale-btn" onclick="pickScale(this,'b1')"><span class="s-num">4</span><span class="s-lbl">Agree</span></div>
+              <div class="scale-btn" onclick="pickScale(this,'b1')"><span class="s-num">5</span><span class="s-lbl">Strongly Agree</span></div>
+            </div>
+          </div>
+          <div class="field">
+            <div class="field-label" style="margin-bottom:6px;">I tend to delay important financial decisions <span style="color:var(--terra)">*</span></div>
+            <div class="scale-group">
+              <div class="scale-btn" onclick="pickScale(this,'b2')"><span class="s-num">1</span><span class="s-lbl">Strongly Disagree</span></div>
+              <div class="scale-btn" onclick="pickScale(this,'b2')"><span class="s-num">2</span><span class="s-lbl">Disagree</span></div>
+              <div class="scale-btn active" onclick="pickScale(this,'b2')"><span class="s-num">3</span><span class="s-lbl">Neutral</span></div>
+              <div class="scale-btn" onclick="pickScale(this,'b2')"><span class="s-num">4</span><span class="s-lbl">Agree</span></div>
+              <div class="scale-btn" onclick="pickScale(this,'b2')"><span class="s-num">5</span><span class="s-lbl">Strongly Agree</span></div>
+            </div>
+          </div>
+          <div class="field">
+            <div class="field-label" style="margin-bottom:6px;">I sometimes spend impulsively and regret it later <span style="color:var(--terra)">*</span></div>
+            <div class="scale-group">
+              <div class="scale-btn" onclick="pickScale(this,'b3')"><span class="s-num">1</span><span class="s-lbl">Strongly Disagree</span></div>
+              <div class="scale-btn" onclick="pickScale(this,'b3')"><span class="s-num">2</span><span class="s-lbl">Disagree</span></div>
+              <div class="scale-btn active" onclick="pickScale(this,'b3')"><span class="s-num">3</span><span class="s-lbl">Neutral</span></div>
+              <div class="scale-btn" onclick="pickScale(this,'b3')"><span class="s-num">4</span><span class="s-lbl">Agree</span></div>
+              <div class="scale-btn" onclick="pickScale(this,'b3')"><span class="s-num">5</span><span class="s-lbl">Strongly Agree</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tab-panel" id="beh-investing">
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div class="field">
+            <div class="field-label" style="margin-bottom:6px;">I invest consistently every month <span style="color:var(--terra)">*</span></div>
+            <div class="scale-group">
+              <div class="scale-btn" onclick="pickScale(this,'b4')"><span class="s-num">1</span><span class="s-lbl">Strongly Disagree</span></div>
+              <div class="scale-btn" onclick="pickScale(this,'b4')"><span class="s-num">2</span><span class="s-lbl">Disagree</span></div>
+              <div class="scale-btn active" onclick="pickScale(this,'b4')"><span class="s-num">3</span><span class="s-lbl">Neutral</span></div>
+              <div class="scale-btn" onclick="pickScale(this,'b4')"><span class="s-num">4</span><span class="s-lbl">Agree</span></div>
+              <div class="scale-btn" onclick="pickScale(this,'b4')"><span class="s-num">5</span><span class="s-lbl">Strongly Agree</span></div>
+            </div>
+          </div>
+          <div class="field">
+            <div class="field-label" style="margin-bottom:6px;">I panic-sell investments when the market drops <span style="color:var(--terra)">*</span></div>
+            <div class="scale-group">
+              <div class="scale-btn" onclick="pickScale(this,'b5')"><span class="s-num">1</span><span class="s-lbl">Strongly Disagree</span></div>
+              <div class="scale-btn" onclick="pickScale(this,'b5')"><span class="s-num">2</span><span class="s-lbl">Disagree</span></div>
+              <div class="scale-btn active" onclick="pickScale(this,'b5')"><span class="s-num">3</span><span class="s-lbl">Neutral</span></div>
+              <div class="scale-btn" onclick="pickScale(this,'b5')"><span class="s-num">4</span><span class="s-lbl">Agree</span></div>
+              <div class="scale-btn" onclick="pickScale(this,'b5')"><span class="s-num">5</span><span class="s-lbl">Strongly Agree</span></div>
+            </div>
+          </div>
+          <div class="field">
+            <div class="field-label" style="margin-bottom:6px;">I hold losing investments too long hoping they recover <span style="color:var(--terra)">*</span></div>
+            <div class="scale-group">
+              <div class="scale-btn" onclick="pickScale(this,'b6')"><span class="s-num">1</span><span class="s-lbl">Strongly Disagree</span></div>
+              <div class="scale-btn" onclick="pickScale(this,'b6')"><span class="s-num">2</span><span class="s-lbl">Disagree</span></div>
+              <div class="scale-btn active" onclick="pickScale(this,'b6')"><span class="s-num">3</span><span class="s-lbl">Neutral</span></div>
+              <div class="scale-btn" onclick="pickScale(this,'b6')"><span class="s-num">4</span><span class="s-lbl">Agree</span></div>
+              <div class="scale-btn" onclick="pickScale(this,'b6')"><span class="s-num">5</span><span class="s-lbl">Strongly Agree</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tab-panel" id="beh-mindset">
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div class="field">
+            <div class="field-label" style="margin-bottom:6px;">I understand the investments I hold <span style="color:var(--terra)">*</span></div>
+            <div class="scale-group">
+              <div class="scale-btn" onclick="pickScale(this,'b7')"><span class="s-num">1</span><span class="s-lbl">Strongly Disagree</span></div>
+              <div class="scale-btn" onclick="pickScale(this,'b7')"><span class="s-num">2</span><span class="s-lbl">Disagree</span></div>
+              <div class="scale-btn active" onclick="pickScale(this,'b7')"><span class="s-num">3</span><span class="s-lbl">Neutral</span></div>
+              <div class="scale-btn" onclick="pickScale(this,'b7')"><span class="s-num">4</span><span class="s-lbl">Agree</span></div>
+              <div class="scale-btn" onclick="pickScale(this,'b7')"><span class="s-num">5</span><span class="s-lbl">Strongly Agree</span></div>
+            </div>
+          </div>
+          <div class="field">
+            <div class="field-label" style="margin-bottom:6px;">I have clear financial goals I'm working towards <span style="color:var(--terra)">*</span></div>
+            <div class="scale-group">
+              <div class="scale-btn" onclick="pickScale(this,'b8')"><span class="s-num">1</span><span class="s-lbl">Strongly Disagree</span></div>
+              <div class="scale-btn" onclick="pickScale(this,'b8')"><span class="s-num">2</span><span class="s-lbl">Disagree</span></div>
+              <div class="scale-btn active" onclick="pickScale(this,'b8')"><span class="s-num">3</span><span class="s-lbl">Neutral</span></div>
+              <div class="scale-btn" onclick="pickScale(this,'b8')"><span class="s-num">4</span><span class="s-lbl">Agree</span></div>
+              <div class="scale-btn" onclick="pickScale(this,'b8')"><span class="s-num">5</span><span class="s-lbl">Strongly Agree</span></div>
+            </div>
+          </div>
+          <div class="field">
+            <div class="field-label" style="margin-bottom:6px;">I feel financially anxious or stressed often <span style="color:var(--terra)">*</span></div>
+            <div class="scale-group">
+              <div class="scale-btn" onclick="pickScale(this,'b9')"><span class="s-num">1</span><span class="s-lbl">Strongly Disagree</span></div>
+              <div class="scale-btn" onclick="pickScale(this,'b9')"><span class="s-num">2</span><span class="s-lbl">Disagree</span></div>
+              <div class="scale-btn active" onclick="pickScale(this,'b9')"><span class="s-num">3</span><span class="s-lbl">Neutral</span></div>
+              <div class="scale-btn" onclick="pickScale(this,'b9')"><span class="s-num">4</span><span class="s-lbl">Agree</span></div>
+              <div class="scale-btn" onclick="pickScale(this,'b9')"><span class="s-num">5</span><span class="s-lbl">Strongly Agree</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── STEP 13: Review & Submit ── -->
+<div class="step-panel" id="s13">
+  <div class="step-head">
+    <div class="step-eyebrow">
+      <svg class="step-icon-head" viewBox="0 0 18 18" fill="none"><path d="M9 2L3 5v5c0 3.87 2.58 7.5 6 8.5 3.42-1 6-4.63 6-8.5V5L9 2z" stroke="#C4522A" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 9l2 2 4-4" stroke="#C4522A" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Review &amp; Submit
+    </div>
+    <div class="step-title">Almost there, Pramod</div>
+    <div class="step-sub">Review your answers and generate your financial health report.</div>
+    <div class="step-head-num">13</div>
+  </div>
+  <div class="step-body">
+    <div class="notice notice-teal">All 12 steps complete — your financial profile is ready to analyse.</div>
+    <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:10px; flex-shrink:0;">
+      <div style="background:#fff;border:1px solid rgba(26,24,20,0.09);border-radius:var(--radius);padding:12px 14px;">
+        <div style="font-size:10px;color:var(--ink-4);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.07em;">Profile</div>
+        <div style="font-size:13px;font-weight:500;color:var(--ink);">Pramod Joshi</div>
+        <div style="font-size:11px;color:var(--ink-3);">21 · Mumbai · Salaried</div>
+      </div>
+      <div style="background:#fff;border:1px solid rgba(26,24,20,0.09);border-radius:var(--radius);padding:12px 14px;">
+        <div style="font-size:10px;color:var(--ink-4);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.07em;">Monthly income</div>
+        <div style="font-size:18px;font-weight:500;color:var(--ink);font-family:'Cormorant Garamond',serif;">₹1,00,000</div>
+        <div style="font-size:11px;color:var(--ink-3);">Take-home salary</div>
+      </div>
+      <div style="background:#fff;border:1px solid rgba(26,24,20,0.09);border-radius:var(--radius);padding:12px 14px;">
+        <div style="font-size:10px;color:var(--ink-4);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.07em;">Monthly expenses</div>
+        <div style="font-size:18px;font-weight:500;color:var(--ink);font-family:'Cormorant Garamond',serif;">₹43,000</div>
+        <div style="font-size:11px;color:var(--ink-3);">Combined outflow</div>
+      </div>
+      <div style="background:#fff;border:1px solid rgba(26,24,20,0.09);border-radius:var(--radius);padding:12px 14px;">
+        <div style="font-size:10px;color:var(--ink-4);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.07em;">Net surplus</div>
+        <div style="font-size:18px;font-weight:500;color:#2A5C40;font-family:'Cormorant Garamond',serif;">₹57,000</div>
+        <div style="font-size:11px;color:var(--ink-3);">Available to grow</div>
+      </div>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px; flex-shrink:0;">
+      <div style="background:#fff;border:1px solid rgba(26,24,20,0.09);border-radius:var(--radius);padding:12px 14px;display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:12px;color:var(--ink-2);">Financial Background</span>
+        <span style="font-size:10px;background:var(--teal-bg);color:var(--teal-ink);padding:2px 8px;border-radius:4px;font-weight:500;">Done</span>
+      </div>
+      <div style="background:#fff;border:1px solid rgba(26,24,20,0.09);border-radius:var(--radius);padding:12px 14px;display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:12px;color:var(--ink-2);">Investments</span>
+        <span style="font-size:10px;background:var(--teal-bg);color:var(--teal-ink);padding:2px 8px;border-radius:4px;font-weight:500;">Done</span>
+      </div>
+      <div style="background:#fff;border:1px solid rgba(26,24,20,0.09);border-radius:var(--radius);padding:12px 14px;display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:12px;color:var(--ink-2);">Goals</span>
+        <span style="font-size:10px;background:var(--gold-bg);color:var(--gold-ink);padding:2px 8px;border-radius:4px;font-weight:500;">0 added</span>
+      </div>
+      <div style="background:#fff;border:1px solid rgba(26,24,20,0.09);border-radius:var(--radius);padding:12px 14px;display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:12px;color:var(--ink-2);">Liabilities</span>
+        <span style="font-size:10px;background:var(--teal-bg);color:var(--teal-ink);padding:2px 8px;border-radius:4px;font-weight:500;">Done</span>
+      </div>
+      <div style="background:#fff;border:1px solid rgba(26,24,20,0.09);border-radius:var(--radius);padding:12px 14px;display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:12px;color:var(--ink-2);">Insurance</span>
+        <span style="font-size:10px;background:var(--teal-bg);color:var(--teal-ink);padding:2px 8px;border-radius:4px;font-weight:500;">Done</span>
+      </div>
+      <div style="background:#fff;border:1px solid rgba(26,24,20,0.09);border-radius:var(--radius);padding:12px 14px;display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:12px;color:var(--ink-2);">Nominations &amp; Will</span>
+        <span style="font-size:10px;background:var(--teal-bg);color:var(--teal-ink);padding:2px 8px;border-radius:4px;font-weight:500;">Done</span>
+      </div>
+    </div>
+    <div style="flex-shrink:0;">
+      <button class="btn btn-primary" style="padding:12px 32px;font-size:13px;border-radius:var(--radius);">Generate My Financial Report →</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<!-- ═══ BOTTOM BAR ═══ -->
+<div class="bottombar">
+  <button class="btn btn-ghost" id="btnBack" onclick="goStep(-1)">← Back</button>
+  <button class="btn btn-review" id="btnReview" onclick="goToStep(13)">Go to Review →</button>
+  <button class="btn btn-primary" id="btnNext" onclick="goStep(1)">Next Step →</button>
+</div>
+
+<script>
+const TOTAL = 13;
+const STEPS = [
+  { title:'Profile & Family',     optional:false },
+  { title:'Financial Background', optional:false },
+  { title:'Income',               optional:false },
+  { title:'Expenses',             optional:false },
+  { title:'Assets & Banking',     optional:false },
+  { title:'Investments',          optional:false },
+  { title:'Goals',                optional:true  },
+  { title:'Liabilities',          optional:true  },
+  { title:'Insurance',            optional:true  },
+  { title:'Tax',                  optional:false },
+  { title:'Nominations & Will',   optional:false },
+  { title:'Financial Behavior',   optional:false },
+  { title:'Review & Submit',      optional:false },
+];
+
+let current = 1;
+let completed = new Set();
+let savedTimeout;
+
+function buildSidebar() {
+  const el = document.getElementById('sidebarSteps');
+  el.innerHTML = STEPS.map((s, i) => {
+    const n = i + 1;
+    const isDone = completed.has(n);
+    const isActive = n === current;
+    const isUpcoming = !isDone && !isActive;
+    const bubbleClass = isDone ? 'done' : isActive ? 'current' : 'upcoming';
+    const icon = isDone ? '✓' : n;
+    return `<div class="step-item ${isActive?'active':''} ${isDone?'done':''}" onclick="goToStep(${n})">
+      <div class="step-bubble ${bubbleClass}">${icon}</div>
+      <div class="step-label">
+        <span class="s-title">${s.title}</span>${s.optional?'<span class="s-opt">(optional)</span>':''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function updateTopbar() {
+  const pct = Math.round(((current - 1) / TOTAL) * 100);
+  document.getElementById('tbStepNum').textContent = current;
+  document.getElementById('tbBar').style.width = pct + '%';
+  document.getElementById('tbPct').textContent = pct + '%';
+}
+
+function showSaved() {
+  const el = document.getElementById('tbSaved');
+  el.style.display = 'flex';
+  clearTimeout(savedTimeout);
+  savedTimeout = setTimeout(() => { el.style.display = 'none'; }, 2500);
+}
+
+function updateButtons() {
+  const back = document.getElementById('btnBack');
+  const next = document.getElementById('btnNext');
+  back.classList.toggle('btn-disabled', current === 1);
+  next.textContent = current === TOTAL ? 'Submit' : 'Next Step →';
+}
+
+function updatePanels() {
+  document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('visible'));
+  const panel = document.getElementById('s' + current);
+  if (panel) panel.classList.add('visible');
+}
+
+function render() {
+  buildSidebar();
+  updateTopbar();
+  updateButtons();
+  updatePanels();
+}
+
+function goStep(dir) {
+  if (dir > 0) {
+    completed.add(current);
+    showSaved();
+  }
+  const next = current + dir;
+  if (next < 1 || next > TOTAL) return;
+  current = next;
+  render();
+  window.scrollTo(0,0);
+}
+
+function goToStep(n) {
+  current = n;
+  render();
+}
+
+/* scale buttons */
+function pickScale(btn, group) {
+  btn.closest('.scale-group').querySelectorAll('.scale-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+/* toggle yes/no */
+function toggleBtn(btn) {
+  btn.closest('.toggle-group').querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+/* tab switching */
+function switchTab(btn, panelId, containerId) {
+  const container = document.getElementById(containerId);
+  container.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(panelId).classList.add('active');
+  btn.closest('.tab-bar').querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+/* accordion */
+function toggleAccordion(bodyId, btnId) {
+  const body = document.getElementById(bodyId);
+  const btn  = document.getElementById(btnId);
+  const open = body.classList.toggle('open');
+  btn.classList.toggle('open', open);
+}
+
+/* add goal */
+let goalCount = 0;
+function addGoal() {
+  goalCount++;
+  const empty = document.getElementById('goalsEmpty');
+  if (empty) empty.style.display = 'none';
+  const list = document.getElementById('goalsList');
+  const div = document.createElement('div');
+  div.style.cssText = 'display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:8px;';
+  div.innerHTML = `
+    <div class="field"><div class="field-label">Goal name</div><input type="text" class="inp" placeholder="e.g. Emergency fund"></div>
+    <div class="field"><div class="field-label">Target amount</div><div class="inp-rupee-wrap"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div></div>
+    <div class="field"><div class="field-label">Target year</div><input type="number" class="inp" placeholder="2027" min="2025" max="2055"></div>
+    <button onclick="this.parentElement.remove()" style="height:36px;width:32px;border:1px solid rgba(26,24,20,0.15);border-radius:var(--radius);background:#fff;color:var(--ink-3);cursor:pointer;font-size:14px;flex-shrink:0;">×</button>
+  `;
+  list.appendChild(div);
+}
+
+/* add loan */
+function addLoan() {
+  const empty = document.getElementById('loansEmpty');
+  if (empty) empty.style.display = 'none';
+  const list = document.getElementById('loansList');
+  const div = document.createElement('div');
+  div.style.cssText = 'display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:8px;';
+  div.innerHTML = `
+    <div class="field"><div class="field-label">Loan type</div><select class="inp"><option>Home Loan</option><option>Car Loan</option><option>Personal Loan</option><option>Education Loan</option><option>Credit Card</option><option>Other</option></select></div>
+    <div class="field"><div class="field-label">Outstanding</div><div class="inp-rupee-wrap"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div></div>
+    <div class="field"><div class="field-label">Monthly EMI</div><div class="inp-rupee-wrap"><span class="rupee">₹</span><input type="number" class="inp" placeholder="0"></div></div>
+    <div class="field"><div class="field-label">Interest rate</div><div class="inp-pct-wrap"><input type="number" class="inp" placeholder="0.0" step="0.1"><span class="pct">%</span></div></div>
+    <button onclick="this.parentElement.remove()" style="height:36px;width:32px;border:1px solid rgba(26,24,20,0.15);border-radius:var(--radius);background:#fff;color:var(--ink-3);cursor:pointer;font-size:14px;flex-shrink:0;">×</button>
+  `;
+  list.appendChild(div);
+}
+
+render();
+</script>
+</body>
+</html>

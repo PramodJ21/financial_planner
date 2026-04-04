@@ -118,6 +118,13 @@ function AuthPreviewCard() {
     <div className="ap-right">
       <div className="ap-container">
 
+        {/* ── Example badge ── */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '4px' }}>
+          <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.8px', color: 'var(--ink-soft)', opacity: 0.5, textTransform: 'uppercase' }}>
+            Example
+          </span>
+        </div>
+
         {/* ── Score Ring ── */}
         <div className="ap-score-section">
           <div className="ap-score-ring-wrap">

@@ -17,7 +17,32 @@
       "Bash(awk 'NR>=91 && NR<=182' \"c:\\\\Users\\\\pramo\\\\.gemini\\\\antigravity\\\\playground\\\\spinning-space\\\\frontend_issues.md\")",
       "Bash(\"c:\\\\Users\\\\pramo\\\\.gemini\\\\antigravity\\\\playground\\\\spinning-space\\\\frontend\\\\src\\\\pages\\\\Questionnaire.jsx\")",
       "Bash(grep -n \"\\\\\\\\!\" \"c:\\\\Users\\\\pramo\\\\.gemini\\\\antigravity\\\\playground\\\\spinning-space\\\\frontend\\\\src\\\\pages\\\\Questionnaire.jsx\")",
-      "Bash(wc -l /d/fin_planner/frontend/src/pages/*.jsx)"
+      "Bash(wc -l /d/fin_planner/frontend/src/pages/*.jsx)",
+      "Bash(find /d/fin_planner/frontend/src -type f -name \"*.css\" -exec ls -lh {})",
+      "Bash(notebooklm status:*)",
+      "Bash(notebooklm auth:*)",
+      "Bash(PYTHONIOENCODING=utf-8 notebooklm auth:*)",
+      "Bash(PYTHONIOENCODING=utf-8 notebooklm create:*)",
+      "Bash(PYTHONIOENCODING=utf-8 notebooklm use 9928df8d-7878-47ab-b3e4-301dda1e1bf7)",
+      "Bash(PYTHONIOENCODING=utf-8 notebooklm source add \"D:/fin_planner/books/Personal-Finance-Management-Handbook.pdf\" --json)",
+      "Bash(PYTHONIOENCODING=utf-8 notebooklm source add \"D:/fin_planner/books/Personal-Finance-Management-Handbook.pdf\" --notebook 9928df8d-7878-47ab-b3e4-301dda1e1bf7 --json)",
+      "Bash(PYTHONIOENCODING=utf-8 notebooklm source:*)",
+      "Bash(PYTHONIOENCODING=utf-8 notebooklm list:*)",
+      "Bash(PYTHONIOENCODING=utf-8 notebooklm use:*)",
+      "Bash(PYTHONIOENCODING=utf-8 notebooklm ask \"Give me a comprehensive summary of all 8 books in this notebook. For each book, tell me: 1\\) The core philosophy/thesis, 2\\) Key frameworks or systems it teaches, 3\\) Most important actionable advice, 4\\) How it is relevant to personal finance planning\" --json)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d['answer']\\)\")",
+      "Bash(PYTHONIOENCODING=utf-8 notebooklm ask \"Across all 8 books, what are the common recurring themes and principles? What frameworks or concepts overlap between multiple books? Also, what are the key metrics, ratios, or benchmarks mentioned \\(like emergency fund months, savings rate percentages, debt-to-income ratios, insurance coverage amounts, etc.\\)?\" --json)",
+      "Bash(PYTHONIOENCODING=utf-8 notebooklm ask \"What behavioral biases, psychological traps, and emotional mistakes do these books warn against when it comes to money management? Also what specific strategies do they recommend to overcome these biases?\" --json)",
+      "Bash(PYTHONIOENCODING=utf-8 notebooklm ask \"Verify these specific claims - are they accurately stated based on the sources? 1\\) Ramit Sethi uses 8% as assumed market return. 2\\) Dave Ramsey recommends exactly 15% of before-tax gross income for retirement. 3\\) The Behavior Gap book recommends a 24-hour to 3-day holding period before acting on financial decisions. 4\\) YNAB recommends money be 30-60 days old. 5\\) Saylor textbook says housing should be 33% of gross income. 6\\) Ramsey recommends 20-year term life insurance at 10x income. For each, confirm if accurate or correct what it actually says.\" --json)",
+      "Bash(PYTHONIOENCODING=utf-8 notebooklm ask \"Verify these claims: 1\\) Bogle says corporations historically return 9.5% on capital. 2\\) The PFM Handbook recommends keeping total debt payments below 20% of income. 3\\) Kiyosaki's book mentions Four Areas of Financial IQ: Accounting, Investing, Understanding Markets, and the Law/Corporations. 4\\) Ramsey's Debt Snowball lists debts from smallest to largest balance. 5\\) Rich Dad Poor Dad says the primary residence is a liability not an asset. 6\\) The Behavior Gap book mentions an Urgent vs Important matrix. Confirm accurate or correct.\" --json)",
+      "Bash(PYTHONIOENCODING=utf-8 notebooklm ask \"Verify these claims: 1\\) Ramit Sethi's Conscious Spending Plan divides money into four buckets: fixed costs, savings, investments, and guilt-free spending. 2\\) Sethi recommends managing money in just 90 minutes a month after automation. 3\\) Kiyosaki describes five archetypes/risk levels of investors. 4\\) The PFM Handbook has a 6-Module curriculum. 5\\) Ramsey has exactly 7 Baby Steps. 6\\) Sethi recommends automating finances so savings and investments happen without willpower. Confirm accurate or correct.\" --json)",
+      "Bash(PYTHONIOENCODING=utf-8 notebooklm ask \"What specific, actionable frameworks from these books could be turned into interactive tools or features in a personal finance app? Think about: scoring systems, step-by-step plans, visual frameworks, behavioral nudges, goal-setting systems, budget allocation rules, debt payoff strategies, and investment guidance. Be specific with numbers and frameworks from each book.\" --json)",
+      "Bash(node:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5000/api)",
+      "Bash(pip show:*)",
+      "Bash(python -m playwright install chromium)",
+      "Bash(python crawl.py)"
     ]
   }
 }

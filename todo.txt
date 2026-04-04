@@ -67,3 +67,11 @@ SIP calculator
 Website Names
 Goal Akaar
 Goly
+
+29-03-2026
+color khataktoy
+Not visited question sections color little unreadable
+partial completion of action list items
+same artistic feel for the questionnare section as the dashboard
+Make the dashboard questionnare feel less overwhelming 
+Have different questionnare for students and salaried person

@@ -473,17 +473,6 @@ export function getStrengths(d, fmt) {
         });
     }
 
-    // 8. Estate planning in order
-    const willEstate = d.overview?.willEstate;
-    if (willEstate?.hasWill && willEstate?.nomineesSet === 'Yes') {
-        strengths.push({
-            title: 'Estate Planning',
-            value: 'Will + nominees set',
-            explanation: 'You have a will in place and nominees set on your accounts — your assets are legally protected.',
-            link: '/estate',
-        });
-    }
-
     // 9. Tax-optimized
     const taxRegime = d.tax?.recommended;
     const potentialSavings = d.tax?.potentialSavings ?? 0;
@@ -652,29 +641,6 @@ export function getGaps(d, fmt) {
             explanation: `Switching to the ${taxRegime} could save you ${fmt(potentialSavings)} per year in taxes.`,
             link: '/tax',
             explorePage: 'Tax',
-        });
-    }
-
-    // 8. No will / nominees
-    const willEstate = d.overview?.willEstate;
-    if (willEstate && !willEstate.hasWill) {
-        gaps.push({
-            title: 'No Will',
-            current: willEstate.willInProgress ? 'In progress' : 'Not created',
-            target: 'Create a will',
-            explanation: 'Without a will, your assets are subject to legal delays and intestacy laws. Creating a will is straightforward and protects your family.',
-            link: '/estate',
-            explorePage: 'Estate & Will',
-        });
-    }
-    if (willEstate && willEstate.nomineesSet !== 'Yes') {
-        gaps.push({
-            title: 'Nominees Not Set',
-            current: 'Not configured',
-            target: 'Set nominees on all accounts',
-            explanation: 'Nominees are not set on your financial accounts. Without them, accessing funds after a death requires lengthy legal processes.',
-            link: '/estate',
-            explorePage: 'Estate & Will',
         });
     }
 

@@ -29,6 +29,19 @@ const MONEY_SIGN_TRAITS = {
 };
 
 
+const FBS_DIMENSION_DEFS = [
+    { label: 'Emergency Fund',          breakdownKey: 'emergencyFund',         weightKey: 'emergencyFund',         desc: '3–6 months of expenses in liquid savings' },
+    { label: 'Health Insurance',        breakdownKey: 'healthInsurance',       weightKey: 'healthInsurance',       desc: 'Adequate medical cover relative to income' },
+    { label: 'Life Insurance',          breakdownKey: 'lifeInsurance',         weightKey: 'lifeInsurance',         desc: 'Term cover ≥ 10× annual income (if dependents)' },
+    { label: 'Liability Management',    breakdownKey: 'liabilities',           weightKey: 'liabilityManagement',   desc: 'Debt-to-income ratio and EMI burden' },
+    { label: 'Investment Regularity',   breakdownKey: 'investmentRegularity',  weightKey: 'investmentRegularity',  desc: 'Consistent SIP habit relative to surplus' },
+    { label: 'Goal Clarity',            breakdownKey: 'goalClarity',           weightKey: 'goalClarity',           desc: 'Defined financial goals with a savings plan' },
+    { label: 'Behavioural Tendencies',  breakdownKey: 'behavioralTendencies',  weightKey: 'behavioralTendencies',  desc: 'Emotional discipline and spending control' },
+    { label: 'Tax Literacy',            breakdownKey: 'tax',                   weightKey: 'taxLiteracy',           desc: 'Use of available tax-saving instruments' },
+    { label: 'Asset Diversity',         breakdownKey: 'assetDiversity',        weightKey: 'assetDiversity',        desc: 'Spread across equity, debt, gold, and alternatives' },
+    { label: 'Portfolio Understanding', breakdownKey: 'portfolioUnderstanding',weightKey: 'portfolioUnderstanding',desc: 'Awareness of what you own and its performance' },
+];
+
 /**
  * Derive an expected FBS range for people with similar characteristics.
  * Based on: age group (life stage), annual income band, and risk comfort level.
@@ -45,43 +58,40 @@ const MONEY_SIGN_TRAITS = {
  * (may under-invest), very aggressive → also lower (may over-leverage)
  */
 function getPeerBenchmark(age, annualIncome, riskComfort) {
-    // Base range by age / life stage
+    // Age-based ranges calibrated against the 10-dimension FBS spec.
+    // Reflects realistic completion rates by life stage:
+    //  - Emergency fund, insurance, investment regularity all take time to build
+    //  - Goal clarity and tax literacy improve with age and income experience
+    //  - Asset diversity typically poor until 35+
     let base;
-    if (age < 25)      base = { low: 28, high: 48 };  // Foundation: just starting
-    else if (age < 30) base = { low: 32, high: 52 };  // Early career
-    else if (age < 40) base = { low: 40, high: 60 };  // Establishing
-    else if (age < 50) base = { low: 44, high: 64 };  // Consolidating
-    else if (age < 58) base = { low: 46, high: 66 };  // Peak earning
-    else               base = { low: 42, high: 62 };  // Pre-retirement
+    if (age < 22)       base = { low: 18, high: 34 };  // Just entering workforce — most dimensions near zero
+    else if (age < 25)  base = { low: 24, high: 40 };  // Foundation — health insurance maybe, no SIP habit yet
+    else if (age < 28)  base = { low: 30, high: 46 };  // Early career — first SIP, partial emergency fund
+    else if (age < 32)  base = { low: 36, high: 52 };  // Building — insurance + SIP taking shape
+    else if (age < 38)  base = { low: 42, high: 57 };  // Establishing — goals clearer, liability load rising
+    else if (age < 45)  base = { low: 46, high: 62 };  // Consolidating — peak complexity, most should have basics
+    else if (age < 52)  base = { low: 48, high: 64 };  // Accumulation — tax literacy up, diversity improving
+    else if (age < 58)  base = { low: 46, high: 63 };  // Pre-retirement — preservation focus kicks in
+    else                base = { low: 42, high: 60 };  // Retirement — different priorities, investment regularity drops
 
-    // Income band adjustment (annual)
+    // Income adjustment — higher income means more tools available
+    // (more tax deductions, insurance capacity, SIP room) but kept secondary to age
     let incAdj = 0;
-    if (annualIncome >= 5000000)       incAdj = 8;   // 50L+
-    else if (annualIncome >= 2000000)  incAdj = 5;   // 20–50L
+    if (annualIncome >= 5000000)       incAdj = 6;   // 50L+
+    else if (annualIncome >= 2000000)  incAdj = 4;   // 20–50L
     else if (annualIncome >= 1000000)  incAdj = 2;   // 10–20L
     else if (annualIncome >= 600000)   incAdj = 0;   // 6–10L
-    else if (annualIncome >= 300000)   incAdj = -4;  // 3–6L
-    else                               incAdj = -8;  // <3L
+    else if (annualIncome >= 300000)   incAdj = -3;  // 3–6L
+    else                               incAdj = -6;  // <3L
 
-    // Risk comfort adjustment (1–5 scale)
-    // Very conservative (1–2): likely to under-invest → slight downward
-    // Very aggressive (4–5): likely to over-leverage, skip safety nets → slight downward
-    let riskAdj = 0;
-    if (riskComfort <= 1)      riskAdj = -4;
-    else if (riskComfort <= 2) riskAdj = -2;
-    else if (riskComfort >= 5) riskAdj = -2;
-    else if (riskComfort >= 4) riskAdj = 0;
+    const low  = Math.max(15, Math.min(60, base.low  + incAdj));
+    const high = Math.max(30, Math.min(82, base.high + incAdj));
 
-    const adj = incAdj + riskAdj;
-    const low  = Math.max(20, Math.min(65, base.low  + adj));
-    const high = Math.max(35, Math.min(85, base.high + adj));
-
-    // Descriptive label for the band
     let label;
-    if (high <= 45)       label = 'Still building';
-    else if (high <= 58)  label = 'Mid-stage';
-    else if (high <= 70)  label = 'Well-established';
-    else                  label = 'High-performing';
+    if (high <= 40)      label = 'Still building';
+    else if (high <= 54) label = 'Mid-stage';
+    else if (high <= 66) label = 'Well-established';
+    else                 label = 'High-performing';
 
     return { low, high, label };
 }
@@ -110,10 +120,8 @@ function getJourney(overview, fmtFn) {
     const nwData = overview.netWorth || {};
     const nw = nwData.netWorth ?? (nwData.assets || 0) - (nwData.liabilities || 0);
 
-    // 1. Net Worth
-    if (nwData && (nwData.assets > 0 || nw !== 0)) {
-        steps.push({ type: nw >= 0 ? 'positive' : 'warning', label: 'Net Worth', value: fmtFn(nw), sub: nw >= 0 ? 'Assets exceed liabilities' : 'Liabilities exceed assets' });
-    }
+    // 1. Net Worth — always first
+    steps.push({ type: nw > 0 ? 'positive' : nw < 0 ? 'warning' : 'neutral', label: 'Net Worth', value: nw !== 0 ? fmtFn(nw) : '—', sub: nw > 0 ? 'Assets exceed liabilities' : nw < 0 ? 'Liabilities exceed assets' : 'No data yet' });
 
     // 2. Liabilities
     if (lia && lia.total > 0) {
@@ -142,10 +150,19 @@ function getJourney(overview, fmtFn) {
         steps.push({ type: hasCover ? 'positive' : 'warning', label: 'Insurance', value: hasCover ? 'Covered' : 'No coverage', sub: hasCover ? 'Health or life cover in place' : 'No cover recorded' });
     }
 
-    // 6. Emergency Fund
+    // 6. Emergency Fund — derived from savings + FD balance
     if (em) {
         const actual = em.emergencyFunds?.actual ?? 0;
-        steps.push({ type: actual > 0 ? 'positive' : 'warning', label: 'Emergency Fund', value: actual > 0 ? fmtFn(actual) : 'Not set', sub: actual > 0 ? 'Reserve available' : 'No fund set aside' });
+        const ideal = em.emergencyFunds?.ideal ?? 0;
+        const months = ideal > 0 ? (actual / (ideal / 6)).toFixed(1) : null;
+        steps.push({
+            type: actual > 0 ? 'positive' : 'warning',
+            label: 'Emergency Fund',
+            value: actual > 0 ? fmtFn(actual) : 'Not built',
+            sub: actual > 0
+                ? `${months}mo covered · from savings & FD`
+                : 'Based on savings & FD balance'
+        });
     }
 
     return steps;
@@ -167,12 +184,24 @@ function Dashboard() {
     const [loading, setLoading] = useState(true);
     const [confirmingAction, setConfirmingAction] = useState(null);
     const [showAllGaps, setShowAllGaps] = useState(false);
+    const [showFBSExplainer, setShowFBSExplainer] = useState(false);
 
     useEffect(() => {
         fetchWithAuth('/dashboard/full')
             .then(d => { setData(d); setLoading(false); })
             .catch(() => setLoading(false));
     }, []);
+
+    // Skip stagger animations for returning users within the same session
+    useEffect(() => {
+        if (!data) return;
+        if (sessionStorage.getItem('dashboard_visited')) {
+            document.body.classList.add('animations-disabled');
+        } else {
+            sessionStorage.setItem('dashboard_visited', '1');
+        }
+        return () => document.body.classList.remove('animations-disabled');
+    }, [data]);
 
     // IntersectionObserver for animations + sidebar sync
     useEffect(() => {
@@ -292,11 +321,15 @@ function Dashboard() {
 
     // Profile facts (kept for potential future use)
     const profile = overview.profile || {};
+    const isSelfEmployed = ['self_employed', 'freelancer', 'business'].includes(profile.employmentType);
 
     // Peer benchmark
     const annualIncome = overview.income?.total || 0;
     const riskComfort = profile.riskComfort || 3;
     const peerBenchmark = getPeerBenchmark(userAge, annualIncome, riskComfort);
+
+    // Questionnaire completeness
+    const isQuestionnaireIncomplete = !overview.isCompleted && (overview.stepsCompleted || 0) < 10;
 
     // FBS helpers
     const fbsRatingLabel = fbs >= 81 ? 'Excellent' : fbs >= 61 ? 'Good' : fbs >= 41 ? 'Moderate' : fbs >= 21 ? 'Poor' : 'Critical';
@@ -458,9 +491,10 @@ function Dashboard() {
                     <div className="health-grid">
                         <div className="health-score-col">
                             <div className="score-eyebrow ani d2">Your Score</div>
-                            <div className="score-big ani d3">{fbs}</div>
-                            <div className="score-denom ani d3">/ 100</div>
                             <div className="score-rating ani d3">{fbsRatingLabel}</div>
+                            <div className="ani d4 score-compass-note">
+                                Use as a compass, not a verdict — every gap is fixable.
+                            </div>
                             <div className="donut-wrap ani-scale d4">
                                 <svg width="140" height="140" viewBox="0 0 140 140"
                                     role="img"
@@ -477,10 +511,19 @@ function Dashboard() {
                                     <circle className="d-fill" cx="70" cy="70" r="58"
                                         style={{ '--donut-offset': donutOffset }} />
                                 </svg>
+                                <div className="donut-center">
+                                    <span className="score-big">{fbs}</span>
+                                    <span className="score-denom">/ 100</span>
+                                </div>
                             </div>
                             {potentialPts > 0 && (
                                 <div className="pts-tag ani d4">
                                     <span className="pts-dot" />↑ +{potentialPts} pts achievable
+                                </div>
+                            )}
+                            {isQuestionnaireIncomplete && (
+                                <div className="score-incomplete-note ani d5">
+                                    Score updates as you complete more steps
                                 </div>
                             )}
                         </div>
@@ -534,6 +577,11 @@ function Dashboard() {
                                     <div className="ss-bar-track"><div className="ss-bar-fill" style={{ '--w': `${bPct}%`, '--bar-color': getTierColor(bPct) }} /></div>
                                     <span className="ss-score">{behaviour.score} / {behaviour.max}</span>
                                 </div>
+                                {isSelfEmployed && (
+                                    <div className="fbs-employment-note">
+                                        Variable-income scoring: your investment regularity score uses a 3-month income buffer, reflecting real-world cash flow variability for self-employed earners.
+                                    </div>
+                                )}
                                 <div className="ss-row">
                                     <span className="ss-icon">{TIER_ICONS.Awareness}</span>
                                     <div className="ss-name-group">
@@ -544,8 +592,55 @@ function Dashboard() {
                                     <span className="ss-score">{awareness.score} / {awareness.max}</span>
                                 </div>
                             </div>
+                            <button
+                                className="fbs-explainer-toggle ani d5"
+                                onClick={() => setShowFBSExplainer(v => !v)}
+                                aria-expanded={showFBSExplainer}
+                                type="button"
+                            >
+                                {showFBSExplainer ? 'Hide methodology ↑' : 'How is this calculated? →'}
+                            </button>
+                            {showFBSExplainer && (
+                                <div className="fbs-explainer-panel ani d1">
+                                    <div className="fbs-explainer-title">How your FBS is calculated</div>
+                                    <p className="fbs-explainer-intro">
+                                        9 dimensions across three groups (Foundation, Behaviour, Awareness). Weights
+                                        shift by life stage — younger users get more weight on investment regularity;
+                                        older users on insurance and portfolio understanding.
+                                    </p>
+                                    <table className="fbs-explainer-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Dimension</th>
+                                                <th>What it measures</th>
+                                                <th>Weight</th>
+                                                <th>Your score</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {FBS_DIMENSION_DEFS.map(d => {
+                                                const weight = overview.fbsWeights?.[d.weightKey] ?? '—';
+                                                const score  = overview.fbsBreakdown?.[d.breakdownKey] ?? 0;
+                                                return (
+                                                    <tr key={d.breakdownKey}>
+                                                        <td><strong>{d.label}</strong></td>
+                                                        <td>{d.desc}</td>
+                                                        <td style={{ textAlign: 'right' }}>{weight}</td>
+                                                        <td style={{ textAlign: 'right' }}>{score} / {weight}</td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
                             <div className="health-insight ani d5">
-                                {fbsCtx.message}
+                                {isQuestionnaireIncomplete && fbs < 40 ? (
+                                    <>
+                                        Your score reflects partial data — complete remaining steps for an accurate picture.{' '}
+                                        <Link to="/questionnaire" className="health-insight-cta">Continue questionnaire →</Link>
+                                    </>
+                                ) : fbsCtx.message}
                             </div>
                         </div>
                     </div>
@@ -737,7 +832,7 @@ function Dashboard() {
                                                 </div>
                                             ) : (
                                                 <button className="act-cta" aria-label={`Mark "${action.title}" as done`} onClick={() => setConfirmingAction(action.title)}>
-                                                    {link.label === 'Mark as done →' ? 'Done →' : link.label}
+                                                    {link.label === 'Mark as done →' ? 'Mark done' : link.label}
                                                 </button>
                                             )}
                                         </div>

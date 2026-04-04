@@ -6,15 +6,15 @@ const router = express.Router();
 
 // Column mapping for each step
 const STEP_COLUMNS = {
-    1: ['date_of_birth', 'city', 'marital_status', 'dependents', 'employment_type', 'risk_comfort', 'investment_experience', 'gen_q1', 'gen_q5', 'gen_q9'],
+    1: ['date_of_birth', 'city', 'marital_status', 'dependents', 'employment_type', 'income_type', 'months_employed', 'risk_comfort', 'investment_experience', 'gen_q1', 'gen_q5', 'gen_q9'],
     2: ['monthly_take_home', 'annual_salary', 'business_income', 'annual_bonus', 'other_income', 'expected_income_growth'],
-    3: ['expense_household', 'expense_rent', 'expense_utilities', 'expense_transport', 'expense_food', 'expense_subscriptions', 'expense_insurance', 'expense_discretionary'],
-    4: ['savings_balance', 'fd_balance', 'fd_rate', 'emergency_fund', 'monthly_surplus'],
-    5: ['inv_direct_stocks', 'inv_equity_mf', 'inv_monthly_sip', 'inv_epf_ppf_nps', 'inv_debt_funds', 'inv_gold_commodities', 'inv_real_estate', 'inv_crypto_alt', 'inv_num_mutual_funds', 'sip_consecutive_months'],
-    6: ['loans', 'credit_cards', 'credit_score'],
-    7: ['health_cover', 'life_cover'],
-    8: ['tax_regime', 'tax_80c_used', 'tax_nps_80ccd', 'tax_hra', 'tax_home_loan_interest', 'tax_80d'],
-    9: ['has_will', 'nominees_set', 'num_nominees'],
+    3: ['expense_household', 'expense_rent', 'expense_utilities', 'expense_transport', 'expense_food', 'expense_subscriptions', 'expense_discretionary', 'expense_annual_insurance', 'expense_annual_education', 'expense_annual_property', 'expense_annual_travel', 'expense_annual_other'],
+    4: ['savings_balance', 'fd_balance', 'fd_rate'],
+    5: ['questionnaire_goals'],
+    6: ['inv_direct_stocks', 'inv_equity_mf', 'inv_monthly_sip', 'inv_epf_ppf_nps', 'inv_debt_funds', 'inv_gold_commodities', 'inv_real_estate', 'inv_crypto_alt', 'sip_consecutive_months'],
+    7: ['loans', 'credit_cards', 'credit_score'],
+    8: ['health_cover', 'health_premium', 'life_cover', 'life_premium'],
+    9: ['tax_regime', 'tax_80c_used', 'tax_nps_80ccd', 'tax_hra', 'tax_home_loan_interest', 'tax_80d'],
     10: ['beh_delay_decisions', 'beh_spend_impulsively', 'beh_review_monthly', 'beh_avoid_debt', 'beh_hold_losing', 'beh_compare_peers', 'beh_market_reaction', 'beh_windfall_behaviour', 'beh_product_understanding', 'beh_prefer_guaranteed', 'beh_follow_market_news', 'beh_anxious_decisions', 'beh_familiar_brands']
 };
 
@@ -54,6 +54,17 @@ router.put('/step/:step', auth, async (req, res) => {
                 // JSONB columns need explicit stringification
                 if (col === 'loans' || col === 'gen_q6_selections' || col === 'credit_cards') {
                     values.push(JSON.stringify(data[col]));
+                } else if (col === 'questionnaire_goals') {
+                    const goals = Array.isArray(data[col]) ? data[col] : [];
+                    const normalized = goals.map(g => ({
+                        name: g.name || '',
+                        target: Number(g.target) || 0,
+                        years: Number(g.years) || 0,
+                        is_saving: g.isSaving || g.is_saving || 'no',
+                        priority_weight: Number(g.priorityWeight || g.priority_weight) || 3,
+                        monthly_sip: Number(g.monthlySip || g.monthly_sip) || 0,
+                    }));
+                    values.push(JSON.stringify(normalized));
                 } else {
                     values.push(data[col]);
                 }

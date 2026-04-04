@@ -1,9 +1,11 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { fetchWithAuth } from '../api';
 import { Download, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import '../styles/reports.css';
 import { fmtFull as fmt } from '../utils/formatCurrency';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const PRIORITY_ORDER = ['critical', 'high', 'medium', 'low'];
 const PRIORITY_LABELS = {
@@ -17,9 +19,7 @@ function Reports() {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [expandedItems, setExpandedItems] = useState({});
-    const [showReport, setShowReport] = useState(false);
     const [error, setError] = useState('');
-    const reportRef = useRef(null);
 
     useEffect(() => {
         fetchWithAuth('/dashboard/full').then(setData).finally(() => setLoading(false));
@@ -80,57 +80,103 @@ function Reports() {
         grouped[key].push({ ...a, _idx: idx });
     });
 
-    /* R4/R5: Download report with app fonts and warm palette colors */
     const downloadReport = () => {
-        setShowReport(true);
-        setTimeout(() => {
-            if (!reportRef.current) return;
-            const html = reportRef.current.innerHTML;
-            const fullHtml = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Financial Action Plan Report - FinHealth</title>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=DM+Mono:wght@300;400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Inter', sans-serif; color: #1C1A17; line-height: 1.6; background: #fff; padding: 40px; max-width: 800px; margin: 0 auto; }
-h1 { font-family: 'Outfit', sans-serif; font-size: 22px; font-weight: 700; margin-bottom: 4px; }
-h2 { font-size: 16px; font-weight: 700; margin: 32px 0 16px; padding-bottom: 8px; border-bottom: 1px solid #EDE7DC; }
-h3 { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
-p { font-size: 13px; color: #6B6760; margin-bottom: 8px; }
-.subtitle { font-size: 12px; color: #6B6760; margin-bottom: 24px; }
-.summary-row { display: flex; gap: 24px; margin-bottom: 24px; }
-.summary-card { flex: 1; border: 1px solid #EDE7DC; border-radius: 8px; padding: 16px; }
-.summary-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #6B6760; font-weight: 600; margin-bottom: 4px; }
-.summary-value { font-family: 'DM Mono', monospace; font-size: 20px; font-weight: 700; }
-.section-title { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin: 28px 0 12px; padding-bottom: 8px; border-bottom: 1px solid #EDE7DC; }
-.item { padding: 12px 0; border-bottom: 1px solid #F7F4EF; }
-.item-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
-.item-desc { font-size: 12px; color: #6B6760; line-height: 1.6; }
-.item-meta { display: flex; gap: 24px; margin-top: 8px; }
-.meta-label { font-size: 10px; text-transform: uppercase; color: #C4BFB8; font-weight: 600; }
-.meta-value { font-size: 13px; font-weight: 600; }
-.category-tag { font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; color: #6B6760; font-weight: 600; }
-.footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #EDE7DC; font-size: 11px; color: #C4BFB8; text-align: center; }
-.disclaimer { margin-top: 24px; padding: 16px; border: 1px solid #EDE7DC; border-radius: 8px; font-size: 11px; color: #6B6760; line-height: 1.6; }
-@media print { body { padding: 20px; } }
-</style>
-</head>
-<body>${html}</body>
-</html>`;
-            const blob = new Blob([fullHtml], { type: 'text/html' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `FinHealth_Action_Plan_${new Date().toISOString().slice(0, 10)}.html`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            setShowReport(false);
-        }, 100);
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const userName = data.user?.fullName || 'Client';
+        const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const margin = 18;
+        let y = 18;
+
+        // ── Header ──
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(18);
+        doc.setTextColor(28, 26, 23);
+        doc.text('FinHealth — Financial Action Plan', margin, y);
+        y += 8;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(107, 103, 96);
+        doc.text(`Prepared for ${userName} · ${dateStr}`, margin, y);
+        y += 12;
+
+        // ── Summary row ──
+        autoTable(doc, {
+            startY: y,
+            margin: { left: margin, right: margin },
+            head: [['FBS Score', 'Progress', 'Total Action Items']],
+            body: [[
+                `${fbs} / 100`,
+                `${progressPct}% (${completedCount} of ${totalCount} completed)`,
+                `${totalCount} (${actionPlan.filter(a => a.status !== 'completed').length} pending)`,
+            ]],
+            styles: { fontSize: 11, cellPadding: 5, halign: 'center' },
+            headStyles: { fillColor: [28, 26, 23], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+            theme: 'grid',
+        });
+        y = doc.lastAutoTable.finalY + 12;
+
+        // ── Priority sections ──
+        const URGENCY_COLORS = {
+            critical: [201, 64, 64],
+            high:     [196, 112, 58],
+            medium:   [74, 124, 89],
+            low:      [107, 103, 96],
+        };
+
+        PRIORITY_ORDER.forEach(urgency => {
+            const items = grouped[urgency];
+            if (!items || items.length === 0) return;
+
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(11);
+            const [r, g, b] = URGENCY_COLORS[urgency] || [28, 26, 23];
+            doc.setTextColor(r, g, b);
+            doc.text(PRIORITY_LABELS[urgency].toUpperCase(), margin, y);
+            y += 6;
+
+            const tableBody = items.map(action => [
+                action.category || '',
+                action.title,
+                action.fbsImpact > 0 ? `+${action.fbsImpact} pts` : '—',
+                action.suggestedAmount > 0 ? fmt(action.suggestedAmount) : '—',
+                action.status === 'completed' ? 'Done' : 'Pending',
+            ]);
+
+            autoTable(doc, {
+                startY: y,
+                margin: { left: margin, right: margin },
+                head: [['Category', 'Action', 'FBS Impact', 'Amount', 'Status']],
+                body: tableBody,
+                styles: { fontSize: 9, cellPadding: 4, overflow: 'linebreak' },
+                headStyles: { fillColor: [237, 231, 220], textColor: [28, 26, 23], fontStyle: 'bold' },
+                columnStyles: {
+                    0: { cellWidth: 28 },
+                    1: { cellWidth: 'auto' },
+                    2: { cellWidth: 22, halign: 'center' },
+                    3: { cellWidth: 28, halign: 'right' },
+                    4: { cellWidth: 18, halign: 'center' },
+                },
+                theme: 'striped',
+                alternateRowStyles: { fillColor: [250, 248, 245] },
+                didParseCell: (hookData) => {
+                    if (hookData.column.index === 4 && hookData.cell.raw === 'Done') {
+                        hookData.cell.styles.textColor = [74, 124, 89];
+                    }
+                },
+            });
+            y = doc.lastAutoTable.finalY + 10;
+        });
+
+        // ── Disclaimer ──
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(160, 155, 148);
+        const disclaimer = 'This action plan is for informational purposes only and does not constitute financial, investment, tax, or legal advice. Consult a qualified professional before making any financial decisions.';
+        const lines = doc.splitTextToSize(disclaimer, pageWidth - margin * 2);
+        doc.text(lines, margin, y + 6);
+
+        doc.save(`FinHealth_Action_Plan_${new Date().toISOString().slice(0, 10)}.pdf`);
     };
 
     return (
@@ -265,79 +311,6 @@ p { font-size: 13px; color: #6B6760; margin-bottom: 8px; }
                 </div>
             </div>
 
-            {/* Hidden report for download */}
-            {showReport && (
-                <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
-                    <div ref={reportRef}>
-                        <h1>Financial Action Plan</h1>
-                        <p className="subtitle">
-                            Prepared on {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })} · {data.profile?.full_name || 'Client'}
-                        </p>
-                        <div className="summary-row">
-                            <div className="summary-card">
-                                <div className="summary-label">FBS Score</div>
-                                <div className="summary-value">{fbs}/100</div>
-                            </div>
-                            <div className="summary-card">
-                                <div className="summary-label">Progress</div>
-                                <div className="summary-value">{progressPct}%</div>
-                                <div style={{ fontSize: '11px', color: '#C4BFB8', marginTop: '4px' }}>{completedCount} of {totalCount} completed</div>
-                            </div>
-                            <div className="summary-card">
-                                <div className="summary-label">Action Items</div>
-                                <div className="summary-value">{totalCount}</div>
-                                <div style={{ fontSize: '11px', color: '#C4BFB8', marginTop: '4px' }}>{actionPlan.filter(a => a.status !== 'completed').length} pending</div>
-                            </div>
-                        </div>
-
-                        {PRIORITY_ORDER.map(urgency => {
-                            const items = grouped[urgency];
-                            if (!items || items.length === 0) return null;
-                            return (
-                                <div key={urgency}>
-                                    <div className="section-title">{PRIORITY_LABELS[urgency]}</div>
-                                    {items.map((action) => (
-                                        <div key={action._idx} className="item">
-                                            <div className="category-tag">{action.category}</div>
-                                            <div className="item-title">
-                                                {action.status === 'completed' ? '✓ ' : ''}{action.title}
-                                            </div>
-                                            <div className="item-desc">{action.description}</div>
-                                            <div className="item-meta">
-                                                {action.suggestedAmount > 0 && (
-                                                    <div>
-                                                        <div className="meta-label">Target Amount</div>
-                                                        <div className="meta-value">{fmt(action.suggestedAmount)}</div>
-                                                    </div>
-                                                )}
-                                                {action.monthlyContribution > 0 && (
-                                                    <div>
-                                                        <div className="meta-label">Monthly</div>
-                                                        <div className="meta-value">{fmt(action.monthlyContribution)}</div>
-                                                    </div>
-                                                )}
-                                                {action.currentPercent !== undefined && (
-                                                    <div>
-                                                        <div className="meta-label">Allocation</div>
-                                                        <div className="meta-value">{action.currentPercent}% → {action.idealPercent}%</div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            );
-                        })}
-
-                        <div className="disclaimer">
-                            <strong>Disclaimer:</strong> This action plan is generated based on the financial data provided and is for informational purposes only. It does not constitute financial, investment, tax, or legal advice. Please consult a qualified financial advisor, tax consultant, or legal professional before making any financial decisions.
-                        </div>
-                        <div className="footer">
-                            Generated by FinHealth · {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

@@ -8,7 +8,7 @@ const router = express.Router();
 router.get('/', auth, async (req, res) => {
     try {
         const result = await pool.query(
-            'SELECT client_id, name, target, years, risk_level, include_inflation, equity_alloc, debt_alloc, commodity_alloc, equity_return, debt_return, commodity_return, priority_weight, is_saving FROM user_goals WHERE user_id = $1 ORDER BY created_at ASC',
+            'SELECT client_id, name, target, years, risk_level, include_inflation, equity_alloc, debt_alloc, commodity_alloc, equity_return, debt_return, commodity_return, priority_weight, is_saving, monthly_sip FROM user_goals WHERE user_id = $1 ORDER BY created_at ASC',
             [req.userId]
         );
         // Map back to frontend expected format
@@ -26,7 +26,8 @@ router.get('/', auth, async (req, res) => {
             customDebtReturn: row.debt_return ? parseFloat(row.debt_return) : null,
             customCommodityReturn: row.commodity_return ? parseFloat(row.commodity_return) : null,
             priorityWeight: row.priority_weight ?? 3,
-            isSaving: row.is_saving || 'no'
+            isSaving: row.is_saving || 'no',
+            monthlySip: row.monthly_sip ? parseFloat(row.monthly_sip) : 0
         }));
         res.json(goals);
     } catch (err) {
@@ -55,9 +56,9 @@ router.post('/', auth, async (req, res) => {
                 INSERT INTO user_goals (
                     user_id, client_id, name, target, years, risk_level, include_inflation,
                     equity_alloc, debt_alloc, commodity_alloc, equity_return, debt_return, commodity_return,
-                    priority_weight, is_saving
+                    priority_weight, is_saving, monthly_sip
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
             `;
             for (const goal of goals) {
                 await client.query(insertQuery, [
@@ -75,7 +76,8 @@ router.post('/', auth, async (req, res) => {
                     goal.customDebtReturn,
                     goal.customCommodityReturn,
                     goal.priorityWeight ?? 3,
-                    goal.isSaving || 'no'
+                    goal.isSaving || 'no',
+                    goal.monthlySip ?? 0
                 ]);
             }
         }

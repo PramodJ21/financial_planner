@@ -1,70 +1,86 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchWithAuth } from '../api';
-import { Check, ChevronRight, Info, Plus, Trash2 } from 'lucide-react';
+import { Check, ChevronRight, ChevronDown, Info, Plus, Trash2, User, BookOpen, Wallet, Receipt, Landmark, TrendingUp, Target, CreditCard, ShieldCheck, FileText, Users, Brain, CheckCircle2 } from 'lucide-react';
 import { formatINR } from '../utils/format';
 
 const STEPS = [
-    { id: 1, name: 'Profile & Family', short: 'Tell us about yourself so we can personalize your plan.' },
-    { id: 2, name: 'Financial Background', short: 'Your family\'s financial history helps us understand your starting point.' },
-    { id: 3, name: 'Income', short: 'Assess savings potential and income streams.' },
-    { id: 4, name: 'Expenses', short: 'Understand your cash flow and spending patterns.' },
-    { id: 5, name: 'Assets & Banking', short: 'Your cash reserves and banking holdings.' },
-    { id: 6, name: 'Investments', short: 'Your investment portfolio breakdown.' },
-    { id: 7, name: 'Goals', short: 'What are you saving or investing towards?', optional: true },
-    { id: 8, name: 'Liabilities', short: 'Active loans, EMIs and credit cards.', optional: true },
-    { id: 9, name: 'Insurance', short: 'Evaluate your health and life coverage.', optional: true },
-    { id: 10, name: 'Tax', short: 'Current tax regime and deductions claimed.' },
-    { id: 11, name: 'Nominations & Will', short: 'Will, nominations and succession plan.' },
-    { id: 12, name: 'Financial Behavior', short: 'Your habits and investment tendencies.' },
-    { id: 13, name: 'Review & Submit', short: 'Check your answers before we generate your dashboard.' },
+    { id: 1,  name: 'Profile & Family',     display: 'Tell us about yourself',          short: 'Help us personalize your financial plan.' },
+    { id: 2,  name: 'Financial Background', display: 'Your financial roots',             short: 'Your family\'s financial history helps us understand your starting point.' },
+    { id: 3,  name: 'Income',               display: 'What do you earn?',               short: 'Assess your savings potential and income streams.' },
+    { id: 4,  name: 'Expenses',             display: 'Where does your money go?',       short: 'Understand your cash flow and spending patterns.' },
+    { id: 5,  name: 'Assets & Banking',     display: 'What do you own?',                short: 'Your cash reserves and banking holdings.' },
+    { id: 6,  name: 'Goals',                display: 'Your financial goals',            short: 'What are you saving or investing towards?', optional: true },
+    { id: 7,  name: 'Investments',          display: 'Your investment portfolio',       short: 'Tell us about your current investments.' },
+    { id: 8,  name: 'Liabilities',          display: 'Your outstanding debts',         short: 'Active loans, EMIs, and credit cards.', optional: true },
+    { id: 9,  name: 'Insurance',            display: 'Your insurance coverage',         short: 'Evaluate your health and life coverage.', optional: true },
+    { id: 10, name: 'Tax',                  display: 'Your tax situation',              short: 'Current tax regime and deductions claimed.' },
+    { id: 11, name: 'Financial Behavior',   display: 'How you think about money',      short: 'Your habits and investment tendencies.' },
+    { id: 12, name: 'Review & Submit',      display: null,                              short: 'Check your answers before we generate your dashboard.' },
 ];
 
-// Maps frontend step number (1–13) to backend step number (1–10).
-// Steps 1 and 2 both save to backend step 1. Step 7 (Goals) saves via POST /goals. Step 13 (review) has no save.
-const BACKEND_STEP = [null, 1, 1, 2, 3, 4, 5, 'goals', 6, 7, 8, 9, 10, null];
-const TOTAL_STEPS = 13;
+// Maps frontend step number (1–12) to backend step number (1–10).
+// Steps 1 and 2 both save to backend step 1. Step 12 (review) has no save.
+const BACKEND_STEP = [null, 1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, null];
+const TOTAL_STEPS = 12;
 
 
 function Questionnaire() {
     const [currentStep, setCurrentStep] = useState(1);
+    const [stepVisible, setStepVisible] = useState(false);
     const [formData, setFormData] = useState({});
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [saveFeedback, setSaveFeedback] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [userName, setUserName] = useState('');
     const navigate = useNavigate();
 
     useEffect(() => { loadProfile(); }, []);
 
     const [userGoals, setUserGoals] = useState([]);
 
+    // ── Centralised step navigation (animates out → in) ──
+    const navigateToStep = (n) => {
+        setStepVisible(false);
+        setTimeout(() => { setCurrentStep(n); setStepVisible(true); }, 250);
+    };
+
     const loadProfile = async () => {
         try {
-            const [data, goalsData] = await Promise.all([
+            const [data, meData] = await Promise.all([
                 fetchWithAuth('/questionnaire'),
-                fetchWithAuth('/goals').catch(() => [])
+                fetchWithAuth('/auth/me').catch(() => null)
             ]);
             setFormData(data || {});
-            setUserGoals(Array.isArray(goalsData) ? goalsData : []);
+            // Load questionnaire goals from profile (separate from Goal Planner's user_goals)
+            const qGoals = Array.isArray(data?.questionnaire_goals)
+                ? data.questionnaire_goals.map((g, i) => ({
+                    id: `goal_${Date.now()}_${i}`,
+                    name: g.name || '',
+                    target: g.target || 0,
+                    years: g.years || 0,
+                    isSaving: g.is_saving || 'no',
+                    priorityWeight: g.priority_weight || 3,
+                    monthlySip: g.monthly_sip || 0,
+                }))
+                : [];
+            setUserGoals(qGoals);
+            if (meData && meData.full_name) setUserName(meData.full_name);
             const dbStep = data.current_step || 1;
-            // DB step 2 is ambiguous: could be "finished profile, not gen wealth yet" OR "finished gen wealth"
-            // Check gen_q1 to distinguish — if filled, gen wealth was completed
-            // Frontend has 13 steps; backend has 10. Steps 1-2 map to backend 1, step 7 (Goals) is separate.
-            // After backend step 5 (investments), frontend inserts Goals step before continuing to backend step 6.
+            // Frontend has 13 steps; backend has 11.
+            // Steps 1+2 both map to backend step 1. All others are backend step + 1.
             let frontendStep;
             if (dbStep <= 1) {
                 frontendStep = 1;
             } else if (dbStep === 2) {
                 frontendStep = data.gen_q1 ? 3 : 2;
-            } else if (dbStep <= 5) {
-                frontendStep = dbStep + 1; // offset for the extra gen wealth step
             } else {
-                frontendStep = dbStep + 2; // offset for gen wealth step + goals step
+                frontendStep = dbStep + 1; // +1 offset for the extra gen wealth step
             }
             setCurrentStep(Math.min(frontendStep, TOTAL_STEPS));
         } catch (err) { console.error('Failed to load profile', err); }
-        finally { setLoading(false); }
+        finally { setLoading(false); setStepVisible(true); }
     };
 
     const handleInputChange = (e) => {
@@ -76,25 +92,13 @@ function Questionnaire() {
         setSaving(true);
         const backendStep = BACKEND_STEP[frontendStep];
         try {
-            if (backendStep === 'goals') {
-                // Goals step saves to /goals endpoint, not /questionnaire
-                const goalsToSave = userGoals.map(g => ({
-                    id: g.id,
-                    name: g.name,
-                    target: g.target || 0,
-                    years: g.years || 0,
-                    riskLevel: g.riskLevel || '3',
-                    includeInflation: g.includeInflation ?? true,
-                    customEquityAlloc: g.customEquityAlloc || null,
-                    customDebtAlloc: g.customDebtAlloc || null,
-                    customCommodityAlloc: g.customCommodityAlloc || null,
-                    customEquityReturn: g.customEquityReturn || null,
-                    customDebtReturn: g.customDebtReturn || null,
-                    customCommodityReturn: g.customCommodityReturn || null,
-                    priorityWeight: g.priorityWeight ?? 3,
-                    isSaving: g.isSaving || 'no',
-                }));
-                await fetchWithAuth('/goals', { method: 'POST', body: JSON.stringify({ goals: goalsToSave }) });
+            if (backendStep === 5) {
+                // Goals step saves to questionnaire_goals in financial_profiles
+                const data = await fetchWithAuth(`/questionnaire/step/5`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ questionnaire_goals: userGoals })
+                });
+                setFormData(data);
             } else {
                 const data = await fetchWithAuth(`/questionnaire/step/${backendStep}`, { method: 'PUT', body: JSON.stringify(formData) });
                 setFormData(data);
@@ -102,7 +106,7 @@ function Questionnaire() {
             if (isFinal) {
                 navigate('/dashboard');
             } else {
-                setCurrentStep(s => Math.min(s + 1, TOTAL_STEPS));
+                navigateToStep(Math.min(frontendStep + 1, TOTAL_STEPS));
                 setSaveFeedback(true);
                 setTimeout(() => setSaveFeedback(false), 2000);
             }
@@ -113,10 +117,10 @@ function Questionnaire() {
     // Compute Next button disabled reason based on current step validation
     const getNextDisabledReason = () => {
         if (saving) return null; // saving state handled separately
-        if (BACKEND_STEP[currentStep] === 'goals') {
+        if (BACKEND_STEP[currentStep] === 5) { // Goals step
             if (userGoals.some(g => !g.name || !g.name.trim())) return 'Enter a name for each goal before continuing';
         }
-        if (BACKEND_STEP[currentStep] === 6) { // Liabilities step
+        if (BACKEND_STEP[currentStep] === 7) { // Liabilities step
             const loans = Array.isArray(formData.loans) ? formData.loans : [];
             const cards = Array.isArray(formData.credit_cards) ? formData.credit_cards : [];
             if (loans.some(l => !l.type || !l.outstanding || !l.emi)) return 'Fill in the outstanding amount and EMI for each loan';
@@ -147,23 +151,19 @@ function Questionnaire() {
         if (!backendStep) { setCurrentStep(TOTAL_STEPS); return; }
         setSaving(true);
         try {
-            if (backendStep === 'goals') {
-                const goalsToSave = userGoals.map(g => ({
-                    id: g.id, name: g.name, target: g.target || 0, years: g.years || 0,
-                    riskLevel: g.riskLevel || '3', includeInflation: g.includeInflation ?? true,
-                    customEquityAlloc: g.customEquityAlloc || null, customDebtAlloc: g.customDebtAlloc || null,
-                    customCommodityAlloc: g.customCommodityAlloc || null, customEquityReturn: g.customEquityReturn || null,
-                    customDebtReturn: g.customDebtReturn || null, customCommodityReturn: g.customCommodityReturn || null,
-                    priorityWeight: g.priorityWeight ?? 3, isSaving: g.isSaving || 'no',
-                }));
-                await fetchWithAuth('/goals', { method: 'POST', body: JSON.stringify({ goals: goalsToSave }) });
+            if (backendStep === 5) {
+                const data = await fetchWithAuth(`/questionnaire/step/5`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ questionnaire_goals: userGoals })
+                });
+                setFormData(data);
             } else {
                 const data = await fetchWithAuth(`/questionnaire/step/${backendStep}`, { method: 'PUT', body: JSON.stringify(formData) });
                 setFormData(data);
             }
             setSaveFeedback(true);
             setTimeout(() => setSaveFeedback(false), 2000);
-            setCurrentStep(TOTAL_STEPS);
+            navigateToStep(TOTAL_STEPS);
         } catch { alert('Failed to save. Please try again.'); }
         finally { setSaving(false); }
     };
@@ -185,10 +185,10 @@ function Questionnaire() {
                 <button className="qn-sidebar-close" onClick={() => setSidebarOpen(false)} aria-label="Close menu" type="button">✕</button>
                 {/* Brand */}
                 <div className="sidebar-brand" style={{ marginBottom: '32px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div className="sidebar-brand-mark" style={{ width: '32px', height: '32px', background: '#1C1A17', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div className="sidebar-brand-mark" style={{ width: '32px', height: '32px', background: '#C4703A', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <span style={{ fontFamily: "var(--font-heading)", fontSize: '13px', color: '#F7F4EF', fontWeight: 600 }}>FH</span>
                     </div>
-                    <div className="sidebar-brand-name" style={{ fontFamily: "var(--font-heading)", fontSize: '18px', fontWeight: 600, color: '#1C1A17' }}>FinHealth</div>
+                    <div className="sidebar-brand-name" style={{ fontFamily: "var(--font-heading)", fontSize: '18px', fontWeight: 600, color: '#F7F4EF' }}>FinHealth</div>
                 </div>
 
                 {/* Step List */}
@@ -209,7 +209,7 @@ function Questionnaire() {
                             <button
                                 key={step.id}
                                 className="qn-step-item"
-                                onClick={() => { if (isCompleted) { setCurrentStep(step.id); setSidebarOpen(false); } }}
+                                onClick={() => { if (isCompleted) { navigateToStep(step.id); setSidebarOpen(false); } }}
                                 disabled={!isCompleted && !isActive}
                                 type="button"
                             >
@@ -223,6 +223,7 @@ function Questionnaire() {
                                     )}
                                 </div>
                                 <span className={labelClass}>
+                                    <span className="qn-sidebar-step-icon"><StepIcon stepId={step.id} size={13} /></span>
                                     {String(step.id).padStart(2, '0')} {step.name}
                                     {step.optional && <span style={{ fontSize: '10px', fontWeight: 400, color: 'var(--ink-ghost)', marginLeft: '4px' }}>(optional)</span>}
                                 </span>
@@ -233,7 +234,7 @@ function Questionnaire() {
             </div>
 
             {/* ─── MAIN CONTENT AREA ─── */}
-            <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflowY: 'auto', flex: 1 }}>
+            <div className="qn-main-wrap" data-step={currentStep}>
                 {/* Top Progress Bar + Surplus Tracker (sticky) */}
                 <div className="qn-sticky-header">
                     <div className="qn-progress-bar-wrap">
@@ -249,65 +250,75 @@ function Questionnaire() {
                         <span className="qn-progress-pct">{currentStep === TOTAL_STEPS ? 100 : Math.round(((currentStep - 1) / (TOTAL_STEPS - 1)) * 100)}%</span>
                         {saveFeedback && <span className="qn-saved-indicator">✓ Saved</span>}
                     </div>
-                    <SurplusTracker formData={formData} currentStep={currentStep} />
+                    <SurplusTracker formData={formData} currentStep={currentStep} goals={userGoals} />
                 </div>
 
-                {/* Scrollable Form Area */}
-                <div className="qn-page">
-                    <div>
-                        <div className="page-title">{STEPS[currentStep - 1].name}</div>
-                        <div className="page-desc">{STEPS[currentStep - 1].short}</div>
+                <div className="qn-content-scroll">
+                    <div className={`qn-step-content${stepVisible ? ' visible' : ''}`}>
+                        <div className="qn-step-header">
+                            <div className="qn-step-header-top">
+                                <div className="qn-step-label-row">
+                                    <span className="qn-step-icon-inline"><StepIcon stepId={currentStep} size={14} /></span>
+                                    <span className="qn-step-name-label">{STEPS[currentStep - 1].name}</span>
+                                </div>
+                                {currentStep === 13 ? (
+                                    <h1 className="page-title">Almost there{userName ? `, ${userName.split(' ')[0]}` : ''}</h1>
+                                ) : (
+                                    <h1 className="page-title">{STEPS[currentStep - 1].display}</h1>
+                                )}
+                                <div className="page-desc">{STEPS[currentStep - 1].short}</div>
+                            </div>
+                            <div className="qn-step-watermark">{String(currentStep).padStart(2, '0')}</div>
+                        </div>
+
+                        <form id="qn-form" onSubmit={handleNext}>
+                            {currentStep === 1 && <Step1Profile formData={formData} onChange={handleInputChange} />}
+                            {currentStep === 2 && <Step1GenWealth formData={formData} onChange={handleInputChange} />}
+                            {currentStep === 3 && <Step2 formData={formData} onChange={handleInputChange} />}
+                            {currentStep === 4 && <Step3 formData={formData} onChange={handleInputChange} />}
+                            {currentStep === 5 && <Step4 formData={formData} onChange={handleInputChange} />}
+                            {currentStep === 6 && <StepGoals goals={userGoals} setGoals={setUserGoals} />}
+                            {currentStep === 7 && <Step5 formData={formData} onChange={handleInputChange} />}
+                            {currentStep === 8 && <Step6 formData={formData} onChange={handleInputChange} setFormData={setFormData} />}
+                            {currentStep === 9 && <Step7 formData={formData} onChange={handleInputChange} />}
+                            {currentStep === 10 && <Step8 formData={formData} onChange={handleInputChange} />}
+                            {currentStep === 11 && <Step10 formData={formData} onChange={handleInputChange} />}
+                            {currentStep === 12 && <StepReview formData={formData} goals={userGoals} onGoToStep={navigateToStep} />}
+
+                            {/* Keeps Enter-key submit behavior intact even with footer controls outside form */}
+                            <button type="submit" style={{ display: 'none' }} aria-hidden="true" tabIndex={-1}>Submit</button>
+                        </form>
                     </div>
+                </div>
 
-                    <form onSubmit={handleNext} style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '48px' }}>
-                        {currentStep === 1 && <Step1Profile formData={formData} onChange={handleInputChange} />}
-                        {currentStep === 2 && <Step1GenWealth formData={formData} onChange={handleInputChange} />}
-                        {currentStep === 3 && <Step2 formData={formData} onChange={handleInputChange} />}
-                        {currentStep === 4 && <Step3 formData={formData} onChange={handleInputChange} />}
-                        {currentStep === 5 && <Step4 formData={formData} onChange={handleInputChange} />}
-                        {currentStep === 6 && <Step5 formData={formData} onChange={handleInputChange} />}
-                        {currentStep === 7 && <StepGoals goals={userGoals} setGoals={setUserGoals} />}
-                        {currentStep === 8 && <Step6 formData={formData} onChange={handleInputChange} setFormData={setFormData} />}
-                        {currentStep === 9 && <Step7 formData={formData} onChange={handleInputChange} />}
-                        {currentStep === 10 && <Step8 formData={formData} onChange={handleInputChange} />}
-                        {currentStep === 11 && <Step9 formData={formData} onChange={handleInputChange} />}
-                        {currentStep === 12 && <Step10 formData={formData} onChange={handleInputChange} />}
-                        {currentStep === 13 && <StepReview formData={formData} goals={userGoals} onGoToStep={setCurrentStep} />}
-
-                        {currentStep === TOTAL_STEPS && (
-                            <div className="qn-generate-hint">Results are ready instantly — no waiting.</div>
+                <div className="qn-nav-footer">
+                    <div className="qn-nav-col qn-nav-col-left">
+                        {currentStep === 1 ? (
+                            <button type="button" className="qn-btn-back" onClick={() => navigate('/dashboard')}>
+                                ← Dashboard
+                            </button>
+                        ) : (
+                            <button type="button" className="qn-btn-back" onClick={() => navigateToStep(Math.max(currentStep - 1, 1))}>
+                                ← Back
+                            </button>
                         )}
-                        <div className="qn-nav-buttons">
-                            {currentStep === 1 ? (
-                                <button type="button" className="qn-btn-back" onClick={() => navigate('/dashboard')}>
-                                    ← Dashboard
-                                </button>
-                            ) : (
-                                <button type="button" className="qn-btn-back" onClick={() => setCurrentStep(s => s - 1)}>
-                                    Back
-                                </button>
-                            )}
+                    </div>
+                    <div className="qn-nav-col qn-nav-col-center">
+                        {currentStep > 1 && currentStep < TOTAL_STEPS && (formData.current_step >= 10 || formData.is_completed) && (
                             <span className={`qn-btn-tooltip-wrap${nextDisabledReason ? ' disabled' : ''}`} data-tooltip={nextDisabledReason || undefined}>
-                                <button type="submit" className="qn-btn-next" disabled={!!nextDisabledReason || saving}>
-                                    {saving ? 'Saving...' : (currentStep === TOTAL_STEPS ? 'Generate Dashboard' : 'Next Step')}
-                                    {!saving && currentStep < TOTAL_STEPS && (
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                                            <polyline points="9 18 15 12 9 6" />
-                                        </svg>
-                                    )}
+                                <button type="button" className="qn-skip-review-link" onClick={handleSkipToReview} disabled={!!nextDisabledReason || saving}>
+                                    Go to Review →
                                 </button>
                             </span>
-                        </div>
-                        {currentStep > 1 && currentStep < TOTAL_STEPS && (formData.current_step >= 10 || formData.is_completed) && (
-                            <div className="qn-skip-review-wrap">
-                                <span className={`qn-btn-tooltip-wrap${nextDisabledReason ? ' disabled' : ''}`} data-tooltip={nextDisabledReason || undefined}>
-                                    <button type="button" className="qn-skip-review-link" onClick={handleSkipToReview} disabled={!!nextDisabledReason || saving}>
-                                        Go to Review →
-                                    </button>
-                                </span>
-                            </div>
                         )}
-                    </form>
+                    </div>
+                    <div className="qn-nav-col qn-nav-col-right">
+                        <span className={`qn-btn-tooltip-wrap${nextDisabledReason ? ' disabled' : ''}`} data-tooltip={nextDisabledReason || undefined}>
+                            <button type="submit" form="qn-form" className="qn-btn-next" disabled={!!nextDisabledReason || saving}>
+                                {saving ? 'Saving...' : (currentStep === TOTAL_STEPS ? 'Generate My Report →' : 'Next Step →')}
+                            </button>
+                        </span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -317,10 +328,42 @@ function Questionnaire() {
 export default Questionnaire;
 
 /* ═══════════════════════════════════════════════
+   STEP ICON MAP
+   ═══════════════════════════════════════════════ */
+
+const StepIcon = ({ stepId, size = 28 }) => {
+    const icons = {
+        1: <User size={size} />, 2: <BookOpen size={size} />, 3: <Wallet size={size} />,
+        4: <Receipt size={size} />, 5: <Landmark size={size} />, 6: <Target size={size} />,
+        7: <TrendingUp size={size} />, 8: <CreditCard size={size} />, 9: <ShieldCheck size={size} />,
+        10: <FileText size={size} />, 11: <Brain size={size} />,
+        12: <CheckCircle2 size={size} />,
+    };
+    return icons[stepId] || null;
+};
+
+const StepTabs = ({ tabs, active, onChange }) => (
+    <div className="qn-tab-bar" role="tablist" aria-label="Step Sections">
+        {tabs.map((label, i) => (
+            <button
+                key={label}
+                type="button"
+                role="tab"
+                aria-selected={active === i}
+                className={`qn-tab${active === i ? ' active' : ''}`}
+                onClick={() => onChange(i)}
+            >
+                {label}
+            </button>
+        ))}
+    </div>
+);
+
+/* ═══════════════════════════════════════════════
    SHARED INPUT COMPONENTS
    ═══════════════════════════════════════════════ */
 
-const InputField = ({ label, description, name, type = 'text', value, onChange, placeholder, info, prefix, suffix, required, min, max }) => {
+const InputField = ({ label, description, name, type = 'text', value, onChange, placeholder, info, prefix, suffix, required, min, max, optional }) => {
     const isCurrency = type === 'currency';
     const rawValue = value !== undefined && value !== null ? value : '';
 
@@ -386,9 +429,10 @@ const InputField = ({ label, description, name, type = 'text', value, onChange, 
             <label>
                 {label}
                 {required && <span className="qn-required">*</span>}
+                {optional && !required && <span className="qn-optional-label">(optional)</span>}
                 {info && <span className="qn-info-icon" data-tooltip={info}>i</span>}
             </label>
-            {description && <div style={{ fontSize: '13px', color: 'var(--ink-soft)', lineHeight: '1.4' }}>{description}</div>}
+            {description && <div className="qn-field-hint">{description}</div>}
 
             {prefix ? (
                 <div className="qn-rupee-wrap">
@@ -405,11 +449,12 @@ const InputField = ({ label, description, name, type = 'text', value, onChange, 
     );
 };
 
-const SelectField = ({ label, name, value, onChange, options, info, required }) => (
+const SelectField = ({ label, name, value, onChange, options, info, required, optional }) => (
     <div className="qn-field">
         <label>
             {label}
             {required && <span className="qn-required">*</span>}
+            {optional && !required && <span className="qn-optional-label">(optional)</span>}
             {info && <span className="qn-info-icon" data-tooltip={info}>i</span>}
         </label>
         <select name={name} value={value !== undefined && value !== null ? value : ''} onChange={onChange} required={required}>
@@ -429,7 +474,7 @@ const DisabledTooltipButton = ({ children, onClick, disabled, reason, className 
     </span>
 );
 
-const SurplusTracker = ({ formData: f, currentStep }) => {
+const SurplusTracker = ({ formData: f, currentStep, goals = [] }) => {
     const income = Number(f.monthly_take_home) || 0;
     if (!income || currentStep < 3) return null;
 
@@ -458,8 +503,9 @@ const SurplusTracker = ({ formData: f, currentStep }) => {
 
     const totalEMI = loanEMI + ccEMI;
     const sip = Number(f.inv_monthly_sip) || 0;
+    const goalSipTotal = goals.reduce((s, g) => s + (Number(g.monthlySip) || 0), 0);
 
-    const totalOutflow = monthlyExpenses + (annualExpenses / 12) + totalEMI + sip;
+    const totalOutflow = monthlyExpenses + (annualExpenses / 12) + totalEMI + sip + goalSipTotal;
     const surplus = income - totalOutflow;
 
     const fmt = (n) => {
@@ -498,19 +544,27 @@ const SurplusTracker = ({ formData: f, currentStep }) => {
 
 const Step1Profile = ({ formData: f, onChange }) => (
     <>
-        <Row>
-            <InputField label="Date of Birth" name="date_of_birth" type="date" value={f.date_of_birth?.split('T')[0]} onChange={onChange} required />
-            <SelectField label="City" name="city" value={f.city} onChange={onChange} options={['Mumbai', 'Delhi', 'Bengaluru', 'Hyderabad', 'Chennai', 'Kolkata', 'Pune', 'Ahmedabad', 'Other']} required />
-        </Row>
-        <Row>
-            <SelectField label="Marital Status" name="marital_status" value={f.marital_status} onChange={onChange} options={['Single', 'Married', 'Divorced', 'Widowed']} required />
-            <InputField label="Dependents" name="dependents" type="number" value={f.dependents} onChange={onChange} placeholder="0" info="Number of people financially dependent on you" required />
-        </Row>
-        <SelectField label="Employment Type" name="employment_type" value={f.employment_type} onChange={onChange} options={['Salaried', 'Self-Employed', 'Business', 'Retired', 'Student']} required />
-        <Row>
-            <SelectField label="Risk Comfort" name="risk_comfort" value={f.risk_comfort} onChange={onChange} options={['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']} required info="Rate your comfort with financial risk, 1 = very low, 10 = very high" />
-            <SelectField label="Investment Experience" name="investment_experience" value={f.investment_experience} onChange={onChange} options={['None', '< 1 year', '1-3 years', '3-5 years', '5+ years']} required />
-        </Row>
+        <div className="ani d1">
+            <Row>
+                <InputField label="Date of Birth" name="date_of_birth" type="date" value={f.date_of_birth?.split('T')[0]} onChange={onChange} required />
+                <SelectField label="City" name="city" value={f.city} onChange={onChange} options={['Mumbai', 'Delhi', 'Bengaluru', 'Hyderabad', 'Chennai', 'Kolkata', 'Pune', 'Ahmedabad', 'Other']} required />
+            </Row>
+        </div>
+        <div className="ani d2">
+            <Row>
+                <SelectField label="Marital Status" name="marital_status" value={f.marital_status} onChange={onChange} options={['Single', 'Married', 'Divorced', 'Widowed']} required />
+                <InputField label="Dependents" name="dependents" type="number" value={f.dependents} onChange={onChange} placeholder="0" info="Number of people financially dependent on you" required />
+            </Row>
+        </div>
+        <div className="ani d3">
+            <SelectField label="Employment Type" name="employment_type" value={f.employment_type} onChange={onChange} options={['Salaried', 'Self-Employed', 'Business', 'Retired', 'Student']} required />
+        </div>
+        <div className="ani d4">
+            <Row>
+                <SelectField label="Risk Comfort" name="risk_comfort" value={f.risk_comfort} onChange={onChange} options={['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']} required info="1 = Very Conservative (prefer FDs, avoid market risk) · 10 = Very Aggressive (comfortable with large swings for higher growth). Most people are 3–7." />
+                <SelectField label="Investment Experience" name="investment_experience" value={f.investment_experience} onChange={onChange} options={['None', '< 1 year', '1-3 years', '3-5 years', '5+ years']} required />
+            </Row>
+        </div>
     </>
 );
 
@@ -562,102 +616,244 @@ const Step1GenWealth = ({ formData: f, onChange }) => {
     );
 };
 
-const Step2 = ({ formData: f, onChange }) => (
-    <>
-        <InputField label="Monthly Take-Home Income" name="monthly_take_home" type="currency" prefix="₹" value={f.monthly_take_home} onChange={onChange} info="After tax & deductions" required />
-        <Row>
-            <InputField label="Annual Salary" name="annual_salary" type="currency" prefix="₹" value={f.annual_salary} onChange={onChange} info="Pre-tax yearly salary incl. allowances" required />
-            <InputField label="Business Income" name="business_income" type="currency" prefix="₹" value={f.business_income} onChange={onChange} info="Annual income from business/profession" />
-        </Row>
-        <Row>
-            <InputField label="Annual Bonus" name="annual_bonus" type="currency" prefix="₹" value={f.annual_bonus} onChange={onChange} />
-            <InputField label="Other Income (yearly)" name="other_income" type="currency" prefix="₹" value={f.other_income} onChange={onChange} info="Rental, freelance, interest etc." />
-        </Row>
-        <InputField label="Expected Income Growth" name="expected_income_growth" type="percentage" suffix="%" value={f.expected_income_growth} onChange={onChange} />
-    </>
-);
+const INCOME_FIELDS = ['monthly_take_home', 'annual_salary', 'business_income', 'annual_bonus', 'other_income', 'expected_income_growth'];
+const INVESTMENT_FIELDS = ['inv_direct_stocks', 'inv_equity_mf', 'inv_gold_commodities', 'inv_epf_ppf_nps', 'inv_debt_funds', 'inv_real_estate', 'inv_crypto_alt', 'inv_monthly_sip', 'sip_consecutive_months'];
 
-const Step3 = ({ formData: f, onChange }) => (
-    <>
-        <div className="qn-callout">
-            This step has two parts — <strong>monthly</strong> and <strong>annual</strong> expenses. We combine both to calculate your true monthly surplus. Leave any field blank if it doesn't apply.
-        </div>
-        <div className="qn-subsection-label">Part A: Monthly Expenses</div>
-        <Row>
-            <InputField label="Household & Lifestyle" description="Groceries, maid, maintenance, clothing, personal care." name="expense_household" type="currency" prefix="₹" value={f.expense_household} onChange={onChange} />
-            <InputField label="Rent / Home EMI" description="House rent or EMI for your primary residence." name="expense_rent" type="currency" prefix="₹" value={f.expense_rent} onChange={onChange} />
-        </Row>
-        <Row>
-            <InputField label="Utilities" description="Electricity, water, gas, internet, mobile bills." name="expense_utilities" type="currency" prefix="₹" value={f.expense_utilities} onChange={onChange} />
-            <InputField label="Transport" description="Fuel, public transit, cab fares, vehicle maintenance." name="expense_transport" type="currency" prefix="₹" value={f.expense_transport} onChange={onChange} />
-        </Row>
-        <Row>
-            <InputField label="Food & Dining" description="Eating out, ordering in, coffee shop visits." name="expense_food" type="currency" prefix="₹" value={f.expense_food} onChange={onChange} />
-            <InputField label="Subscriptions" description="Netflix, Gym, Amazon Prime, software." name="expense_subscriptions" type="currency" prefix="₹" value={f.expense_subscriptions} onChange={onChange} />
-        </Row>
-        <Row full>
-            <InputField label="Discretionary" description="Shopping, hobbies, movies, recreational activities." name="expense_discretionary" type="currency" prefix="₹" value={f.expense_discretionary} onChange={onChange} />
-        </Row>
+const Step2 = ({ formData: f, onChange }) => {
+    const hasAnyData = !!(f.monthly_take_home || f.annual_salary || f.business_income ||
+        f.annual_bonus || f.other_income || f.expected_income_growth);
 
-        <div className="qn-subsection-label" style={{ marginTop: '32px' }}>Part B: Annual Expenses</div>
-        <div className="qn-callout" style={{ marginBottom: '20px' }}>
-            <strong>Why do we ask for these?</strong> Yearly obligations take a hidden cut from your monthly income. We prorate these to reveal your true monthly surplus.
-        </div>
-        <Row>
-            <InputField label="Insurance Premiums" description="Yearly payments for Health, Term, Vehicle, or Home insurance." name="expense_annual_insurance" type="currency" prefix="₹" value={f.expense_annual_insurance} onChange={onChange} />
-            <InputField label="Education / School Fees" description="Yearly school, college, or tuition fees for children or self." name="expense_annual_education" type="currency" prefix="₹" value={f.expense_annual_education} onChange={onChange} />
-        </Row>
-        <Row>
-            <InputField label="Property Tax & Maintenance" description="Yearly property taxes, major home repairs, or society charges." name="expense_annual_property" type="currency" prefix="₹" value={f.expense_annual_property} onChange={onChange} />
-            <InputField label="Travel & Vacations" description="Estimated yearly budget for family trips and holidays." name="expense_annual_travel" type="currency" prefix="₹" value={f.expense_annual_travel} onChange={onChange} />
-        </Row>
-        <Row>
-            <InputField label="Other Annual Obligations" description="Festive expenses, large gifts, or any other yearly recurring costs." name="expense_annual_other" type="currency" prefix="₹" value={f.expense_annual_other} onChange={onChange} />
-        </Row>
-    </>
-);
+    const [hasIncome, setHasIncome] = useState(hasAnyData ? true : null);
+
+    const zeroIncomeFields = () => {
+        INCOME_FIELDS.forEach(name => onChange({ target: { name, value: 0, type: 'number' } }));
+    };
+
+    return (
+        <>
+            <div className="ani d1">
+                <div className="qn-field">
+                    <label>Do you have income?</label>
+                    <div className="qn-binary-options">
+                        <button type="button"
+                            className={`qn-binary-btn${hasIncome === true ? ' selected' : ''}`}
+                            onClick={() => setHasIncome(true)}>Yes</button>
+                        <button type="button"
+                            className={`qn-binary-btn${hasIncome === false ? ' selected' : ''}`}
+                            onClick={() => { setHasIncome(false); zeroIncomeFields(); }}>Not yet</button>
+                    </div>
+                </div>
+            </div>
+
+            {hasIncome === false && (
+                <div className="ani d2">
+                    <div className="qn-callout">
+                        No problem — we'll tailor your plan around your current situation.{' '}
+                        <button type="button" className="qn-link-btn" onClick={() => setHasIncome(true)}>
+                            I want to add income details anyway →
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {hasIncome === true && (
+                <>
+                    <div className="ani d2">
+                        <InputField label="Monthly Take-Home Income" name="monthly_take_home" type="currency" prefix="₹" value={f.monthly_take_home} onChange={onChange} info="After tax & deductions" required />
+                    </div>
+                    <div className="ani d3">
+                        <Row>
+                            <InputField label="Annual Salary" name="annual_salary" type="currency" prefix="₹" value={f.annual_salary} onChange={onChange} info="Pre-tax yearly salary incl. allowances" />
+                            <InputField label="Business Income" name="business_income" type="currency" prefix="₹" value={f.business_income} onChange={onChange} info="Annual income from business/profession" />
+                        </Row>
+                    </div>
+                    <div className="ani d4">
+                        <Row>
+                            <InputField label="Annual Bonus" name="annual_bonus" type="currency" prefix="₹" value={f.annual_bonus} onChange={onChange} />
+                            <InputField label="Other Income (yearly)" name="other_income" type="currency" prefix="₹" value={f.other_income} onChange={onChange} info="Rental, freelance, interest etc." />
+                        </Row>
+                    </div>
+                    <div className="ani d5">
+                        <InputField label="Expected Income Growth" name="expected_income_growth" type="percentage" suffix="%" value={f.expected_income_growth} onChange={onChange} />
+                    </div>
+                </>
+            )}
+        </>
+    );
+};
+
+const Step3 = ({ formData: f, onChange }) => {
+    const hasAnnual = !!(f.expense_annual_insurance || f.expense_annual_education || f.expense_annual_property || f.expense_annual_travel || f.expense_annual_other);
+    const hasMonthly = !!(f.expense_household || f.expense_rent || f.expense_utilities || f.expense_transport || f.expense_food || f.expense_subscriptions || f.expense_discretionary);
+    const [tab, setTab] = useState(hasAnnual && !hasMonthly ? 1 : 0);
+
+    return (
+        <>
+            <div className="ani d1" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div className="qn-callout">
+                    This step has two parts — <strong>monthly</strong> and <strong>annual</strong> expenses. We combine both to calculate your true monthly surplus. Leave any field blank if it doesn't apply.
+                </div>
+                <StepTabs tabs={['Monthly', 'Annual']} active={tab} onChange={setTab} />
+            </div>
+
+            {tab === 0 ? (
+                <div className="ani d2">
+                    <div className="qn-subsection-label">Part A: Monthly Expenses</div>
+                    <Row>
+                        <InputField label="Household & Lifestyle" description="Groceries, maid, maintenance, clothing, personal care." name="expense_household" type="currency" prefix="₹" value={f.expense_household} onChange={onChange} />
+                        <InputField label="Rent / Home EMI" description="House rent or EMI for your primary residence." name="expense_rent" type="currency" prefix="₹" value={f.expense_rent} onChange={onChange} />
+                    </Row>
+                    <Row>
+                        <InputField label="Utilities" description="Electricity, water, gas, internet, mobile bills." name="expense_utilities" type="currency" prefix="₹" value={f.expense_utilities} onChange={onChange} />
+                        <InputField label="Transport" description="Fuel, public transit, cab fares, vehicle maintenance." name="expense_transport" type="currency" prefix="₹" value={f.expense_transport} onChange={onChange} />
+                    </Row>
+                    <Row>
+                        <InputField label="Food & Dining" description="Eating out, ordering in, coffee shop visits." name="expense_food" type="currency" prefix="₹" value={f.expense_food} onChange={onChange} />
+                        <InputField label="Subscriptions" description="Netflix, Gym, Amazon Prime, software." name="expense_subscriptions" type="currency" prefix="₹" value={f.expense_subscriptions} onChange={onChange} />
+                    </Row>
+                    <Row full>
+                        <InputField label="Discretionary" description="Shopping, hobbies, movies, recreational activities." name="expense_discretionary" type="currency" prefix="₹" value={f.expense_discretionary} onChange={onChange} />
+                    </Row>
+                </div>
+            ) : (
+                <div className="ani d2">
+                    <div className="qn-subsection-label">Part B: Annual Expenses</div>
+                    <div className="qn-callout" style={{ marginBottom: '18px' }}>
+                        <strong>Why do we ask for these?</strong> Yearly obligations take a hidden cut from your monthly income. We prorate these to reveal your true monthly surplus.
+                    </div>
+                    <Row>
+                        <InputField label="Insurance Premiums" description="Vehicle, Home, and other insurance only. Do not include Health or Life premiums — enter those in the Insurance step." name="expense_annual_insurance" type="currency" prefix="₹" value={f.expense_annual_insurance} onChange={onChange} />
+                        <InputField label="Education / School Fees" description="Yearly school, college, or tuition fees for children or self." name="expense_annual_education" type="currency" prefix="₹" value={f.expense_annual_education} onChange={onChange} />
+                    </Row>
+                    <Row>
+                        <InputField label="Property Tax & Maintenance" description="Yearly property taxes, major home repairs, or society charges." name="expense_annual_property" type="currency" prefix="₹" value={f.expense_annual_property} onChange={onChange} />
+                        <InputField label="Travel & Vacations" description="Estimated yearly budget for family trips and holidays." name="expense_annual_travel" type="currency" prefix="₹" value={f.expense_annual_travel} onChange={onChange} />
+                    </Row>
+                    <Row>
+                        <InputField label="Other Annual Obligations" description="Festive expenses, large gifts, or any other yearly recurring costs." name="expense_annual_other" type="currency" prefix="₹" value={f.expense_annual_other} onChange={onChange} />
+                    </Row>
+                </div>
+            )}
+        </>
+    );
+};
 
 const Step4 = ({ formData: f, onChange }) => (
     <>
-        <div className="qn-callout warn">
-            <strong>Not sure about exact numbers?</strong> Rough estimates are totally fine — leave any field blank and we'll still generate a complete plan.
+        <div className="ani d1" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div className="qn-callout warn">
+                <strong>Not sure about exact numbers?</strong> Rough estimates are totally fine — leave any field blank and we'll still generate a complete plan.
+            </div>
+            <InputField label="Savings Account Balance" name="savings_balance" type="currency" prefix="₹" value={f.savings_balance} onChange={onChange} info="Total balance across all savings accounts" optional />
         </div>
-        <InputField label="Savings Account Balance" name="savings_balance" type="currency" prefix="₹" value={f.savings_balance} onChange={onChange} info="Total balance across all savings accounts" />
-        <Row>
-            <InputField label="Fixed Deposits Balance" name="fd_balance" type="currency" prefix="₹" value={f.fd_balance} onChange={onChange} info="FDs are time-bound deposits with guaranteed returns at a fixed interest rate" />
-            <InputField label="FD Average Rate" name="fd_rate" type="percentage" suffix="%" value={f.fd_rate} onChange={onChange} info="Weighted average interest rate across your FDs" />
-        </Row>
-        <InputField label="Emergency Fund Set Aside" name="emergency_fund" type="currency" prefix="₹" value={f.emergency_fund} onChange={onChange} info="Liquid cash kept aside for unexpected expenses (medical, job loss). Ideally 3-6 months of expenses." />
+        <div className="ani d2">
+            <Row>
+                <InputField label="Fixed Deposits Balance" name="fd_balance" type="currency" prefix="₹" value={f.fd_balance} onChange={onChange} info="FDs are time-bound deposits with guaranteed returns at a fixed interest rate" optional />
+                <InputField label="FD Average Rate" name="fd_rate" type="percentage" suffix="%" value={f.fd_rate} onChange={onChange} info="Weighted average interest rate across your FDs" optional />
+            </Row>
+        </div>
     </>
 );
 
-const Step5 = ({ formData: f, onChange }) => (
-    <>
-        <div className="qn-callout warn">
-            <strong>Just starting out?</strong> It's okay if you haven't invested yet — leave fields blank. We'll include investment recommendations in your action plan.
-        </div>
-        <Row>
-            <InputField label="Direct Stocks" name="inv_direct_stocks" type="currency" prefix="₹" value={f.inv_direct_stocks} onChange={onChange} info="Current market value of shares you directly hold in a Demat account" />
-            <InputField label="Equity Mutual Funds" name="inv_equity_mf" type="currency" prefix="₹" value={f.inv_equity_mf} onChange={onChange} info="Current NAV value of all equity-oriented mutual fund holdings" />
-        </Row>
-        <Row>
-            <InputField label="EPF / PPF / NPS" name="inv_epf_ppf_nps" type="currency" prefix="₹" value={f.inv_epf_ppf_nps} onChange={onChange} info="EPF = Employee Provident Fund (employer deduction). PPF = Public Provident Fund. NPS = National Pension System." />
-            <InputField label="Debt Funds & Bonds" name="inv_debt_funds" type="currency" prefix="₹" value={f.inv_debt_funds} onChange={onChange} info="Funds that invest in fixed-income instruments like govt bonds, corporate bonds. Lower risk than equity." />
-        </Row>
-        <Row>
-            <InputField label="Gold / Commodities" name="inv_gold_commodities" type="currency" prefix="₹" value={f.inv_gold_commodities} onChange={onChange} info="Physical gold, Sovereign Gold Bonds, Gold ETFs, or commodity investments" />
-            <InputField label="Real Estate Value" name="inv_real_estate" type="currency" prefix="₹" value={f.inv_real_estate} onChange={onChange} info="Current market value of all property owned (excluding primary residence loan)" />
-        </Row>
-        <Row full>
-            <InputField label="Crypto / Alternatives" name="inv_crypto_alt" type="currency" prefix="₹" value={f.inv_crypto_alt} onChange={onChange} info="Cryptocurrency, REITs, InvITs, angel investments, P2P lending, etc." />
-        </Row>
-        <div className="qn-subsection-label big" style={{ marginTop: '16px' }}>Recurring Investments</div>
-        <Row>
-            <InputField label="Monthly SIP Amount" name="inv_monthly_sip" type="currency" prefix="₹" value={f.inv_monthly_sip} onChange={onChange} info="Total monthly SIP or recurring investment amount across all schemes (mutual funds, stocks, etc.)" />
-            <InputField label="How long have you been doing SIP regularly?" name="sip_consecutive_months" type="number" value={f.sip_consecutive_months} onChange={onChange} min={0} placeholder="e.g. 12 months" info="Approximate months of consistent SIP investing, regardless of amount. This only measures your investment consistency habit for your financial behaviour score — not the SIP amount." />
-        </Row>
-    </>
-);
+const Step5 = ({ formData: f, onChange }) => {
+    // Gate: derived from whether any investment data exists
+    const hasAnyData = !!(f.inv_direct_stocks || f.inv_equity_mf || f.inv_gold_commodities ||
+        f.inv_epf_ppf_nps || f.inv_debt_funds || f.inv_real_estate ||
+        f.inv_crypto_alt || f.inv_monthly_sip);
+    // Expanded section auto-opens if user has data in those fields
+    const hasExpandedData = !!(f.inv_epf_ppf_nps || f.inv_debt_funds ||
+        f.inv_real_estate || f.inv_crypto_alt);
+
+    const [investingYes, setInvestingYes] = useState(hasAnyData ? true : null);
+    const [expanded, setExpanded] = useState(hasExpandedData);
+
+    const zeroInvestmentFields = () => {
+        INVESTMENT_FIELDS.forEach(name => onChange({ target: { name, value: 0, type: 'number' } }));
+    };
+
+    return (
+        <>
+            <div className="ani d1" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                <div className="qn-callout warn">
+                    <strong>Just starting out?</strong> It's okay if you haven't invested yet — leave fields blank or select "Not yet".
+                </div>
+
+                {/* ── Gate question ── */}
+                <div className="qn-field">
+                    <label>Do you currently invest?</label>
+                    <div className="qn-binary-options">
+                        <button type="button"
+                            className={`qn-binary-btn${investingYes === true ? ' selected' : ''}`}
+                            onClick={() => setInvestingYes(true)}>Yes</button>
+                        <button type="button"
+                            className={`qn-binary-btn${investingYes === false ? ' selected' : ''}`}
+                            onClick={() => { setInvestingYes(false); setExpanded(false); zeroInvestmentFields(); }}>Not yet</button>
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Not yet message ── */}
+            {investingYes === false && (
+                <div className="ani d2">
+                    <div className="qn-callout">
+                        That's okay — we'll include investment recommendations in your action plan.{' '}
+                        <button type="button" className="qn-link-btn" onClick={() => setInvestingYes(true)}>
+                            I want to add details anyway →
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Investing fields ── */}
+            {investingYes === true && (
+                <>
+                    {/* Core 3: Direct Stocks, Equity MF, Gold */}
+                    <div className="ani d2">
+                        <Row>
+                            <InputField label="Direct Stocks" name="inv_direct_stocks" type="currency" prefix="₹" value={f.inv_direct_stocks} onChange={onChange} info="Current market value of shares you directly hold in a Demat account" optional />
+                            <InputField label="Equity Mutual Funds" name="inv_equity_mf" type="currency" prefix="₹" value={f.inv_equity_mf} onChange={onChange} info="Current NAV value of all equity-oriented mutual fund holdings" optional />
+                        </Row>
+                        <Row>
+                            <InputField label="Gold / Commodities" name="inv_gold_commodities" type="currency" prefix="₹" value={f.inv_gold_commodities} onChange={onChange} info="Physical gold, Sovereign Gold Bonds, Gold ETFs" optional />
+                        </Row>
+                    </div>
+
+                    {/* Recurring Investments — always visible */}
+                    <div className="ani d3">
+                        <div className="qn-subsection-label big">Recurring Investments</div>
+                        <Row>
+                            <InputField label="General SIP (excl. goal SIPs)" name="inv_monthly_sip" type="currency" prefix="₹" value={f.inv_monthly_sip} onChange={onChange} info="Monthly investment NOT tied to any specific goal. Goal-specific SIPs are entered in the Goals step." optional />
+                            <InputField label="How long have you been doing SIP regularly?" name="sip_consecutive_months" type="number" value={f.sip_consecutive_months} onChange={onChange} min={0} placeholder="e.g. 12 months" info="Months of consistent SIP — measures your investment habit, not amount." optional />
+                        </Row>
+                    </div>
+
+                    {/* Toggle for extended fields */}
+                    <div className="ani d4">
+                        <button type="button" className={`qn-inv-toggle${expanded ? ' open' : ''}`}
+                            onClick={() => setExpanded(e => !e)}>
+                            I have more investments
+                            <ChevronDown size={14} className="qn-inv-chevron" />
+                        </button>
+                    </div>
+
+                    {/* Expanded: EPF/PPF, Debt, Real Estate, Crypto */}
+                    <div className={`qn-inv-extra${expanded ? ' open' : ''}`}>
+                        <div>
+                            <Row>
+                                <InputField label="EPF / PPF / NPS" name="inv_epf_ppf_nps" type="currency" prefix="₹" value={f.inv_epf_ppf_nps} onChange={onChange} info="EPF = Employee Provident Fund. PPF = Public Provident Fund. NPS = National Pension System." />
+                                <InputField label="Debt Funds & Bonds" name="inv_debt_funds" type="currency" prefix="₹" value={f.inv_debt_funds} onChange={onChange} info="Fixed-income instruments: govt bonds, corporate bonds" />
+                            </Row>
+                            <Row>
+                                <InputField label="Real Estate Value" name="inv_real_estate" type="currency" prefix="₹" value={f.inv_real_estate} onChange={onChange} info="Market value of all property owned (excl. primary residence loan)" />
+                                <InputField label="Crypto / Alternatives" name="inv_crypto_alt" type="currency" prefix="₹" value={f.inv_crypto_alt} onChange={onChange} info="Cryptocurrency, REITs, InvITs, angel investments, P2P" />
+                            </Row>
+                        </div>
+                    </div>
+                </>
+            )}
+        </>
+    );
+};
 
 const SAVING_OPTIONS = [
     { value: 'regular', label: 'Yes, regularly (SIP / monthly)' },
@@ -666,29 +862,42 @@ const SAVING_OPTIONS = [
 ];
 
 const StepGoals = ({ goals, setGoals }) => {
-    const hasIncompleteGoal = goals.some(g => !g.name || !g.name.trim());
+    const [draftGoal, setDraftGoal] = useState(null);
+    const [draftIdx, setDraftIdx] = useState(null); // null = new goal
 
-    const addGoal = () => {
-        if (goals.length >= 5 || hasIncompleteGoal) return;
-        setGoals([...goals, {
-            id: `goal_${Date.now()}`,
-            name: '',
-            target: 0,
-            years: 0,
-            riskLevel: '3',
-            includeInflation: true,
-            isSaving: 'no',
-            priorityWeight: 3,
-        }]);
+    const fmtShort = (n) => {
+        if (!n) return null;
+        if (n >= 10000000) return `₹${(n / 10000000).toFixed(1)}Cr`;
+        if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
+        if (n >= 1000) return `₹${Math.round(n / 1000)}K`;
+        return `₹${Number(n).toLocaleString('en-IN')}`;
     };
 
-    const updateGoal = (idx, field, value) => {
-        setGoals(goals.map((g, i) => i === idx ? { ...g, [field]: value } : g));
+    const openAdd = () => {
+        setDraftGoal({ id: `goal_${Date.now()}`, name: '', target: 0, years: 0, riskLevel: '3', includeInflation: true, isSaving: 'no', priorityWeight: 3, monthlySip: 0 });
+        setDraftIdx(null);
     };
 
-    const removeGoal = (idx) => {
-        setGoals(goals.filter((_, i) => i !== idx));
+    const openEdit = (idx) => {
+        setDraftGoal({ ...goals[idx] });
+        setDraftIdx(idx);
     };
+
+    const closeModal = () => { setDraftGoal(null); setDraftIdx(null); };
+
+    const saveDraft = () => {
+        if (!draftGoal.name || !draftGoal.name.trim()) return;
+        if (draftIdx === null) {
+            setGoals([...goals, draftGoal]);
+        } else {
+            setGoals(goals.map((g, i) => i === draftIdx ? draftGoal : g));
+        }
+        closeModal();
+    };
+
+    const removeGoal = (idx) => setGoals(goals.filter((_, i) => i !== idx));
+
+    const updateDraft = (field, value) => setDraftGoal(prev => ({ ...prev, [field]: value }));
 
     return (
         <>
@@ -698,9 +907,9 @@ const StepGoals = ({ goals, setGoals }) => {
             </div>
 
             {goals.length < 5 && (
-                <DisabledTooltipButton onClick={addGoal} disabled={hasIncompleteGoal} reason="Enter a name for each goal before adding another" className="qn-btn-add">
+                <button type="button" onClick={openAdd} className="qn-btn-add">
                     <Plus size={13} /> Add Goal
-                </DisabledTooltipButton>
+                </button>
             )}
 
             {goals.length === 0 && (
@@ -710,38 +919,75 @@ const StepGoals = ({ goals, setGoals }) => {
                 </div>
             )}
 
-            {goals.map((goal, idx) => (
-                <div key={goal.id} className="qn-loan-card">
-                    <div className="qn-loan-card-header">
-                        <span className="qn-loan-card-title">Goal {idx + 1}</span>
-                        <button type="button" onClick={() => removeGoal(idx)} className="qn-btn-remove">
-                            <Trash2 size={12} /> Remove
-                        </button>
-                    </div>
-
-                    <div className="qn-form-grid full">
-                        <div className="qn-field">
-                            <label>Goal Name <span className="qn-required">*</span></label>
-                            <input type="text" value={goal.name} onChange={e => updateGoal(idx, 'name', e.target.value)} placeholder="e.g. Buy a home, Retirement, Child's education" />
+            <div className="qn-saved-cards-list">
+                {goals.map((goal, idx) => (
+                    <div key={goal.id} className="qn-saved-card">
+                        <div className="qn-saved-card-main">
+                            <div className="qn-saved-card-title">{goal.name || `Goal ${idx + 1}`}</div>
+                            <div className="qn-saved-card-meta">
+                                {goal.target > 0 && <span>{fmtShort(goal.target)}</span>}
+                                {goal.years > 0 && <span>in {goal.years}y</span>}
+                                {goal.isSaving === 'regular' && goal.monthlySip > 0 && <span>SIP {fmtShort(goal.monthlySip)}/mo</span>}
+                                {goal.isSaving === 'regular' && !goal.monthlySip && <span>Saving regularly</span>}
+                                {goal.isSaving === 'irregular' && <span>Saving irregularly</span>}
+                                {goal.isSaving === 'no' && <span>Not saving yet</span>}
+                            </div>
+                        </div>
+                        <div className="qn-saved-card-actions">
+                            <button type="button" onClick={() => openEdit(idx)} className="qn-btn-edit">Edit</button>
+                            <button type="button" onClick={() => removeGoal(idx)} className="qn-btn-remove"><Trash2 size={12} /></button>
                         </div>
                     </div>
+                ))}
+            </div>
 
-                    <Row>
-                        <InputField label="Target Amount" name={`goal_target_${idx}`} type="currency" prefix="₹" value={goal.target || ''} onChange={e => updateGoal(idx, 'target', e.target.value === '' ? 0 : Number(String(e.target.value).replace(/,/g, '')))} info="How much do you need for this goal? Leave blank if you're not sure yet." />
-                        <InputField label="Timeframe (years)" name={`goal_years_${idx}`} type="number" value={goal.years || ''} onChange={e => updateGoal(idx, 'years', e.target.value === '' ? 0 : Number(e.target.value))} min={0} placeholder="e.g. 5" info="In how many years do you want to achieve this? Leave blank if unsure." />
-                    </Row>
-
-                    <div className="qn-form-grid full">
-                        <div className="qn-field">
-                            <label>Are you currently saving for this goal?</label>
-                            <select value={goal.isSaving || 'no'} onChange={e => updateGoal(idx, 'isSaving', e.target.value)}>
-                                {SAVING_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                            </select>
+            {draftGoal && (
+                <div className="qn-modal-overlay" onClick={closeModal}>
+                    <div className="qn-modal" onClick={e => e.stopPropagation()}>
+                        <div className="qn-modal-header">
+                            <span>{draftIdx === null ? 'Add Goal' : 'Edit Goal'}</span>
+                            <button type="button" onClick={closeModal} className="qn-modal-close">✕</button>
+                        </div>
+                        <div className="qn-modal-body">
+                            <div className="qn-form-grid full">
+                                <div className="qn-field">
+                                    <label>Goal Name <span className="qn-required">*</span></label>
+                                    <input type="text" value={draftGoal.name} onChange={e => updateDraft('name', e.target.value)} placeholder="e.g. Buy a home, Retirement, Child's education" autoFocus />
+                                </div>
+                            </div>
+                            <Row>
+                                <InputField label="Target Amount" name="draft_goal_target" type="currency" prefix="₹" value={draftGoal.target || ''} onChange={e => updateDraft('target', e.target.value === '' ? 0 : Number(String(e.target.value).replace(/,/g, '')))} info="How much do you need for this goal? Leave blank if you're not sure yet." />
+                                <InputField label="Timeframe (years)" name="draft_goal_years" type="number" value={draftGoal.years || ''} onChange={e => updateDraft('years', e.target.value === '' ? 0 : Number(e.target.value))} min={0} placeholder="e.g. 5" info="In how many years do you want to achieve this? Leave blank if unsure." />
+                            </Row>
+                            <div className="qn-form-grid full">
+                                <div className="qn-field">
+                                    <label>Are you currently saving for this goal?</label>
+                                    <select value={draftGoal.isSaving || 'no'} onChange={e => updateDraft('isSaving', e.target.value)}>
+                                        {SAVING_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                            {draftGoal.isSaving === 'regular' && (
+                                <Row>
+                                    <InputField
+                                        label="Monthly contribution towards this goal"
+                                        name="draft_goal_sip"
+                                        type="currency"
+                                        prefix="₹"
+                                        value={draftGoal.monthlySip || ''}
+                                        onChange={e => updateDraft('monthlySip', e.target.value === '' ? 0 : Number(String(e.target.value).replace(/,/g, '')))}
+                                        info="How much you put in every month for this goal specifically. Used to check if you're on track."
+                                    />
+                                </Row>
+                            )}
+                        </div>
+                        <div className="qn-modal-footer">
+                            <button type="button" onClick={closeModal} className="qn-btn-secondary">Cancel</button>
+                            <button type="button" onClick={saveDraft} className="qn-btn-primary" disabled={!draftGoal.name?.trim()}>Save Goal</button>
                         </div>
                     </div>
-
                 </div>
-            ))}
+            )}
         </>
     );
 };
@@ -749,323 +995,428 @@ const StepGoals = ({ goals, setGoals }) => {
 const Step6 = ({ formData: f, onChange, setFormData }) => {
     const loans = Array.isArray(f.loans) ? f.loans : [];
     const creditCards = Array.isArray(f.credit_cards) ? f.credit_cards : [];
+    const [tab, setTab] = useState(creditCards.length > 0 && loans.length === 0 ? 1 : 0);
 
-    // Validation: check if last loan has basics filled
-    const hasIncompleteLoan = loans.length > 0 && loans.some(l => !l.type || !l.outstanding || !l.emi);
-    const hasIncompleteCard = creditCards.length > 0 && creditCards.some(c => {
-        if (!c.balance && c.balance !== 0) return true;
-        if (!c.type) return true;
-        if (c.type === 'emi' && !c.emi_amount) return true;
-        return false;
-    });
+    // ── Loan modal state ──
+    const [draftLoan, setDraftLoan] = useState(null);
+    const [draftLoanIdx, setDraftLoanIdx] = useState(null);
+
+    // ── Card modal state ──
+    const [draftCard, setDraftCard] = useState(null);
+    const [draftCardIdx, setDraftCardIdx] = useState(null);
+
+    const fmtShort = (n) => {
+        if (!n) return null;
+        if (n >= 10000000) return `₹${(n / 10000000).toFixed(1)}Cr`;
+        if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
+        if (n >= 1000) return `₹${Math.round(n / 1000)}K`;
+        return `₹${Number(n).toLocaleString('en-IN')}`;
+    };
 
     // ── Loan helpers ──
-    const addLoan = () => {
-        if (hasIncompleteLoan) return;
-        setFormData(prev => ({
-            ...prev,
-            loans: [...(Array.isArray(prev.loans) ? prev.loans : []), { type: 'Home Loan', outstanding: '', interestRate: '', emi: '', tenure: '' }]
-        }));
+    const openAddLoan = () => {
+        setDraftLoan({ type: 'Home Loan', outstanding: '', interestRate: '', emi: '', tenure: '' });
+        setDraftLoanIdx(null);
     };
+    const openEditLoan = (idx) => { setDraftLoan({ ...loans[idx] }); setDraftLoanIdx(idx); };
+    const closeLoanModal = () => { setDraftLoan(null); setDraftLoanIdx(null); };
+    const saveLoan = () => {
+        if (!draftLoan.outstanding || !draftLoan.emi) return;
+        if (draftLoanIdx === null) {
+            setFormData(prev => ({ ...prev, loans: [...(Array.isArray(prev.loans) ? prev.loans : []), draftLoan] }));
+        } else {
+            setFormData(prev => {
+                const updated = [...(Array.isArray(prev.loans) ? prev.loans : [])];
+                updated[draftLoanIdx] = draftLoan;
+                return { ...prev, loans: updated };
+            });
+        }
+        closeLoanModal();
+    };
+    const removeLoan = (idx) => setFormData(prev => ({ ...prev, loans: (Array.isArray(prev.loans) ? prev.loans : []).filter((_, i) => i !== idx) }));
+    const updateDraftLoan = (field, value) => setDraftLoan(prev => ({ ...prev, [field]: value }));
 
-    const removeLoan = (idx) => {
-        setFormData(prev => ({
-            ...prev,
-            loans: (Array.isArray(prev.loans) ? prev.loans : []).filter((_, i) => i !== idx)
-        }));
+    // ── Card helpers ──
+    const openAddCard = () => {
+        setDraftCard({ name: '', balance: '', type: 'full', emi_amount: '' });
+        setDraftCardIdx(null);
     };
+    const openEditCard = (idx) => { setDraftCard({ ...creditCards[idx] }); setDraftCardIdx(idx); };
+    const closeCardModal = () => { setDraftCard(null); setDraftCardIdx(null); };
+    const saveCard = () => {
+        if (!draftCard.balance && draftCard.balance !== 0) return;
+        if (!draftCard.type) return;
+        if (draftCardIdx === null) {
+            setFormData(prev => ({ ...prev, credit_cards: [...(Array.isArray(prev.credit_cards) ? prev.credit_cards : []), draftCard] }));
+        } else {
+            setFormData(prev => {
+                const updated = [...(Array.isArray(prev.credit_cards) ? prev.credit_cards : [])];
+                updated[draftCardIdx] = draftCard;
+                return { ...prev, credit_cards: updated };
+            });
+        }
+        closeCardModal();
+    };
+    const removeCard = (idx) => setFormData(prev => ({ ...prev, credit_cards: (Array.isArray(prev.credit_cards) ? prev.credit_cards : []).filter((_, i) => i !== idx) }));
+    const updateDraftCard = (field, value) => setDraftCard(prev => ({ ...prev, [field]: value }));
 
-    const updateLoan = (idx, field, value) => {
-        setFormData(prev => {
-            const updated = [...(Array.isArray(prev.loans) ? prev.loans : [])];
-            updated[idx] = { ...updated[idx], [field]: value };
-            return { ...prev, loans: updated };
-        });
-    };
-
-    // ── Credit card helpers ──
-    const addCard = () => {
-        if (hasIncompleteCard) return;
-        setFormData(prev => ({
-            ...prev,
-            credit_cards: [...(Array.isArray(prev.credit_cards) ? prev.credit_cards : []), { name: '', balance: '', type: 'full', emi_amount: '' }]
-        }));
-    };
-
-    const removeCard = (idx) => {
-        setFormData(prev => ({
-            ...prev,
-            credit_cards: (Array.isArray(prev.credit_cards) ? prev.credit_cards : []).filter((_, i) => i !== idx)
-        }));
-    };
-
-    const updateCard = (idx, field, value) => {
-        setFormData(prev => {
-            const updated = [...(Array.isArray(prev.credit_cards) ? prev.credit_cards : [])];
-            updated[idx] = { ...updated[idx], [field]: value };
-            return { ...prev, credit_cards: updated };
-        });
-    };
+    const REPAY_LABELS = { full: 'Paid in full', emi: 'EMI', revolving: 'Revolving' };
 
     return (
         <>
-            {/* ── Active Loans ── */}
-            <div className="qn-subsection-label" style={{ marginBottom: '24px' }}>
-                <span>Active Loans</span>
-                <DisabledTooltipButton onClick={addLoan} disabled={hasIncompleteLoan} reason="Fill in the outstanding amount and EMI for each loan before adding another" className="qn-btn-add">
-                    <Plus size={14} /> Add Loan
-                </DisabledTooltipButton>
+            <div className="ani d1">
+                <div className="qn-callout warn" style={{ marginBottom: '16px' }}>
+                    <strong>No loans or cards?</strong> Skip this step entirely — you can add debts later.
+                </div>
             </div>
+            <StepTabs tabs={['Loans', 'Credit Cards']} active={tab} onChange={setTab} />
 
-            {loans.length === 0 && (
-                <div className="qn-empty-state">
-                    No loans added — click <strong>Add Loan</strong> above if you have an active loan or EMI.
-                </div>
-            )}
-
-            {loans.map((loan, idx) => (
-                <div key={idx} className="qn-loan-card">
-                    <div className="qn-loan-card-header">
-                        <span className="qn-loan-card-title">Loan {idx + 1}</span>
-                        <button type="button" onClick={() => removeLoan(idx)} className="qn-btn-remove">
-                            <Trash2 size={12} /> Remove
-                        </button>
-                    </div>
-                    <div className="qn-form-grid full">
-                        <div className="qn-field">
-                            <label>Loan Type</label>
-                            <select value={loan.type || ''} onChange={e => updateLoan(idx, 'type', e.target.value)}>
-                                <option value="" disabled>Select</option>
-                                {['Home Loan', 'Car Loan', 'Personal Loan', 'Education Loan', 'Gold Loan', 'Other'].map(opt =>
-                                    <option key={opt} value={opt}>{opt}</option>
-                                )}
-                            </select>
-                        </div>
-                    </div>
-                    <Row>
-                        <div className="qn-field">
-                            <label>Outstanding Amount</label>
-                            <div className="qn-rupee-wrap">
-                                <span>₹</span>
-                                <input type="number" value={loan.outstanding || ''} onChange={e => updateLoan(idx, 'outstanding', e.target.value)} />
-                            </div>
-                        </div>
-                        <div className="qn-field">
-                            <label>Interest Rate</label>
-                            <div className="qn-pct-wrap">
-                                <input type="number" value={loan.interestRate || ''} onChange={e => updateLoan(idx, 'interestRate', e.target.value)} />
-                                <span>%</span>
-                            </div>
-                        </div>
-                    </Row>
-                    <Row>
-                        <div className="qn-field">
-                            <label>Monthly EMI</label>
-                            <div className="qn-rupee-wrap">
-                                <span>₹</span>
-                                <input type="number" value={loan.emi || ''} onChange={e => updateLoan(idx, 'emi', e.target.value)} />
-                            </div>
-                        </div>
-                        <div className="qn-field">
-                            <label>Remaining Tenure (months)</label>
-                            <input type="number" value={loan.tenure || ''} onChange={e => updateLoan(idx, 'tenure', e.target.value)} min="0" />
-                        </div>
-                    </Row>
-                </div>
-            ))}
-
-            {/* ── Credit Cards ── */}
-            <div className="qn-subsection-label" style={{ marginTop: '32px', marginBottom: '24px' }}>
-                <span>Credit Cards</span>
-                <DisabledTooltipButton onClick={addCard} disabled={hasIncompleteCard} reason="Fill in the balance and repayment type for each card before adding another" className="qn-btn-add">
-                    <Plus size={14} /> Add Card
-                </DisabledTooltipButton>
-            </div>
-
-            {creditCards.length === 0 && (
-                <div className="qn-empty-state">
-                    No credit cards added — click <strong>Add Card</strong> above if you carry any outstanding balance.
-                </div>
-            )}
-
-            {creditCards.map((card, idx) => (
-                <div key={idx} className="qn-loan-card">
-                    <div className="qn-loan-card-header">
-                        <span className="qn-loan-card-title">Card {idx + 1}</span>
-                        <button type="button" onClick={() => removeCard(idx)} className="qn-btn-remove">
-                            <Trash2 size={12} /> Remove
+            {tab === 0 && (
+                <>
+                    <div className="qn-subsection-label" style={{ marginBottom: '24px' }}>
+                        <span>Active Loans</span>
+                        <button type="button" onClick={openAddLoan} className="qn-btn-add">
+                            <Plus size={14} /> Add Loan
                         </button>
                     </div>
 
-                    {/* Card name */}
-                    <div className="qn-form-grid full">
-                        <div className="qn-field">
-                            <label>Card Name / Issuer <span style={{ color: 'var(--ink-soft)', fontWeight: 400 }}>(optional)</span></label>
-                            <input
-                                type="text"
-                                placeholder="e.g. HDFC Regalia, SBI SimplyCLICK"
-                                value={card.name || ''}
-                                onChange={e => updateCard(idx, 'name', e.target.value)}
-                            />
+                    {loans.length === 0 && (
+                        <div className="qn-empty-state">
+                            No loans added — click <strong>Add Loan</strong> above if you have an active loan or EMI.
                         </div>
-                    </div>
+                    )}
 
-                    <Row>
-                        {/* Outstanding balance */}
-                        <div className="qn-field">
-                            <label>Outstanding Balance</label>
-                            <div className="qn-rupee-wrap">
-                                <span>₹</span>
-                                <input
-                                    type="number"
-                                    placeholder="0"
-                                    value={card.balance || ''}
-                                    onChange={e => updateCard(idx, 'balance', e.target.value)}
-                                    min="0"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Repayment type */}
-                        <div className="qn-field">
-                            <label>How do you repay?</label>
-                            <select
-                                value={card.type || 'revolving'}
-                                onChange={e => updateCard(idx, 'type', e.target.value)}
-                            >
-                                <option value="full">Paid in full every month</option>
-                                <option value="emi">Converted to EMI</option>
-                                <option value="revolving">Revolving / minimum due only</option>
-                            </select>
-                        </div>
-                    </Row>
-
-                    {/* EMI amount — only shown when type === 'emi' */}
-                    {card.type === 'emi' && (
-                        <Row>
-                            <div className="qn-field">
-                                <label>Monthly EMI Amount</label>
-                                <div className="qn-rupee-wrap">
-                                    <span>₹</span>
-                                    <input
-                                        type="number"
-                                        placeholder="0"
-                                        value={card.emi_amount || ''}
-                                        onChange={e => updateCard(idx, 'emi_amount', e.target.value)}
-                                        min="0"
-                                    />
+                    <div className="qn-saved-cards-list">
+                        {loans.map((loan, idx) => (
+                            <div key={idx} className="qn-saved-card">
+                                <div className="qn-saved-card-main">
+                                    <div className="qn-saved-card-title">{loan.type || `Loan ${idx + 1}`}</div>
+                                    <div className="qn-saved-card-meta">
+                                        {loan.outstanding && <span>Outstanding {fmtShort(Number(loan.outstanding))}</span>}
+                                        {loan.emi && <span>EMI {fmtShort(Number(loan.emi))}/mo</span>}
+                                        {loan.interestRate && <span>{loan.interestRate}% p.a.</span>}
+                                    </div>
+                                </div>
+                                <div className="qn-saved-card-actions">
+                                    <button type="button" onClick={() => openEditLoan(idx)} className="qn-btn-edit">Edit</button>
+                                    <button type="button" onClick={() => removeLoan(idx)} className="qn-btn-remove"><Trash2 size={12} /></button>
                                 </div>
                             </div>
-                            <div className="qn-field" /> {/* spacer */}
-                        </Row>
-                    )}
-                </div>
-            ))}
+                        ))}
+                    </div>
 
-            {/* ── Credit Score ── */}
-            <Row full>
-                <InputField label="Credit Score" name="credit_score" type="number" value={f.credit_score} onChange={onChange} placeholder="e.g. 750" info="Check on CIBIL, Experian, etc." />
-            </Row>
+                    {/* Loan modal */}
+                    {draftLoan && (
+                        <div className="qn-modal-overlay" onClick={closeLoanModal}>
+                            <div className="qn-modal" onClick={e => e.stopPropagation()}>
+                                <div className="qn-modal-header">
+                                    <span>{draftLoanIdx === null ? 'Add Loan' : 'Edit Loan'}</span>
+                                    <button type="button" onClick={closeLoanModal} className="qn-modal-close">✕</button>
+                                </div>
+                                <div className="qn-modal-body">
+                                    <div className="qn-form-grid full">
+                                        <div className="qn-field">
+                                            <label>Loan Type</label>
+                                            <select value={draftLoan.type || 'Home Loan'} onChange={e => updateDraftLoan('type', e.target.value)}>
+                                                {['Home Loan', 'Car Loan', 'Personal Loan', 'Education Loan', 'Gold Loan', 'Other'].map(opt =>
+                                                    <option key={opt} value={opt}>{opt}</option>
+                                                )}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <Row>
+                                        <div className="qn-field">
+                                            <label>Outstanding Amount <span className="qn-required">*</span></label>
+                                            <div className="qn-rupee-wrap">
+                                                <span>₹</span>
+                                                <input type="number" value={draftLoan.outstanding || ''} onChange={e => updateDraftLoan('outstanding', e.target.value)} autoFocus />
+                                            </div>
+                                        </div>
+                                        <div className="qn-field">
+                                            <label>Interest Rate</label>
+                                            <div className="qn-pct-wrap">
+                                                <input type="number" value={draftLoan.interestRate || ''} onChange={e => updateDraftLoan('interestRate', e.target.value)} />
+                                                <span>%</span>
+                                            </div>
+                                        </div>
+                                    </Row>
+                                    <Row>
+                                        <div className="qn-field">
+                                            <label>Monthly EMI <span className="qn-required">*</span></label>
+                                            <div className="qn-rupee-wrap">
+                                                <span>₹</span>
+                                                <input type="number" value={draftLoan.emi || ''} onChange={e => updateDraftLoan('emi', e.target.value)} />
+                                            </div>
+                                        </div>
+                                        <div className="qn-field">
+                                            <label>Remaining Tenure (months)</label>
+                                            <input type="number" value={draftLoan.tenure || ''} onChange={e => updateDraftLoan('tenure', e.target.value)} min="0" />
+                                        </div>
+                                    </Row>
+                                </div>
+                                <div className="qn-modal-footer">
+                                    <button type="button" onClick={closeLoanModal} className="qn-btn-secondary">Cancel</button>
+                                    <button type="button" onClick={saveLoan} className="qn-btn-primary" disabled={!draftLoan.outstanding || !draftLoan.emi}>Save Loan</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </>
+            )}
+
+            {tab === 1 && (
+                <>
+                    <div className="qn-subsection-label" style={{ marginBottom: '24px' }}>
+                        <span>Credit Cards</span>
+                        <button type="button" onClick={openAddCard} className="qn-btn-add">
+                            <Plus size={14} /> Add Card
+                        </button>
+                    </div>
+
+                    {creditCards.length === 0 && (
+                        <div className="qn-empty-state">
+                            No credit cards added — click <strong>Add Card</strong> above if you carry any outstanding balance.
+                        </div>
+                    )}
+
+                    <div className="qn-saved-cards-list">
+                        {creditCards.map((card, idx) => (
+                            <div key={idx} className="qn-saved-card">
+                                <div className="qn-saved-card-main">
+                                    <div className="qn-saved-card-title">{card.name || `Card ${idx + 1}`}</div>
+                                    <div className="qn-saved-card-meta">
+                                        {card.balance && <span>Balance {fmtShort(Number(card.balance))}</span>}
+                                        <span>{REPAY_LABELS[card.type] || card.type}</span>
+                                        {card.type === 'emi' && card.emi_amount && <span>EMI {fmtShort(Number(card.emi_amount))}/mo</span>}
+                                    </div>
+                                </div>
+                                <div className="qn-saved-card-actions">
+                                    <button type="button" onClick={() => openEditCard(idx)} className="qn-btn-edit">Edit</button>
+                                    <button type="button" onClick={() => removeCard(idx)} className="qn-btn-remove"><Trash2 size={12} /></button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Card modal */}
+                    {draftCard && (
+                        <div className="qn-modal-overlay" onClick={closeCardModal}>
+                            <div className="qn-modal" onClick={e => e.stopPropagation()}>
+                                <div className="qn-modal-header">
+                                    <span>{draftCardIdx === null ? 'Add Credit Card' : 'Edit Credit Card'}</span>
+                                    <button type="button" onClick={closeCardModal} className="qn-modal-close">✕</button>
+                                </div>
+                                <div className="qn-modal-body">
+                                    <div className="qn-form-grid full">
+                                        <div className="qn-field">
+                                            <label>Card Name / Issuer <span style={{ color: 'var(--ink-soft)', fontWeight: 400 }}>(optional)</span></label>
+                                            <input type="text" placeholder="e.g. HDFC Regalia, SBI SimplyCLICK" value={draftCard.name || ''} onChange={e => updateDraftCard('name', e.target.value)} autoFocus />
+                                        </div>
+                                    </div>
+                                    <Row>
+                                        <div className="qn-field">
+                                            <label>Outstanding Balance <span className="qn-required">*</span></label>
+                                            <div className="qn-rupee-wrap">
+                                                <span>₹</span>
+                                                <input type="number" placeholder="0" value={draftCard.balance || ''} onChange={e => updateDraftCard('balance', e.target.value)} min="0" />
+                                            </div>
+                                        </div>
+                                        <div className="qn-field">
+                                            <label>How do you repay?</label>
+                                            <select value={draftCard.type || 'revolving'} onChange={e => updateDraftCard('type', e.target.value)}>
+                                                <option value="full">Paid in full every month</option>
+                                                <option value="emi">Converted to EMI</option>
+                                                <option value="revolving">Revolving / minimum due only</option>
+                                            </select>
+                                        </div>
+                                    </Row>
+                                    {draftCard.type === 'emi' && (
+                                        <Row>
+                                            <div className="qn-field">
+                                                <label>Monthly EMI Amount <span className="qn-required">*</span></label>
+                                                <div className="qn-rupee-wrap">
+                                                    <span>₹</span>
+                                                    <input type="number" placeholder="0" value={draftCard.emi_amount || ''} onChange={e => updateDraftCard('emi_amount', e.target.value)} min="0" />
+                                                </div>
+                                            </div>
+                                            <div className="qn-field" />
+                                        </Row>
+                                    )}
+                                </div>
+                                <div className="qn-modal-footer">
+                                    <button type="button" onClick={closeCardModal} className="qn-btn-secondary">Cancel</button>
+                                    <button type="button" onClick={saveCard} className="qn-btn-primary" disabled={!draftCard.balance && draftCard.balance !== 0}>Save Card</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Credit Score ── */}
+                    <Row full>
+                        <InputField label="Credit Score" name="credit_score" type="number" value={f.credit_score} onChange={onChange} placeholder="e.g. 750" info="Check on CIBIL, Experian, etc." />
+                    </Row>
+                </>
+            )}
         </>
     );
 };
 
 const Step7 = ({ formData: f, onChange }) => (
     <>
-        <div className="qn-subsection-label">Health Insurance</div>
-        <Row>
-            <InputField label="Health Cover Amount" name="health_cover" type="currency" prefix="₹" value={f.health_cover} onChange={onChange} info="Sum insured - the maximum the insurer will pay. Ideal: ₹10-25L for a family." />
-        </Row>
-        <div className="qn-subsection-label" style={{ marginTop: '32px' }}>Life Insurance</div>
-        <Row>
-            <InputField label="Term Cover Amount" name="life_cover" type="currency" prefix="₹" value={f.life_cover} onChange={onChange} info="Term insurance pays a lump sum to your nominee if you die during the policy term. Ideal: 10-15x your annual income." />
-        </Row>
-        <div className="qn-callout" style={{ marginTop: '24px' }}>
-            Insurance premiums (health, term, vehicle, etc.) should be included in the annual Insurance Premiums field under the Expenses step.
+        <div className="ani d1">
+            <div className="qn-callout warn" style={{ marginBottom: '12px' }}>
+                <strong>No insurance yet?</strong> Leave the fields blank — we'll include getting covered in your action plan.
+            </div>
+        </div>
+        <div className="ani d2">
+            <div className="qn-callout">
+                Enter premiums here for Health and Life insurance. Do not add these again under Insurance Premiums in the Expenses step — that is for Vehicle, Home, and other policies only.
+            </div>
+        </div>
+        <div className="ani d3 qn-insurance-cards">
+            <div className="qn-insurance-card">
+                <div className="qn-insurance-card-header">
+                    <ShieldCheck size={16} />
+                    <span>HEALTH INSURANCE</span>
+                </div>
+                <div className="qn-insurance-card-body">
+                    <InputField label="Cover Amount" name="health_cover" type="currency" prefix="₹" value={f.health_cover} onChange={onChange} info="Sum insured — the maximum the insurer will pay. Ideal: ₹10–25L for a family." optional />
+                    <InputField label="Annual Premium" name="health_premium" type="currency" prefix="₹" value={f.health_premium} onChange={onChange} info="Total yearly premium paid for health insurance." optional />
+                </div>
+            </div>
+            <div className="qn-insurance-card">
+                <div className="qn-insurance-card-header">
+                    <Users size={16} />
+                    <span>LIFE INSURANCE</span>
+                </div>
+                <div className="qn-insurance-card-body">
+                    <InputField label="Term Cover Amount" name="life_cover" type="currency" prefix="₹" value={f.life_cover} onChange={onChange} info="Term insurance pays a lump sum to your nominee if you die during the policy term. Ideal: 10–15× your annual income." optional />
+                    <InputField label="Annual Premium" name="life_premium" type="currency" prefix="₹" value={f.life_premium} onChange={onChange} info="Total yearly premium paid for life / term insurance." optional />
+                </div>
+            </div>
+        </div>
+        <div className="ani d2">
+            <div className="qn-callout">
+                Insurance premiums (health, term, vehicle, etc.) should also be included in the annual Insurance Premiums field under the Expenses step.
+            </div>
         </div>
     </>
 );
 
 const Step8 = ({ formData: f, onChange }) => (
     <>
-        <div className="qn-callout warn">
-            <strong>Not sure about tax?</strong> Select <em>New Regime</em> below and leave the rest blank — we'll still give you a complete financial plan. The fields below only apply if you're using the Old Regime with deductions.
+        <div className="ani d1" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div className="qn-callout warn">
+                <strong>Not sure about tax?</strong> Select <em>New Regime</em> below and leave the rest blank — we'll still give you a complete financial plan. The fields below only apply if you're using the Old Regime with deductions.
+            </div>
+            <SelectField label="Current Tax Regime" name="tax_regime" value={f.tax_regime} onChange={onChange} options={['Old Regime', 'New Regime', 'Not Sure']} info="Old Regime allows deductions (80C, HRA, etc) but has higher base rates. New Regime has lower rates but fewer deductions." />
         </div>
-        <SelectField label="Current Tax Regime" name="tax_regime" value={f.tax_regime} onChange={onChange} options={['Old Regime', 'New Regime', 'Not Sure']} info="Old Regime allows deductions (80C, HRA, etc) but has higher base rates. New Regime has lower rates but fewer deductions." />
-        <Row>
-            <InputField label="80C Used (PPF, ELSS, etc)" name="tax_80c_used" type="currency" prefix="₹" value={f.tax_80c_used} onChange={onChange} info="Section 80C: up to ₹1.5L deduction for PPF, ELSS, LIC, tuition fees, home loan principal, etc." />
-            <InputField label="NPS 80CCD(1B)" name="tax_nps_80ccd" type="currency" prefix="₹" value={f.tax_nps_80ccd} onChange={onChange} info="Extra ₹50,000 deduction over 80C for NPS (National Pension System) contributions. Only in Old Regime." />
-        </Row>
-        <Row>
-            <InputField label="HRA Used" name="tax_hra" type="currency" prefix="₹" value={f.tax_hra} onChange={onChange} info="House Rent Allowance exemption for salaried individuals paying rent. Only in Old Regime." />
-            <InputField label="Home Loan Interest" name="tax_home_loan_interest" type="currency" prefix="₹" value={f.tax_home_loan_interest} onChange={onChange} info="Section 24: up to ₹2L deduction on home loan interest paid (self-occupied property). Old Regime only." />
-        </Row>
-        <InputField label="Health Insurance 80D" name="tax_80d" type="currency" prefix="₹" value={f.tax_80d} onChange={onChange} info="Up to ₹25K for self + ₹25K for parents (₹50K if senior). Covers health insurance premiums and preventive checkups." />
+        <div className="ani d2">
+            <Row>
+                <InputField label="80C Used (PPF, ELSS, etc)" name="tax_80c_used" type="currency" prefix="₹" value={f.tax_80c_used} onChange={onChange} info="Section 80C: up to ₹1.5L deduction for PPF, ELSS, LIC, tuition fees, home loan principal, etc." />
+                <InputField label="NPS 80CCD(1B)" name="tax_nps_80ccd" type="currency" prefix="₹" value={f.tax_nps_80ccd} onChange={onChange} info="Extra ₹50,000 deduction over 80C for NPS (National Pension System) contributions. Only in Old Regime." />
+            </Row>
+            <Row>
+                <InputField label="HRA Used" name="tax_hra" type="currency" prefix="₹" value={f.tax_hra} onChange={onChange} info="House Rent Allowance exemption for salaried individuals paying rent. Only in Old Regime." />
+                <InputField label="Home Loan Interest" name="tax_home_loan_interest" type="currency" prefix="₹" value={f.tax_home_loan_interest} onChange={onChange} info="Section 24: up to ₹2L deduction on home loan interest paid (self-occupied property). Old Regime only." />
+            </Row>
+        </div>
+        <div className="ani d3">
+            <InputField label="Health Insurance 80D" name="tax_80d" type="currency" prefix="₹" value={f.tax_80d} onChange={onChange} info="Up to ₹25K for self + ₹25K for parents (₹50K if senior). Covers health insurance premiums and preventive checkups." />
+        </div>
     </>
 );
 
 const Step9 = ({ formData: f, onChange }) => (
     <>
-        <div className="qn-callout warn">
-            <strong>Don't have a will yet?</strong> That's okay — even setting nominees on your bank, demat, insurance, PF, and mutual fund accounts takes just 5 minutes and protects your family from legal delays.
+        <div className="ani d1">
+            <div className="qn-callout warn">
+                <strong>Don't have a will yet?</strong> That's okay — even setting nominees on your bank, demat, insurance, PF, and mutual fund accounts takes just 5 minutes and protects your family from legal delays.
+            </div>
         </div>
-        <SelectField label="Do you have a Will?" name="has_will" value={f.has_will} onChange={onChange} options={['Yes', 'No', 'In Progress']} info="A legally registered will ensures your assets go to chosen beneficiaries and avoids family disputes." />
-        <SelectField label="Nominees set for major accounts?" name="nominees_set" value={f.nominees_set} onChange={onChange} options={['Yes, all', 'Yes, some', 'No']} info="Nominees are temporary custodians. Set nominees on: Bank accounts, Demat, Insurance, PF, NPS, MF folios." />
-        <InputField label="Number of Nominees Assigned" name="num_nominees" type="number" value={f.num_nominees} onChange={onChange} info="Count of unique nominees across all your financial accounts" />
+        <div className="ani d2">
+            <SelectField label="Do you have a Will?" name="has_will" value={f.has_will} onChange={onChange} options={['Yes', 'No', 'In Progress']} info="A legally registered will ensures your assets go to chosen beneficiaries and avoids family disputes." />
+            <SelectField label="Nominees set for major accounts?" name="nominees_set" value={f.nominees_set} onChange={onChange} options={['Yes, all', 'Yes, some', 'No']} info="Nominees are temporary custodians. Set nominees on: Bank accounts, Demat, Insurance, PF, NPS, MF folios." />
+            <InputField label="Number of Nominees Assigned" name="num_nominees" type="number" value={f.num_nominees} onChange={onChange} info="Count of unique nominees across all your financial accounts" />
+        </div>
     </>
 );
 
 const Step10 = ({ formData: f, onChange }) => {
-    const questions = [
-        { label: 'I review my finances at least once a month', name: 'beh_review_monthly' },
-        { label: 'I tend to delay important financial decisions', name: 'beh_delay_decisions' },
-        { label: 'I sometimes spend impulsively and regret it later', name: 'beh_spend_impulsively' },
-        { label: 'I actively avoid taking on unnecessary debt', name: 'beh_avoid_debt' },
-        { label: 'When markets fall, I stay calm and don\'t change my investments', name: 'beh_market_reaction' },
-        { label: 'When I receive unexpected money, I invest or save most of it', name: 'beh_windfall_behaviour' },
-        { label: 'I hold onto losing investments hoping they will recover', name: 'beh_hold_losing' },
-        { label: 'I understand what I\'m invested in and why', name: 'beh_product_understanding' },
-        { label: 'I compare my financial progress with friends or peers', name: 'beh_compare_peers' },
-        { label: 'I prefer guaranteed returns over higher but uncertain gains', name: 'beh_prefer_guaranteed' },
-        { label: 'I regularly follow financial news and market updates', name: 'beh_follow_market_news' },
-        { label: 'I feel anxious when making big financial decisions', name: 'beh_anxious_decisions' },
-        { label: 'I tend to invest in brands or companies I already know', name: 'beh_familiar_brands' },
+    const groups = [
+        {
+            name: 'Spending',
+            questions: [
+                { label: 'I review my finances at least once a month', name: 'beh_review_monthly' },
+                { label: 'I tend to delay important financial decisions', name: 'beh_delay_decisions' },
+                { label: 'I sometimes spend impulsively and regret it later', name: 'beh_spend_impulsively' },
+                { label: 'I actively avoid taking on unnecessary debt', name: 'beh_avoid_debt' },
+            ],
+        },
+        {
+            name: 'Investing',
+            questions: [
+                { label: 'When markets fall, I stay calm and don\'t change my investments', name: 'beh_market_reaction' },
+                { label: 'When I receive unexpected money, I invest or save most of it', name: 'beh_windfall_behaviour' },
+                { label: 'I hold onto losing investments hoping they will recover', name: 'beh_hold_losing' },
+                { label: 'I understand what I\'m invested in and why', name: 'beh_product_understanding' },
+                { label: 'I regularly follow financial news and market updates', name: 'beh_follow_market_news' },
+            ],
+        },
+        {
+            name: 'Mindset',
+            questions: [
+                { label: 'I compare my financial progress with friends or peers', name: 'beh_compare_peers' },
+                { label: 'I prefer guaranteed returns over higher but uncertain gains', name: 'beh_prefer_guaranteed' },
+                { label: 'I feel anxious when making big financial decisions', name: 'beh_anxious_decisions' },
+                { label: 'I tend to invest in brands or companies I already know', name: 'beh_familiar_brands' },
+            ],
+        },
     ];
+    const [tab, setTab] = useState(0);
     const scaleLabels = ['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree'];
-    return <>
-        <div className="qn-callout" style={{ marginBottom: '8px' }}>
-            <strong>How to answer:</strong> Rate each statement 1–5 based on how strongly you agree.
-            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginTop: '8px' }}>
-                {scaleLabels.map((lbl, i) => (
-                    <span key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
-                        <strong>{i + 1}</strong> = {lbl}
-                    </span>
-                ))}
-            </div>
-        </div>
-        {questions.map((q, i) => {
-            const current = f[q.name] ? String(f[q.name]) : '';
-            return (
-                <div key={i} className="qn-scale-question" style={{ marginBottom: '24px' }}>
-                    <p>{q.label} <span className="qn-required">*</span></p>
-                    <div className="qn-scale-options">
-                        {scaleLabels.map((lbl, j) => {
-                            const val = String(j + 1);
-                            const selected = current === val;
-                            return (
-                                <button key={val} type="button"
-                                    className={`qn-scale-btn ${selected ? 'selected' : ''}`}
-                                    onClick={() => onChange({ target: { name: q.name, value: val, type: 'number' } })}
-                                >
-                                    <span className="num">{val}</span>
-                                    <span className="lbl">{lbl}</span>
-                                </button>
-                            );
-                        })}
-                    </div>
+    const renderQ = (q, i) => {
+        const current = f[q.name] ? String(f[q.name]) : '';
+        return (
+            <div key={i} className="qn-scale-question" style={{ marginBottom: '24px' }}>
+                <p>{q.label} <span className="qn-required">*</span></p>
+                <div className="qn-scale-options">
+                    {scaleLabels.map((lbl, j) => {
+                        const val = String(j + 1);
+                        const selected = current === val;
+                        return (
+                            <button key={val} type="button"
+                                className={`qn-scale-btn ${selected ? 'selected' : ''}`}
+                                onClick={() => onChange({ target: { name: q.name, value: val, type: 'number' } })}
+                            >
+                                <span className="num">{val}</span>
+                                <span className="lbl">{lbl}</span>
+                            </button>
+                        );
+                    })}
                 </div>
-            );
-        })}
+            </div>
+        );
+    };
+    const activeGroup = groups[tab];
+
+    return <>
+        <div className="ani d1" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="qn-callout">
+                <strong>How to answer:</strong> Rate each statement 1–5 based on how strongly you agree.
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginTop: '6px' }}>
+                    {scaleLabels.map((lbl, i) => (
+                        <span key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
+                            <strong>{i + 1}</strong> = {lbl}
+                        </span>
+                    ))}
+                </div>
+            </div>
+            <StepTabs tabs={['Spending', 'Investing', 'Mindset']} active={tab} onChange={setTab} />
+        </div>
+        <div className="ani d2">
+            {activeGroup.questions.map((q, i) => renderQ(q, i))}
+        </div>
     </>;
 };
 /* ═══════════════════════════════════════════════
@@ -1074,131 +1425,94 @@ const Step10 = ({ formData: f, onChange }) => {
 
 const StepReview = ({ formData: f, goals = [], onGoToStep }) => {
     const fmtAmt = (v) => {
-        if (!v && v !== 0) return '—';
+        if (!v && v !== 0) return null;
         const n = Number(v);
-        if (isNaN(n) || n === 0) return '—';
+        if (isNaN(n) || n === 0) return null;
         if (n >= 10000000) return `₹${(n / 10000000).toFixed(1)}Cr`;
         if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
         if (n >= 1000) return `₹${Math.round(n / 1000)}K`;
         return `₹${n.toLocaleString('en-IN')}`;
     };
-    const v = (val) => (val !== null && val !== undefined && val !== '') ? String(val) : '—';
 
     const loans = Array.isArray(f.loans) ? f.loans : [];
     const cards = Array.isArray(f.credit_cards) ? f.credit_cards : [];
     const behFields = ['beh_review_monthly','beh_delay_decisions','beh_spend_impulsively','beh_avoid_debt','beh_market_reaction','beh_windfall_behaviour','beh_hold_losing','beh_product_understanding','beh_compare_peers','beh_prefer_guaranteed','beh_follow_market_news','beh_anxious_decisions','beh_familiar_brands'];
     const behAnswered = behFields.filter(k => f[k]).length;
 
-    const sections = [
-        { step: 1, title: 'Profile & Family', rows: [
-            ['Date of Birth', f.date_of_birth ? f.date_of_birth.split('T')[0] : '—'],
-            ['City', v(f.city)],
-            ['Marital Status', v(f.marital_status)],
-            ['Dependents', f.dependents !== null && f.dependents !== undefined ? String(f.dependents) : '—'],
-            ['Employment', v(f.employment_type)],
-            ['Risk Comfort', f.risk_comfort ? `${f.risk_comfort} / 10` : '—'],
-            ['Investment Experience', v(f.investment_experience)],
-        ]},
-        { step: 2, title: 'Financial Background', rows: [
-            ['Childhood Finances', f.gen_q1 ? `${f.gen_q1} / 5` : '—'],
-            ['Inheritance Expected', f.gen_q5 ? `${f.gen_q5} / 5` : '—'],
-            ['Family Safety Net', f.gen_q9 ? `${f.gen_q9} / 5` : '—'],
-        ]},
-        { step: 3, title: 'Income', rows: [
-            ['Monthly Take-Home', fmtAmt(f.monthly_take_home)],
-            ['Annual Salary', fmtAmt(f.annual_salary)],
-            ['Business Income', fmtAmt(f.business_income)],
-            ['Annual Bonus', fmtAmt(f.annual_bonus)],
-            ['Other Income', fmtAmt(f.other_income)],
-            ['Expected Growth', f.expected_income_growth ? `${f.expected_income_growth}%` : '—'],
-        ]},
-        { step: 4, title: 'Expenses', rows: [
-            ['Household', fmtAmt(f.expense_household)],
-            ['Rent / Home EMI', fmtAmt(f.expense_rent)],
-            ['Utilities', fmtAmt(f.expense_utilities)],
-            ['Transport', fmtAmt(f.expense_transport)],
-            ['Food & Dining', fmtAmt(f.expense_food)],
-            ['Subscriptions', fmtAmt(f.expense_subscriptions)],
-            ['Discretionary', fmtAmt(f.expense_discretionary)],
-            ['Annual Insurance', fmtAmt(f.expense_annual_insurance)],
-            ['Annual Education', fmtAmt(f.expense_annual_education)],
-            ['Annual Travel', fmtAmt(f.expense_annual_travel)],
-        ]},
-        { step: 5, title: 'Assets & Banking', rows: [
-            ['Savings Balance', fmtAmt(f.savings_balance)],
-            ['Fixed Deposits', fmtAmt(f.fd_balance)],
-            ['FD Average Rate', f.fd_rate ? `${f.fd_rate}%` : '—'],
-            ['Emergency Fund', fmtAmt(f.emergency_fund)],
-        ]},
-        { step: 6, title: 'Investments', rows: [
-            ['Direct Stocks', fmtAmt(f.inv_direct_stocks)],
-            ['Equity Mutual Funds', fmtAmt(f.inv_equity_mf)],
-            ['EPF / PPF / NPS', fmtAmt(f.inv_epf_ppf_nps)],
-            ['Debt Funds & Bonds', fmtAmt(f.inv_debt_funds)],
-            ['Gold / Commodities', fmtAmt(f.inv_gold_commodities)],
-            ['Real Estate', fmtAmt(f.inv_real_estate)],
-            ['Crypto / Alternatives', fmtAmt(f.inv_crypto_alt)],
-            ['Monthly SIP', fmtAmt(f.inv_monthly_sip)],
-            ['Regular SIP Duration', f.sip_consecutive_months ? `${f.sip_consecutive_months} months` : '—'],
-        ]},
-        { step: 7, title: 'Goals', rows: goals.length > 0 ? goals.map((g, i) => {
-            const savingLabel = g.isSaving === 'regular' ? 'Saving regularly' : g.isSaving === 'irregular' ? 'Saving irregularly' : 'Not saving yet';
-            return [`Goal ${i + 1}: ${g.name || 'Untitled'}`, [
-                g.target ? fmtAmt(g.target) : '',
-                g.years ? `${g.years}y` : '',
-                savingLabel,
-            ].filter(Boolean).join(' · ') || '—'];
-        }) : [['Goals', 'None added']]},
-        { step: 8, title: 'Liabilities', rows: [
-            ['Active Loans', loans.length > 0 ? `${loans.length} loan${loans.length > 1 ? 's' : ''}` : 'None'],
-            ['Credit Cards', cards.length > 0 ? `${cards.length} card${cards.length > 1 ? 's' : ''}` : 'None'],
-            ['Credit Score', v(f.credit_score)],
-        ]},
-        { step: 9, title: 'Insurance', rows: [
-            ['Health Cover', fmtAmt(f.health_cover)],
-            ['Health Premium (yearly)', fmtAmt(f.health_premium)],
-            ['Life Cover', fmtAmt(f.life_cover)],
-            ['Life Premium (yearly)', fmtAmt(f.life_premium)],
-        ]},
-        { step: 10, title: 'Tax', rows: [
-            ['Tax Regime', v(f.tax_regime)],
-            ['80C Used', fmtAmt(f.tax_80c_used)],
-            ['NPS 80CCD(1B)', fmtAmt(f.tax_nps_80ccd)],
-            ['HRA Used', fmtAmt(f.tax_hra)],
-            ['Home Loan Interest', fmtAmt(f.tax_home_loan_interest)],
-            ['Health Insurance 80D', fmtAmt(f.tax_80d)],
-        ]},
-        { step: 11, title: 'Nominations & Will', rows: [
-            ['Has Will', v(f.has_will)],
-            ['Nominees Set', v(f.nominees_set)],
-            ['Number of Nominees', v(f.num_nominees)],
-        ]},
-        { step: 12, title: 'Financial Behavior', rows: [
-            ['Questions Answered', `${behAnswered} of ${behFields.length}`],
-        ]},
+    // KPI calculations — matches SurplusTracker and backend computeSurplus logic
+    const monthlyIncome = (Number(f.monthly_take_home) || 0) + (Number(f.business_income) || 0) / 12 + (Number(f.other_income) || 0) / 12;
+    const monthlyExpenses = (Number(f.expense_household) || 0) + (Number(f.expense_rent) || 0) + (Number(f.expense_utilities) || 0) + (Number(f.expense_transport) || 0) + (Number(f.expense_food) || 0) + (Number(f.expense_subscriptions) || 0) + (Number(f.expense_discretionary) || 0);
+    const annualExpenses = (Number(f.expense_annual_insurance) || 0) + (Number(f.expense_annual_education) || 0) + (Number(f.expense_annual_property) || 0) + (Number(f.expense_annual_travel) || 0) + (Number(f.expense_annual_other) || 0);
+    const reviewLoans = Array.isArray(f.loans) ? f.loans : [];
+    const reviewLoanEMI = reviewLoans.reduce((sum, l) => sum + (Number(l.emi) || 0), 0);
+    const reviewCards = Array.isArray(f.credit_cards) ? f.credit_cards : [];
+    const reviewCcEMI = reviewCards.reduce((sum, c) => {
+        const balance = Number(c.balance) || 0;
+        if (c.type === 'full' || !balance) return sum;
+        if (c.type === 'emi') return sum + (Number(c.emi_amount) || balance * 0.03);
+        return sum + (balance * 0.03);
+    }, 0);
+    const totalEMI = reviewLoanEMI + reviewCcEMI;
+    const generalSip = Number(f.inv_monthly_sip) || 0;
+    const goalSipTotal = goals.reduce((s, g) => s + (Number(g.monthlySip) || 0), 0);
+    const totalSip = generalSip + goalSipTotal;
+    const totalOutflow = monthlyExpenses + (annualExpenses / 12) + totalEMI + totalSip;
+    const surplus = monthlyIncome - totalOutflow;
+
+    const kpis = [
+        { label: 'Profile', value: f.date_of_birth ? (f.city || 'Set') : 'Incomplete', sub: f.employment_type || '—' },
+        { label: 'Monthly Income', value: fmtAmt(monthlyIncome) || '—', sub: f.expected_income_growth ? `${f.expected_income_growth}% growth exp.` : 'No growth set' },
+        { label: 'Monthly Outflow', value: fmtAmt(totalOutflow) || '—', sub: 'Expenses, EMIs & SIPs' },
+        { label: 'Net Surplus', value: surplus > 0 ? (fmtAmt(surplus) || '—') : (surplus < 0 ? `–${fmtAmt(Math.abs(surplus)) || '—'}` : '—'), sub: surplus > 0 ? 'Free cash after all commitments' : surplus < 0 ? 'Deficit detected' : 'Not yet calculated', accent: surplus < 0 },
+    ];
+
+    const sectionStatus = [
+        { step: 2, title: 'Financial Background', done: !!(f.gen_q1 && f.gen_q2 && f.gen_q3) },
+        { step: 6, title: 'Goals', done: goals.length > 0, count: goals.length, unit: 'goal' },
+        { step: 7, title: 'Investments', done: !!(f.inv_equity_mf || f.inv_direct_stocks || f.inv_gold_commodities || f.inv_epf_ppf_nps) },
+        { step: 8, title: 'Liabilities', done: !!(loans.length || cards.length || f.credit_score), count: loans.length + cards.length, unit: 'item' },
+        { step: 9, title: 'Insurance', done: !!(f.health_cover || f.life_cover) },
     ];
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div className="qn-callout">
-                Review your answers below. Click <strong>Edit</strong> on any section to go back and make changes, then return here to submit.
+        <div className="qn-review-wrap">
+            <div className="qn-review-complete-banner">
+                <CheckCircle2 size={18} />
+                <span>You've completed all the essential sections. Review below and generate your report.</span>
             </div>
-            {sections.map(section => (
-                <div key={section.step} className="qn-review-section">
-                    <div className="qn-review-header">
-                        <span className="qn-review-title">{section.title}</span>
-                        <button type="button" className="qn-review-edit" onClick={() => onGoToStep(section.step)}>Edit</button>
+
+            {/* KPI Cards */}
+            <div className="qn-review-kpis">
+                {kpis.map((k, i) => (
+                    <div key={i} className={`qn-review-kpi${k.accent ? ' accent-red' : ''}`}>
+                        <div className="qn-review-kpi-value">{k.value}</div>
+                        <div className="qn-review-kpi-label">{k.label}</div>
+                        <div className="qn-review-kpi-sub">{k.sub}</div>
                     </div>
-                    <div className="qn-review-grid">
-                        {section.rows.map(([label, value]) => (
-                            <div key={label} className="qn-review-row">
-                                <span className="qn-review-label">{label}</span>
-                                <span className={`qn-review-value${value === '—' || value === 'None' ? ' empty' : ''}`}>{value}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            ))}
+                ))}
+            </div>
+
+            {/* Section completion grid */}
+            <div className="qn-review-sections-label">Optional & detailed sections</div>
+            <div className="qn-review-sections-grid">
+                {sectionStatus.map(s => (
+                    <button key={s.step} type="button" className="qn-review-section-tile" onClick={() => onGoToStep(s.step)}>
+                        <div className="qn-review-section-tile-icon">
+                            <StepIcon stepId={s.step} size={16} />
+                        </div>
+                        <div className="qn-review-section-tile-title">{s.title}</div>
+                        <div className={`qn-review-section-tile-badge${s.done ? ' done' : ''}`}>
+                            {s.done
+                                ? (s.count != null ? `${s.count} ${s.count === 1 ? s.unit : s.unit + 's'}` : 'Done')
+                                : 'Skipped'}
+                        </div>
+                    </button>
+                ))}
+            </div>
+
+            <div className="qn-review-edit-prompt">
+                Want to change something? Click any section above or use the sidebar to navigate.
+            </div>
         </div>
     );
 };

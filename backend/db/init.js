@@ -77,10 +77,11 @@ CREATE TABLE IF NOT EXISTS financial_profiles (
   savings_balance NUMERIC(15,2) DEFAULT 0,
   fd_balance NUMERIC(15,2) DEFAULT 0,
   fd_rate NUMERIC(5,2) DEFAULT 0,
-  emergency_fund NUMERIC(15,2) DEFAULT 0,
-  monthly_surplus NUMERIC(15,2) DEFAULT 0,
-  
-  -- Step 5: Investments
+
+  -- Step 5: Goals (questionnaire capture — Goal Planner goals stored in user_goals table)
+  questionnaire_goals JSONB DEFAULT '[]',
+
+  -- Step 6: Investments
   inv_direct_stocks NUMERIC(15,2) DEFAULT 0,
   inv_equity_mf NUMERIC(15,2) DEFAULT 0,
   inv_monthly_sip NUMERIC(15,2) DEFAULT 0,
@@ -91,7 +92,7 @@ CREATE TABLE IF NOT EXISTS financial_profiles (
   inv_crypto_alt NUMERIC(15,2) DEFAULT 0,
   inv_num_mutual_funds INTEGER DEFAULT 0,
   sip_consecutive_months INTEGER DEFAULT 0,
-  
+
   -- Step 6: Liabilities
   loans JSONB DEFAULT '[]',
   credit_cards JSONB DEFAULT '[]',
@@ -110,11 +111,6 @@ CREATE TABLE IF NOT EXISTS financial_profiles (
   tax_hra NUMERIC(15,2) DEFAULT 0,
   tax_home_loan_interest NUMERIC(15,2) DEFAULT 0,
   tax_80d NUMERIC(15,2) DEFAULT 0,
-  
-  -- Step 9: Estate Planning
-  has_will VARCHAR(20) DEFAULT 'No',
-  nominees_set VARCHAR(20) DEFAULT 'No',
-  num_nominees INTEGER DEFAULT 0,
   
   -- Step 10: Financial Behavior (1-5 scale)
   beh_delay_decisions INTEGER DEFAULT 3,
@@ -169,6 +165,8 @@ CREATE TABLE IF NOT EXISTS user_goals (
   debt_return NUMERIC(5,2),
   commodity_return NUMERIC(5,2),
   priority_weight INTEGER DEFAULT 3,
+  is_saving VARCHAR(20) DEFAULT 'no',
+  monthly_sip NUMERIC(15,2) DEFAULT 0,
   created_at TIMESTAMP DEFAULT NOW()
 );
 `;

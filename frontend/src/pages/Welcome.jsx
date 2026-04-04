@@ -21,7 +21,7 @@ function Welcome() {
                     </div>
 
                     <div className="landing-meta">
-                        <div className="landing-meta-item"><div className="meta-dot"></div>13 steps — income, expenses, investments, loans, insurance, tax, and more</div>
+                        <div className="landing-meta-item"><div className="meta-dot"></div>12 steps — income, expenses, investments, loans, insurance, tax, and more</div>
                         <div className="landing-meta-item"><div className="meta-dot"></div>8–12 minutes · save and resume anytime, no time pressure</div>
                         <div className="landing-meta-item"><div className="meta-dot"></div>Instant results — no waiting, no advisor, no sales calls</div>
                     </div>

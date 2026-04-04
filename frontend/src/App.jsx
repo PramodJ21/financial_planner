@@ -16,7 +16,6 @@ import Investments from './pages/Investments';
 import Liabilities from './pages/Liabilities';
 import Insurance from './pages/Insurance';
 import Tax from './pages/Tax';
-import Estate from './pages/Estate';
 import Reports from './pages/Reports';
 import GoalPlanner from './pages/GoalPlanner';
 import Layout from './components/Layout';
@@ -44,9 +43,9 @@ function App() {
         <Route path="/liabilities" element={<ProtectedRoute><Layout><Liabilities /></Layout></ProtectedRoute>} />
         <Route path="/insurance" element={<ProtectedRoute><Layout><Insurance /></Layout></ProtectedRoute>} />
         <Route path="/tax" element={<ProtectedRoute><Layout><Tax /></Layout></ProtectedRoute>} />
-        <Route path="/estate" element={<ProtectedRoute><Layout><Estate /></Layout></ProtectedRoute>} />
         <Route path="/reports" element={<ProtectedRoute><Layout><Reports /></Layout></ProtectedRoute>} />
         <Route path="/goal-planner" element={<ProtectedRoute><Layout><GoalPlanner /></Layout></ProtectedRoute>} />
+        <Route path="/goals" element={<Navigate to="/goal-planner" replace />} />
 
         {/* Protected Questionnaire */}
         <Route path="/questionnaire" element={<ProtectedRoute><Questionnaire /></ProtectedRoute>} />

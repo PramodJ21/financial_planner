@@ -1,0 +1,1 @@
+- [Action Plan Spec](project_action_plan_spec.md) — action_plan.md is the authoritative spec for priority-scored action item generation; paired with fbs_calculation.md
