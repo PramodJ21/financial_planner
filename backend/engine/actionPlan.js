@@ -682,10 +682,6 @@ function generateActionPlan(profile, fbsResult) {
         };
         const totalDeviation = Object.values(deviations).reduce((s, v) => s + v, 0);
 
-        const overweightClass = Object.entries(deviations)
-            .filter(([, d]) => d > 0 && alloc[_k => _k] >= (idealRanges[_k] || [0, 100])[1])
-            .sort((a, b) => b[1] - a[1])[0];
-
         const getOverweightClass = () => {
             let maxDev = 0, maxClass = null;
             for (const [cls, d] of Object.entries(deviations)) {

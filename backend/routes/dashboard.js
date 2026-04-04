@@ -28,7 +28,18 @@ router.get('/full', auth, async (req, res) => {
         const dashboard = calc.computeFullDashboard(profile, userResult.rows[0]);
 
         const fbsResult = calc.computeFBS(profile);
-        const newActionPlan = generateActionPlan(profile, fbsResult);
+        let newActionPlan = [];
+        try {
+            const generated = generateActionPlan(profile, fbsResult);
+            newActionPlan = Array.isArray(generated) ? generated : [];
+        } catch (apErr) {
+            console.error('[dashboard/full] action-plan fallback', {
+                userId: req.userId,
+                message: apErr?.message,
+                stack: apErr?.stack
+            });
+            newActionPlan = [];
+        }
 
         const savedPlans = await pool.query('SELECT id, title, status FROM action_plans WHERE user_id = $1', [req.userId]);
         const statusMap = {};
