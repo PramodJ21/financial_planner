@@ -42,7 +42,10 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5000/api)",
       "Bash(pip show:*)",
       "Bash(python -m playwright install chromium)",
-      "Bash(python crawl.py)"
+      "Bash(python crawl.py)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(grep -v \"^\\\\s*//\")"
     ]
   }
 }

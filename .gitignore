@@ -27,5 +27,8 @@ npm-debug.log*
 # Misc
 .gemini/
 todo.txt
-calculation.md
+fbs_calculation.md
+action_plan.md
 test_profiles.md
+books/
+references/
