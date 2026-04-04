@@ -62,8 +62,24 @@ router.get('/full', auth, async (req, res) => {
 
         res.json(dashboard);
     } catch (err) {
-        console.error('Dashboard error:', err);
-        res.status(500).json({ error: 'Server error computing dashboard.' });
+        console.error('[dashboard/full] error', {
+            userId: req.userId,
+            message: err?.message,
+            code: err?.code,
+            detail: err?.detail,
+            hint: err?.hint,
+            position: err?.position,
+            table: err?.table,
+            column: err?.column,
+            constraint: err?.constraint,
+            where: err?.where,
+            stack: err?.stack
+        });
+
+        res.status(500).json({
+            error: 'Server error computing dashboard.',
+            code: err?.code || 'UNKNOWN_ERROR'
+        });
     }
 });
 
