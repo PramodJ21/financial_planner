@@ -8270,6 +8270,11 @@ body {
 /* ── Tier 1: wide + small height (e.g. 1440–1920px @ ≤820px)
       Minimal reduction — text wraps less, rows are shorter ── */
 @media (max-height: 820px) and (min-width: 1441px) {
+  .sidebar { padding: 24px 0 24px 16px; }
+  .sidebar-logo { margin-bottom: 36px; }
+  .sidebar-nav li button, .sidebar-nav--explore li a { padding: 9px 0; }
+  .sidebar-edit-answers { margin: 10px 0 16px; padding-top: 14px; }
+
   .section {
     padding: 32px 56px 12px 44px;
   }
@@ -8330,6 +8335,13 @@ body {
 /* ── Tier 2: medium + small height (e.g. 1024–1440px @ ≤820px)
       Moderate reduction — the common small laptop range ── */
 @media (max-height: 820px) and (min-width: 1025px) and (max-width: 1440px) {
+  .sidebar { padding: 20px 0 20px 16px; }
+  .sidebar-logo { font-size: 18px; margin-bottom: 28px; }
+  .sidebar-nav li button, .sidebar-nav--explore li a { padding: 8px 0; }
+  .sidebar-edit-answers { margin: 8px 0 14px; padding-top: 12px; }
+  .nav-group-label { margin-bottom: 6px; }
+  .sidebar-user { padding-top: 8px; }
+
   .section {
     padding: 28px 50px 8px 38px;
   }
@@ -8476,6 +8488,15 @@ body {
       Most aggressive — narrow viewport means more text wrapping,
       every row is taller so reduction must be steeper ── */
 @media (max-height: 820px) and (min-width: 769px) and (max-width: 1024px) {
+  .sidebar { padding: 16px 0 16px 12px; }
+  .sidebar-logo { font-size: 16px; margin-bottom: 24px; padding-right: 28px; }
+  .sidebar-nav li button, .sidebar-nav--explore li a { padding: 7px 0; gap: 8px; }
+  .nav-num { width: 18px; font-size: 10px; }
+  .nav-label { font-size: 9px; }
+  .nav-group-label { font-size: 9px; margin-bottom: 6px; }
+  .sidebar-edit-answers { margin: 8px 0 12px; padding-top: 10px; font-size: 10px; }
+  .sidebar-user { padding-top: 8px; }
+
   .section {
     padding: 26px 36px 6px 28px;
   }
@@ -8633,6 +8654,12 @@ body {
 
 /* Wide + very short (1441px+ @ ≤700px) */
 @media (max-height: 700px) and (min-width: 1441px) {
+  .sidebar { padding: 18px 0 18px 16px; }
+  .sidebar-logo { font-size: 18px; margin-bottom: 24px; }
+  .sidebar-nav li button, .sidebar-nav--explore li a { padding: 7px 0; }
+  .sidebar-edit-answers { margin: 8px 0 12px; padding-top: 10px; }
+  .nav-group-label { margin-bottom: 6px; }
+
   .section {
     padding: 24px 52px 4px 40px;
   }
@@ -8689,6 +8716,15 @@ body {
 
 /* Medium + very short (1025–1440px @ ≤700px) */
 @media (max-height: 700px) and (min-width: 1025px) and (max-width: 1440px) {
+  .sidebar { padding: 14px 0 14px 12px; }
+  .sidebar-logo { font-size: 16px; margin-bottom: 20px; }
+  .sidebar-nav li button, .sidebar-nav--explore li a { padding: 6px 0; gap: 8px; }
+  .nav-label { font-size: 9px; }
+  .nav-num { font-size: 10px; width: 18px; }
+  .nav-group-label { font-size: 9px; margin-bottom: 6px; }
+  .sidebar-edit-answers { margin: 6px 0 10px; padding-top: 10px; font-size: 10px; }
+  .sidebar-user { padding-top: 8px; }
+
   .section {
     padding: 24px 44px 0px 34px;
   }
@@ -8829,6 +8865,18 @@ body {
 
 /* Narrow + very short (769–1024px @ ≤700px) */
 @media (max-height: 700px) and (min-width: 769px) and (max-width: 1024px) {
+  .sidebar { padding: 12px 0 12px 10px; }
+  .sidebar-logo { font-size: 14px; margin-bottom: 16px; }
+  .sidebar-nav li button, .sidebar-nav--explore li a { padding: 4px 0; gap: 6px; }
+  .nav-label { font-size: 8px; }
+  .nav-num { font-size: 8px; width: 14px; }
+  .nav-group-label { font-size: 8px; margin-bottom: 4px; }
+  .sidebar-edit-answers { margin: 4px 0 8px; padding-top: 8px; font-size: 9px; }
+  .sidebar-user { padding-top: 6px; margin-top: 8px; }
+  .sidebar-avatar { width: 24px; height: 24px; font-size: 9px; }
+  .sidebar-user-info p:first-child { font-size: 11px; }
+  .sidebar-user-info p:last-child { font-size: 9px; }
+
   .section {
     padding: 20px 28px 0px 22px;
   }
