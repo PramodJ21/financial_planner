@@ -18,6 +18,9 @@ import Insurance from './pages/Insurance';
 import Tax from './pages/Tax';
 import Reports from './pages/Reports';
 import GoalPlanner from './pages/GoalPlanner';
+import Portfolio from './pages/Portfolio';
+import PortfolioNew from './pages/PortfolioNew';
+import PortfolioEdit from './pages/PortfolioEdit';
 import Layout from './components/Layout';
 
 const ProtectedRoute = ({ children }) => {
@@ -46,6 +49,9 @@ function App() {
         <Route path="/reports" element={<ProtectedRoute><Layout><Reports /></Layout></ProtectedRoute>} />
         <Route path="/goal-planner" element={<ProtectedRoute><Layout><GoalPlanner /></Layout></ProtectedRoute>} />
         <Route path="/goals" element={<Navigate to="/goal-planner" replace />} />
+        <Route path="/portfolio" element={<ProtectedRoute><Layout><Portfolio /></Layout></ProtectedRoute>} />
+        <Route path="/portfolio/new" element={<ProtectedRoute><PortfolioNew /></ProtectedRoute>} />
+        <Route path="/portfolio/:id/edit" element={<ProtectedRoute><PortfolioEdit /></ProtectedRoute>} />
 
         {/* Protected Questionnaire */}
         <Route path="/questionnaire" element={<ProtectedRoute><Questionnaire /></ProtectedRoute>} />

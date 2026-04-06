@@ -6,6 +6,7 @@ const authRoutes = require('./routes/auth');
 const questionnaireRoutes = require('./routes/questionnaire');
 const dashboardRoutes = require('./routes/dashboard');
 const goalsRoutes = require('./routes/goals');
+const portfolioRoutes = require('./routes/portfolio');
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/questionnaire', questionnaireRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/goals', goalsRoutes);
+app.use('/api', portfolioRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

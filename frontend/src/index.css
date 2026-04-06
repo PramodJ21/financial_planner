@@ -6884,6 +6884,203 @@ body {
 @media (max-height: 900px) {
   .health-intro { display: none; }
 }
+
+/* ═══════════════════════════════════════════════════
+   SMALL-HEIGHT LAPTOP — RESPONSIVE SCALING
+   Combines height + width so wide screens (1920px) at
+   the same height get lighter treatment than narrow
+   laptops (1366px) where text wraps more and rows stack
+   taller. No overflow / no inline scroll — just smaller.
+   ═══════════════════════════════════════════════════ */
+
+/* ── Tier 1: wide + small height (e.g. 1440–1920px @ ≤820px)
+      Minimal reduction — text wraps less, rows are shorter ── */
+@media (max-height: 820px) and (min-width: 1441px) {
+  .section   { padding: 22px 56px 22px 44px; }
+  .sec-bar   { margin-bottom: 18px; }
+
+  .w-title, .att-title, .cf-title, .act-title { font-size: 44px; margin-bottom: 4px; }
+
+  .w-sub   { margin-bottom: 18px; }
+  .att-sub { margin-bottom: 18px; }
+  .act-sub { margin-bottom: 14px; }
+
+  .str-row  { padding: 16px 0; }
+  .al-row   { padding: 15px 0; }
+  .act-item { padding: 15px 0; }
+
+  .proj-num   { font-size: 38px; }
+  .proj-track { margin-bottom: 24px; }
+}
+
+/* ── Tier 2: medium + small height (e.g. 1024–1440px @ ≤820px)
+      Moderate reduction — the common small laptop range ── */
+@media (max-height: 820px) and (min-width: 1025px) and (max-width: 1440px) {
+  .section   { padding: 18px 50px 18px 38px; }
+  .sec-bar   { margin-bottom: 14px; }
+
+  .w-title, .att-title, .cf-title, .act-title { font-size: 38px; margin-bottom: 4px; }
+
+  .w-sub    { margin-bottom: 14px; font-size: 13px; }
+  .att-sub  { margin-bottom: 14px; font-size: 13px; }
+  .cf-sub   { margin-bottom: 18px; font-size: 13px; }
+  .act-sub  { margin-bottom: 10px; font-size: 13px; }
+
+  .str-row  { padding: 13px 0; gap: 14px; }
+  .str-name { font-size: 14px; margin-bottom: 2px; }
+  .str-desc { font-size: 13px; margin-bottom: 4px; }
+  .str-val-num { font-size: 20px; }
+
+  .al-row   { padding: 12px 0; gap: 18px; }
+  .al-title { font-size: 14px; margin-bottom: 2px; }
+  .al-desc  { font-size: 13px; margin-bottom: 4px; }
+  .al-meta-val { font-size: 18px; }
+  .al-bar   { min-height: 36px; }
+
+  .act-item      { padding: 12px 0; gap: 18px; }
+  .act-pts       { font-size: 24px; }
+  .act-pts-label { font-size: 8px; }
+  .act-name      { font-size: 14px; margin-bottom: 2px; }
+  .act-desc      { font-size: 13px; margin-bottom: 4px; }
+
+  .proj-num   { font-size: 32px; }
+  .proj-row   { margin-bottom: 4px; gap: 8px; }
+  .proj-track { margin-bottom: 18px; }
+
+  .cf-table td            { padding: 10px 0; font-size: 13px; }
+  .cf-table td:last-child { font-size: 15px; }
+  .cf-footnote            { margin-top: 16px; padding-top: 14px; font-size: 13px; }
+}
+
+/* ── Tier 3: narrow + small height (769–1024px @ ≤820px)
+      Most aggressive — narrow viewport means more text wrapping,
+      every row is taller so reduction must be steeper ── */
+@media (max-height: 820px) and (min-width: 769px) and (max-width: 1024px) {
+  .section   { padding: 14px 36px 14px 28px; }
+  .sec-bar   { margin-bottom: 10px; }
+
+  .w-title, .att-title, .cf-title, .act-title { font-size: 32px; margin-bottom: 2px; }
+
+  .w-sub    { margin-bottom: 10px; font-size: 12px; }
+  .att-sub  { margin-bottom: 10px; font-size: 12px; }
+  .cf-sub   { margin-bottom: 14px; font-size: 12px; }
+  .act-sub  { margin-bottom: 8px;  font-size: 12px; }
+
+  .str-row  { padding: 10px 0; gap: 12px; }
+  .str-name { font-size: 13px; margin-bottom: 2px; }
+  .str-desc { font-size: 12px; margin-bottom: 3px; }
+  .str-val-num { font-size: 18px; }
+
+  .al-row   { padding: 10px 0; gap: 14px; }
+  .al-title { font-size: 13px; margin-bottom: 2px; }
+  .al-desc  { font-size: 12px; margin-bottom: 3px; }
+  .al-meta-val { font-size: 16px; }
+  .al-bar   { min-height: 30px; }
+
+  .act-item      { padding: 10px 0; gap: 14px; }
+  .act-pts       { font-size: 20px; }
+  .act-pts-label { font-size: 8px; }
+  .act-name      { font-size: 13px; margin-bottom: 2px; }
+  .act-desc      { font-size: 12px; margin-bottom: 3px; }
+
+  .proj-num   { font-size: 28px; }
+  .proj-row   { margin-bottom: 3px; gap: 6px; }
+  .proj-track { margin-bottom: 14px; }
+
+  .cf-table td            { padding: 9px 0;  font-size: 12px; }
+  .cf-table td:last-child { font-size: 14px; }
+  .cf-footnote            { margin-top: 12px; padding-top: 12px; font-size: 12px; }
+}
+
+/* ── Extra-small height (≤700px) — same width tiers ── */
+
+/* Wide + very short (1441px+ @ ≤700px) */
+@media (max-height: 700px) and (min-width: 1441px) {
+  .section   { padding: 14px 52px 14px 40px; }
+  .sec-bar   { margin-bottom: 10px; }
+
+  .w-title, .att-title, .cf-title, .act-title { font-size: 34px; margin-bottom: 2px; }
+
+  .w-sub, .att-sub, .cf-sub, .act-sub { font-size: 12px; margin-bottom: 10px; }
+
+  .str-row  { padding: 10px 0; }
+  .al-row   { padding: 9px  0; }
+  .act-item { padding: 9px  0; }
+
+  .proj-num   { font-size: 28px; }
+  .proj-track { margin-bottom: 14px; }
+}
+
+/* Medium + very short (1025–1440px @ ≤700px) */
+@media (max-height: 700px) and (min-width: 1025px) and (max-width: 1440px) {
+  .section   { padding: 10px 44px 10px 34px; }
+  .sec-bar   { margin-bottom: 8px; }
+
+  .w-title, .att-title, .cf-title, .act-title { font-size: 28px; margin-bottom: 2px; }
+
+  .w-sub    { margin-bottom: 8px;  font-size: 12px; }
+  .att-sub  { margin-bottom: 8px;  font-size: 12px; }
+  .cf-sub   { margin-bottom: 10px; font-size: 12px; }
+  .act-sub  { margin-bottom: 6px;  font-size: 12px; }
+
+  .str-row  { padding: 9px 0; gap: 12px; }
+  .str-name { font-size: 13px; }
+  .str-desc { font-size: 11px; margin-bottom: 2px; }
+  .str-val-num { font-size: 17px; }
+
+  .al-row   { padding: 8px 0; gap: 12px; }
+  .al-title { font-size: 13px; }
+  .al-desc  { font-size: 11px; margin-bottom: 2px; }
+  .al-meta-val { font-size: 15px; }
+  .al-bar   { min-height: 26px; }
+
+  .act-item      { padding: 8px 0; gap: 14px; }
+  .act-pts       { font-size: 18px; }
+  .act-name      { font-size: 13px; }
+  .act-desc      { font-size: 11px; margin-bottom: 2px; }
+
+  .proj-num   { font-size: 24px; }
+  .proj-row   { margin-bottom: 2px; gap: 6px; }
+  .proj-track { margin-bottom: 10px; }
+
+  .cf-table td            { padding: 7px 0;  font-size: 12px; }
+  .cf-table td:last-child { font-size: 13px; }
+  .cf-footnote            { margin-top: 10px; padding-top: 10px; font-size: 12px; }
+}
+
+/* Narrow + very short (769–1024px @ ≤700px) */
+@media (max-height: 700px) and (min-width: 769px) and (max-width: 1024px) {
+  .section   { padding: 8px 28px 8px 22px; }
+  .sec-bar   { margin-bottom: 6px; }
+
+  .w-title, .att-title, .cf-title, .act-title { font-size: 24px; margin-bottom: 2px; }
+
+  .w-sub, .att-sub, .cf-sub, .act-sub { font-size: 11px; margin-bottom: 6px; }
+
+  .str-row  { padding: 7px 0; gap: 10px; }
+  .str-name { font-size: 12px; margin-bottom: 1px; }
+  .str-desc { font-size: 11px; margin-bottom: 2px; }
+  .str-val-num { font-size: 15px; }
+
+  .al-row   { padding: 6px 0; gap: 10px; }
+  .al-title { font-size: 12px; margin-bottom: 1px; }
+  .al-desc  { font-size: 11px; margin-bottom: 2px; }
+  .al-meta-val { font-size: 14px; }
+  .al-bar   { min-height: 22px; }
+
+  .act-item      { padding: 7px 0; gap: 12px; }
+  .act-pts       { font-size: 16px; }
+  .act-name      { font-size: 12px; margin-bottom: 1px; }
+  .act-desc      { font-size: 11px; margin-bottom: 2px; }
+
+  .proj-num   { font-size: 22px; }
+  .proj-row   { margin-bottom: 2px; gap: 5px; }
+  .proj-track { margin-bottom: 8px; }
+
+  .cf-table td            { padding: 6px 0;  font-size: 11px; }
+  .cf-table td:last-child { font-size: 12px; }
+  .cf-footnote            { margin-top: 8px; padding-top: 8px; font-size: 11px; }
+}
 .health-intro p { margin: 0; }
 .health-intro strong { color: var(--black); font-weight: 600; }
 

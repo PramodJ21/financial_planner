@@ -13,6 +13,7 @@ const CHAPTERS = [
 ];
 
 const EXPLORE_ITEMS = [
+    { name: 'Portfolio', path: '/portfolio' },
     { name: 'Investments', path: '/investments' },
     { name: 'Liabilities', path: '/liabilities' },
     { name: 'Insurance', path: '/insurance' },
