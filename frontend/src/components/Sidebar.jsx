@@ -128,10 +128,24 @@ function Sidebar({ mobileOpen, onCloseMobile, collapsed, onToggleCollapse, secti
                 ))}
             </ul>
 
-            {/* Edit Answers */}
-            <Link to="/questionnaire" className="sidebar-edit-answers" onClick={onCloseMobile}>
-                Edit Answers →
-            </Link>
+            {/* Actions group */}
+            <div className="sidebar-actions-group">
+                <Link to="/questionnaire" className="sidebar-edit-answers" onClick={onCloseMobile}>
+                    Edit Answers →
+                </Link>
+
+                {isDashboard && (
+                    <button
+                        className="sidebar-take-tour"
+                        onClick={() => {
+                            window.dispatchEvent(new Event('start-dashboard-tour'));
+                            if (onCloseMobile) onCloseMobile();
+                        }}
+                    >
+                        Take a Tour →
+                    </button>
+                )}
+            </div>
 
             {/* Explore group */}
             <div className="nav-group-label">Explore</div>

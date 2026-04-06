@@ -75,7 +75,15 @@ function Reports() {
     const grouped = {};
     PRIORITY_ORDER.forEach(u => { grouped[u] = []; });
     actionPlan.forEach((a, idx) => {
-        const key = a.urgency || 'medium';
+        let key = 'medium';
+        if (typeof a.priorityScore === 'number') {
+            if (a.priorityScore >= 70) key = 'critical';
+            else if (a.priorityScore >= 50) key = 'high';
+            else if (a.priorityScore >= 30) key = 'medium';
+            else key = 'low';
+        } else if (typeof a.urgency === 'string') {
+            key = a.urgency;
+        }
         if (!grouped[key]) grouped[key] = [];
         grouped[key].push({ ...a, _idx: idx });
     });
@@ -255,8 +263,11 @@ function Reports() {
                                             <div className="reports-action-meta">{action.category}</div>
                                             <div className="reports-action-title">
                                                 {action.title}
-                                                {action.fbsImpact > 0 && <span className="reports-fbs-tag">+{action.fbsImpact} FBS Points</span>}
                                             </div>
+                                        </div>
+
+                                        <div className="reports-action-points">
+                                            {action.fbsImpact > 0 && <span className="reports-fbs-tag">+{action.fbsImpact} pts</span>}
                                         </div>
 
                                         <div className="reports-action-amount">

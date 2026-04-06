@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { driver } from 'driver.js';
+import 'driver.js/dist/driver.css';
 import { fetchWithAuth } from '../api';
 import { Link } from 'react-router-dom';
 import {
@@ -186,6 +188,62 @@ function Dashboard() {
     const [showAllGaps, setShowAllGaps] = useState(false);
     const [showFBSExplainer, setShowFBSExplainer] = useState(false);
 
+    const startTour = () => {
+        const d = driver({
+            showProgress: true,
+            animate: true,
+            steps: [
+                {
+                    element: '#chapter-01',
+                    popover: { title: 'Your Money Personality', description: 'This shows your money personality based on how you handle risks. It spots your strengths and areas where you might get tripped up.', side: 'left', align: 'start' }
+                },
+                {
+                    element: '#chapter-01 .journey-grid',
+                    popover: { title: 'Financial Snapshot', description: 'A quick summary of everything you own vs. what you owe, plus your monthly expenses.', side: 'left', align: 'start' }
+                },
+                {
+                    element: '#chapter-02',
+                    popover: { title: 'Financial Health Score', description: 'Your total Score out of 100! It doesn\'t judge how rich you are, but rather how healthy your financial habits and safety nets are.', side: 'left', align: 'start' }
+                },
+                {
+                    element: '#chapter-02 .health-grid',
+                    popover: { title: 'Score Breakdown', description: 'Here\'s how your score breaks down. The higher the bars, the better your habits and knowledge.', side: 'left', align: 'start' }
+                },
+                {
+                    element: '#chapter-03',
+                    popover: { title: 'What\'s Working', description: 'This highlights the good things you\'re already doing right, so you can keep them going.', side: 'left', align: 'start' }
+                },
+                {
+                    element: '#chapter-04',
+                    popover: { title: 'Needs Attention', description: 'These are the vulnerable spots that need your focus to prevent future money stress.', side: 'left', align: 'start' }
+                },
+                {
+                    element: '#chapter-05',
+                    popover: { title: 'Cashflow', description: 'Your money-in vs money-out prediction. It shows how much extra cash you have leftover or if things are too tight.', side: 'left', align: 'start' }
+                },
+                {
+                    element: '#chapter-06',
+                    popover: { title: 'Action Plan', description: 'Your personal checklist! Completing these simple tasks will immediately boost your score and fix any weak spots.', side: 'left', align: 'start' }
+                }
+            ]
+        });
+        d.drive();
+    };
+
+    useEffect(() => {
+        if (!data) return;
+        if (!localStorage.getItem('dashboard_tour_seen')) {
+            localStorage.setItem('dashboard_tour_seen', '1');
+            setTimeout(() => startTour(), 800);
+        }
+    }, [data]);
+
+    useEffect(() => {
+        const handleStartTour = () => startTour();
+        window.addEventListener('start-dashboard-tour', handleStartTour);
+        return () => window.removeEventListener('start-dashboard-tour', handleStartTour);
+    }, []);
+
     useEffect(() => {
         fetchWithAuth('/dashboard/full')
             .then(d => { setData(d); setLoading(false); })
@@ -305,8 +363,7 @@ function Dashboard() {
     const fbsCtx = getFBSContext(fbs, overview.fbsLifeStage);
     const fbsActions = actionPlan
         .filter(a => a.fbsImpact > 0 && a.status !== 'completed')
-        .sort((a, b) => b.fbsImpact - a.fbsImpact)
-        .slice(0, 5);
+        .slice(0, 3);
     const userName = data.user?.fullName?.split(' ')[0] || '';
     const moneySign = overview.moneySign;
 
@@ -333,6 +390,20 @@ function Dashboard() {
 
     // FBS helpers
     const fbsRatingLabel = fbs >= 81 ? 'Excellent' : fbs >= 61 ? 'Good' : fbs >= 41 ? 'Moderate' : fbs >= 21 ? 'Poor' : 'Critical';
+    
+    // Add context to the FBS score so the user understands what the rating implies
+    const getFBSContextMessage = (rating) => {
+        switch(rating) {
+            case 'Excellent': return "You have an incredibly strong financial foundation. Your emergency funds, insurance, and investments are fully optimized.";
+            case 'Good': return "Your financial health is solid. You have the fundamentals in place, with just a few specific areas to optimize.";
+            case 'Moderate': return "You've started building your foundation, but there are notable gaps in your safety nets or investment habits.";
+            case 'Poor': return "Your finances are highly vulnerable right now. Focus immediately on the critical action items below.";
+            case 'Critical': return "You are currently exposed to high financial risk. This is just a starting point — tackle the critical actions one step at a time.";
+            default: return "Use this score as a compass, not a verdict — every gap is fixable.";
+        }
+    };
+    const fbsMeaningText = getFBSContextMessage(fbsRatingLabel);
+
     const potentialPts = fbsActions.reduce((s, a) => s + (a.fbsImpact || 0), 0);
     const projectedScore = Math.min(100, fbs + potentialPts);
     const projectedPct = Math.round((projectedScore / 100) * 100);
@@ -492,8 +563,8 @@ function Dashboard() {
                         <div className="health-score-col">
                             <div className="score-eyebrow ani d2">Your Score</div>
                             <div className="score-rating ani d3">{fbsRatingLabel}</div>
-                            <div className="ani d4 score-compass-note">
-                                Use as a compass, not a verdict — every gap is fixable.
+                            <div className="ani d4 score-compass-note" style={{marginTop: '8px', marginBottom: '16px', lineHeight: '1.5'}}>
+                                {fbsMeaningText}
                             </div>
                             <div className="donut-wrap ani-scale d4">
                                 <svg width="140" height="140" viewBox="0 0 140 140"
@@ -824,17 +895,9 @@ function Dashboard() {
                                             {nextStep && <div className="act-highlight">{nextStep}</div>}
                                         </div>
                                         <div>
-                                            {confirmingAction === action.title ? (
-                                                <div className="act-confirm">
-                                                    <span className="act-confirm-text">Done?</span>
-                                                    <button className="act-confirm-yes" aria-label={`Yes, mark "${action.title}" as done`} onClick={() => handleMarkDone(action)}>Yes</button>
-                                                    <button className="act-confirm-cancel" aria-label="No, cancel" onClick={() => setConfirmingAction(null)}>No</button>
-                                                </div>
-                                            ) : (
-                                                <button className="act-cta" aria-label={`Mark "${action.title}" as done`} onClick={() => setConfirmingAction(action.title)}>
-                                                    {link.label === 'Mark as done →' ? 'Mark done' : link.label}
-                                                </button>
-                                            )}
+                                            <Link to="/reports" className="act-cta" aria-label={`Review "${action.title}" and mark as done`}>
+                                                {link.label === 'Mark as done →' ? 'Review & Complete →' : link.label}
+                                            </Link>
                                         </div>
                                     </div>
                                 );

@@ -40,8 +40,8 @@ function computeFbsWithDimensionMaxed(profile, fbsResult, dimensionKey) {
 
     const keyMap = {
         emergencyFund: 'emergencyFund',
-        healthInsurance: 'insurance',
-        lifeInsurance: 'insurance',
+        healthInsurance: 'healthInsurance',
+        lifeInsurance: 'lifeInsurance',
         liabilityManagement: 'liabilities',
         investmentRegularity: 'investmentRegularity',
         goalClarity: 'goalClarity',
@@ -55,11 +55,12 @@ function computeFbsWithDimensionMaxed(profile, fbsResult, dimensionKey) {
     if (!bdKey) return current;
     const weightKey = {
         emergencyFund: 'emergencyFund',
-        insurance: 'insurance',
+        healthInsurance: 'healthInsurance',
+        lifeInsurance: 'lifeInsurance',
         liabilities: 'liabilityManagement',
         investmentRegularity: 'investmentRegularity',
         goalClarity: 'goalClarity',
-        behavioralTendencies: 'behaviouralTendencies',
+        behavioralTendencies: 'behavioralTendencies',
         tax: 'taxLiteracy',
         assetDiversity: 'assetDiversity',
         portfolioUnderstanding: 'portfolioUnderstanding',
@@ -752,8 +753,8 @@ function generateActionPlan(profile, fbsResult) {
 
     const dimCount = {};
     const selected = [];
-    const MAX_PER_DIM = 2;
-    const MAX_TOTAL = 5;
+    const MAX_PER_DIM = 99;
+    const MAX_TOTAL = 99;
     const MIN_TOTAL = 3;
 
     for (const item of rest) {
