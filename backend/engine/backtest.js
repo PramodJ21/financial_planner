@@ -15,7 +15,7 @@
 
 const { ensureData } = require('../market_data/on_demand_fetcher');
 
-const RISK_FREE = 0.065; // 6.5% p.a. for Sharpe / Sortino
+const DEFAULT_RISK_FREE = 0.065; // 6.5% p.a. for Sharpe / Sortino
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
@@ -231,7 +231,7 @@ function performRebalance(date, holdings, navLookups, holdingUnits, cash, costPc
 
 // ── Metrics computation ───────────────────────────────────────────────────────
 
-function computeMetrics(dailyValues, benchmarkValues) {
+function computeMetrics(dailyValues, benchmarkValues, riskFree = DEFAULT_RISK_FREE) {
     if (dailyValues.length < 2) return null;
 
     const startVal  = dailyValues[0].value;
@@ -258,11 +258,18 @@ function computeMetrics(dailyValues, benchmarkValues) {
         if (dd < maxDD) maxDD = dd;
     }
 
-    const vol     = stddev(logReturns) * Math.sqrt(252);
-    const sharpe  = vol > 0 ? (cagr - RISK_FREE) / vol : 0;
+    const vol = stddev(logReturns) * Math.sqrt(252);
+
+    // Sharpe & Sortino: use arithmetic mean of daily excess returns (annualized),
+    // not CAGR. CAGR (geometric mean) understates the numerator for volatile portfolios.
+    const rfDaily          = riskFree / 252;
+    const meanDailyReturn  = logReturns.length > 0 ? Math.exp(mean(logReturns)) - 1 : 0;
+    const excessAnnualized = (meanDailyReturn - rfDaily) * 252;
+
+    const sharpe  = vol > 0 ? excessAnnualized / vol : 0;
     const negR    = logReturns.filter((r) => r < 0);
     const dVol    = negR.length > 1 ? stddev(negR) * Math.sqrt(252) : vol;
-    const sortino = dVol > 0 ? (cagr - RISK_FREE) / dVol : 0;
+    const sortino = dVol > 0 ? excessAnnualized / dVol : 0;
     const calmar  = maxDD < 0 ? cagr / Math.abs(maxDD) : 0;
     const sortedR = [...logReturns].sort((a, b) => a - b);
     const var95   = percentile(sortedR, 0.05);
@@ -291,11 +298,23 @@ function computeMetrics(dailyValues, benchmarkValues) {
             const cov  = pR.reduce((s, r, i) => s + (r - pMean) * (bR[i] - bMean), 0) / (pR.length - 1);
             const bVar = bR.reduce((s, r) => s + (r - bMean) ** 2, 0) / (bR.length - 1);
             beta = bVar > 0 ? cov / bVar : 1;
-            if (benchCAGR !== null) alpha = cagr - (RISK_FREE + beta * (benchCAGR - RISK_FREE));
+            if (benchCAGR !== null) alpha = cagr - (riskFree + beta * (benchCAGR - riskFree));
         }
     }
 
     const yearlyReturns = computeYearlyReturns(dailyValues, benchmarkValues);
+
+    // Drawdown series (monthly sampled for charting)
+    const drawdownSeries = [];
+    let ddPeak = startVal;
+    for (const { date, value } of dailyValues) {
+        if (value > ddPeak) ddPeak = value;
+        drawdownSeries.push({ date, drawdown: ddPeak > 0 ? +((value - ddPeak) / ddPeak * 100).toFixed(2) : 0 });
+    }
+    // Sample monthly (last point per month)
+    const ddMonthly = {};
+    for (const pt of drawdownSeries) ddMonthly[pt.date.slice(0, 7)] = pt;
+    const drawdownSeriesMonthly = Object.values(ddMonthly).sort((a, b) => a.date.localeCompare(b.date));
 
     return {
         cagr:            +(cagr * 100).toFixed(2),
@@ -314,7 +333,9 @@ function computeMetrics(dailyValues, benchmarkValues) {
         benchmark_cagr:  benchCAGR !== null ? +(benchCAGR * 100).toFixed(2) : null,
         alpha:           alpha !== null ? +(alpha * 100).toFixed(2) : null,
         beta:            beta !== null ? +beta.toFixed(3) : null,
-        yearly_returns:  yearlyReturns,
+        yearly_returns:    yearlyReturns,
+        drawdown_series:  drawdownSeriesMonthly,
+        risk_free_rate:   +(riskFree * 100).toFixed(2),
     };
 }
 
@@ -367,27 +388,45 @@ function computeFdBenchmark(dates, principal, rate) {
     }));
 }
 
+// Sample monthly dates from allDates — take the last trading day of each month
+function monthlyDates(allDates) {
+    const seen = {};
+    for (const d of allDates) seen[d.slice(0, 7)] = d; // last date wins
+    return Object.values(seen).sort();
+}
+
 function computeHoldingsMetrics(holdings, navLookups, allDates, principal) {
     if (allDates.length < 2) return [];
-    const startDate = allDates[0];
-    const endDate   = allDates[allDates.length - 1];
-    const years     = yearsBetween(startDate, endDate);
+    const startDate  = allDates[0];
+    const endDate    = allDates[allDates.length - 1];
+    const years      = yearsBetween(startDate, endDate);
+    const mDates     = monthlyDates(allDates);
 
     return holdings.map((h) => {
         const alloc  = parseFloat(h.allocation_pct);
         const amount = principal * alloc / 100;
 
         if (h.instrument_type === 'fixed_return') {
-            const rate    = getFixedRate(h.ticker, h.custom_return_rate);
-            const finalV  = amount * Math.pow(1 + rate, years);
+            const rate   = getFixedRate(h.ticker, h.custom_return_rate);
+            const finalV = amount * Math.pow(1 + rate, years);
+            const totRet = (finalV / amount - 1);
+            // Build series: compound growth at each monthly date
+            const startMs = new Date(startDate).getTime();
+            const series  = mDates.map((d) => {
+                const t = (new Date(d).getTime() - startMs) / (365.25 * 24 * 3600 * 1000);
+                return { date: d, value: +(amount * Math.pow(1 + rate, t)).toFixed(2) };
+            });
             return {
-                instrument_id: h.instrument_id,
-                name:          h.instrument_name,
-                ticker:        h.ticker,
-                allocation_pct: alloc,
-                total_return:  +((finalV / amount - 1) * 100).toFixed(2),
-                cagr:          +(rate * 100).toFixed(2),
-                final_value:   +finalV.toFixed(2),
+                instrument_id:    h.instrument_id,
+                group_id:         h.group_id || null,
+                name:             h.instrument_name,
+                ticker:           h.ticker,
+                allocation_pct:   alloc,
+                total_return:     +(totRet * 100).toFixed(2),
+                cagr:             +(rate * 100).toFixed(2),
+                final_value:      +finalV.toFixed(2),
+                contribution_pct: +((alloc / 100) * totRet * 100).toFixed(2),
+                series,
             };
         }
 
@@ -396,30 +435,135 @@ function computeHoldingsMetrics(holdings, navLookups, allDates, principal) {
         const endNav   = getNavAt(lookup, endDate);
         if (!startNav || !endNav) {
             return { instrument_id: h.instrument_id, name: h.instrument_name, ticker: h.ticker,
-                     allocation_pct: alloc, total_return: null, cagr: null, final_value: null };
+                     allocation_pct: alloc, total_return: null, cagr: null, final_value: null, series: [] };
         }
 
-        const totalReturn  = (endNav - startNav) / startNav;
-        const holdingCagr  = years > 0 ? (Math.pow(endNav / startNav, 1 / years) - 1) : 0;
-        const finalVal     = amount * (endNav / startNav);
+        const totalReturn     = (endNav - startNav) / startNav;
+        const holdingCagr     = years > 0 ? (Math.pow(endNav / startNav, 1 / years) - 1) : 0;
+        const finalVal        = amount * (endNav / startNav);
+        const contributionPct = +((alloc / 100) * totalReturn * 100).toFixed(2);
+
+        // Monthly series: value of initial investment at each point
+        const series = mDates.map((d) => {
+            const nav = getNavAt(lookup, d);
+            return nav ? { date: d, value: +(amount * nav / startNav).toFixed(2) } : null;
+        }).filter(Boolean);
 
         const dailyVals = allDates.map((d) => getNavAt(lookup, d)).filter(Boolean);
-        let maxDD = 0, pk = dailyVals[0];
-        for (const v of dailyVals) {
-            if (v > pk) pk = v;
-            const dd = (v - pk) / pk;
-            if (dd < maxDD) maxDD = dd;
+        let maxDD = 0;
+        if (dailyVals.length === 0) {
+            maxDD = null;
+        } else {
+            let pk = dailyVals[0];
+            for (const v of dailyVals) {
+                if (v > pk) pk = v;
+                const dd = (v - pk) / pk;
+                if (dd < maxDD) maxDD = dd;
+            }
         }
 
         return {
-            instrument_id:  h.instrument_id,
-            name:           h.instrument_name,
-            ticker:         h.ticker,
-            allocation_pct: alloc,
-            total_return:   +(totalReturn * 100).toFixed(2),
-            cagr:           +(holdingCagr * 100).toFixed(2),
-            final_value:    +finalVal.toFixed(2),
-            max_drawdown:   +(maxDD * 100).toFixed(2),
+            instrument_id:    h.instrument_id,
+            group_id:         h.group_id || null,
+            name:             h.instrument_name,
+            ticker:           h.ticker,
+            allocation_pct:   alloc,
+            total_return:     +(totalReturn * 100).toFixed(2),
+            cagr:             +(holdingCagr * 100).toFixed(2),
+            final_value:      +finalVal.toFixed(2),
+            max_drawdown:     maxDD !== null ? +(maxDD * 100).toFixed(2) : null,
+            contribution_pct: contributionPct,
+            series,
+        };
+    });
+}
+
+// ── Rolling 1Y returns (monthly sampled) ─────────────────────────────────────
+function computeRollingReturns(dailyValues) {
+    // Build month → last value of that month
+    const monthly = {};
+    for (const { date, value } of dailyValues) monthly[date.slice(0, 7)] = value;
+    const months = Object.keys(monthly).sort();
+
+    const result = [];
+    for (const m of months) {
+        const [y, mo] = m.split('-').map(Number);
+        const prevDate = new Date(y, mo - 1, 1);
+        prevDate.setFullYear(prevDate.getFullYear() - 1);
+        const prevM = prevDate.toISOString().slice(0, 7);
+        if (!monthly[prevM]) continue;
+        const curr = monthly[m], prev = monthly[prevM];
+        if (prev > 0) result.push({ date: m, return_1y: +((curr / prev - 1) * 100).toFixed(2) });
+    }
+    return result;
+}
+
+// ── Correlation matrix ─────────────────────────────────────────────────────────
+function computeCorrelationMatrix(holdings, navLookups, allDates) {
+    const mkt = holdings.filter((h) => h.instrument_type !== 'fixed_return' && navLookups[h.instrument_id]);
+    if (mkt.length < 2) return null;
+
+    // Build daily log-return arrays per holding
+    const series = mkt.map((h) => {
+        const lookup = navLookups[h.instrument_id];
+        return allDates.slice(1).map((d, i) => {
+            const prev = getNavAt(lookup, allDates[i]);
+            const curr = getNavAt(lookup, d);
+            return prev > 0 && curr > 0 ? Math.log(curr / prev) : null;
+        });
+    });
+
+    const n = mkt.length;
+    const matrix = [];
+    for (let i = 0; i < n; i++) {
+        const row = [];
+        for (let j = 0; j < n; j++) {
+            if (i === j) { row.push(1.0); continue; }
+            const pairs = [];
+            for (let k = 0; k < series[i].length; k++) {
+                if (series[i][k] !== null && series[j][k] !== null)
+                    pairs.push([series[i][k], series[j][k]]);
+            }
+            if (pairs.length < 20) { row.push(null); continue; }
+            const ai = pairs.map((p) => p[0]), aj = pairs.map((p) => p[1]);
+            const mi = mean(ai), mj = mean(aj);
+            const num = ai.reduce((s, v, k) => s + (v - mi) * (aj[k] - mj), 0);
+            const di  = Math.sqrt(ai.reduce((s, v) => s + (v - mi) ** 2, 0));
+            const dj  = Math.sqrt(aj.reduce((s, v) => s + (v - mj) ** 2, 0));
+            row.push(di > 0 && dj > 0 ? +(num / (di * dj)).toFixed(3) : null);
+        }
+        matrix.push(row);
+    }
+    return { labels: mkt.map((h) => h.instrument_name), matrix };
+}
+
+// ── Group-level metrics ───────────────────────────────────────────────────────
+function computeGroupMetrics(holdingsMetrics, groupsById) {
+    const byGroup = {};
+    for (const h of holdingsMetrics) {
+        if (h.group_id == null) continue;
+        (byGroup[h.group_id] = byGroup[h.group_id] || []).push(h);
+    }
+    return Object.entries(byGroup).map(([gid, hh]) => {
+        const totalAlloc = hh.reduce((s, h) => s + h.allocation_pct, 0);
+        const withReturn = hh.filter((h) => h.total_return !== null);
+        const wAvgReturn = withReturn.length
+            ? withReturn.reduce((s, h) => s + h.total_return * h.allocation_pct, 0) / totalAlloc
+            : null;
+        const wAvgCagr = withReturn.length
+            ? withReturn.reduce((s, h) => s + h.cagr * h.allocation_pct, 0) / totalAlloc
+            : null;
+        const totalContrib = hh.reduce((s, h) => s + (h.contribution_pct || 0), 0);
+        const g = groupsById[gid];
+        return {
+            group_id:        +gid,
+            name:            g?.name || 'Group',
+            color:           g?.color || null,
+            allocation_pct:  +totalAlloc.toFixed(2),
+            avg_return:      wAvgReturn !== null ? +wAvgReturn.toFixed(2) : null,
+            avg_cagr:        wAvgCagr   !== null ? +wAvgCagr.toFixed(2)   : null,
+            contribution_pct: +totalContrib.toFixed(2),
+            holding_count:   hh.length,
         };
     });
 }
@@ -430,11 +574,17 @@ async function runBacktest(pool, portfolioId, config) {
     const {
         from_date,
         to_date,
-        benchmark             = 'fd_7pct',
-        rebalance_strategy    = 'none',
+        benchmark               = 'fd_7pct',
+        benchmark_instrument_id = null,   // required when benchmark === 'instrument'
+        rebalance_strategy      = 'none',
         rebalance_threshold_pct = 5,
-        transaction_cost_pct  = 0,
+        transaction_cost_pct    = 0,
+        slippage_pct            = 0,
+        risk_free_rate,
     } = config;
+    const riskFree = risk_free_rate != null && !isNaN(parseFloat(risk_free_rate))
+        ? parseFloat(risk_free_rate) / 100
+        : DEFAULT_RISK_FREE;
 
     // 1. Portfolio
     const portRes = await pool.query('SELECT principal FROM portfolios WHERE id = $1', [portfolioId]);
@@ -443,7 +593,7 @@ async function runBacktest(pool, portfolioId, config) {
 
     // 2. Holdings
     const holdRes = await pool.query(
-        `SELECT h.id, h.instrument_id, h.allocation_pct,
+        `SELECT h.id, h.group_id, h.instrument_id, h.allocation_pct,
                 i.ticker, i.name AS instrument_name, i.instrument_type,
                 i.custom_return_rate
          FROM holdings h
@@ -451,6 +601,13 @@ async function runBacktest(pool, portfolioId, config) {
          WHERE h.portfolio_id = $1 AND h.archived = false`,
         [portfolioId]
     );
+
+    // Also fetch group names for group_metrics
+    const groupRes = await pool.query(
+        `SELECT id, name, color FROM portfolio_groups WHERE portfolio_id = $1`,
+        [portfolioId]
+    );
+    const groupsById = Object.fromEntries(groupRes.rows.map((g) => [g.id, g]));
     const holdings = holdRes.rows;
     if (holdings.length === 0) throw new Error('Portfolio has no holdings.');
 
@@ -532,15 +689,35 @@ async function runBacktest(pool, portfolioId, config) {
 
         const hasData = coverage.filter((r) => r.nav_count > 0);
         if (hasData.length > 0) {
-            // Determine the actual overlapping range across all instruments
-            const globalFirst = hasData.reduce((m, r) => r.first_date < m ? r.first_date : m, hasData[0].first_date);
-            const globalLast  = hasData.reduce((m, r) => r.last_date  > m ? r.last_date  : m, hasData[0].last_date);
+            // Determine the actual overlapping range across all instruments (intersection, not union)
+            // Use max of first_date so all instruments have data from the start
+            const globalFirst = hasData.reduce((m, r) => r.first_date > m ? r.first_date : m, hasData[0].first_date);
+            // Use min of last_date so all instruments have data through the end
+            const globalLast  = hasData.reduce((m, r) => r.last_date  < m ? r.last_date  : m, hasData[0].last_date);
 
-            // If the requested from_date is after the last available date, error
-            if (from_date > globalLast) {
+            // Find which instruments are limiting the window (for helpful error messages)
+            const limitingLast  = hasData.find((r) => r.last_date  === globalLast);
+            const limitingFirst = hasData.find((r) => r.first_date === globalFirst);
+
+            // No common overlap at all (one instrument ends before another begins)
+            if (globalFirst > globalLast) {
+                const nameA = limitingFirst ? `"${limitingFirst.name}"` : 'one instrument';
+                const nameB = limitingLast  ? `"${limitingLast.name}"`  : 'another instrument';
                 throw new Error(
-                    `Requested start date (${from_date.slice(0,7)}) is after the latest available data (${globalLast.slice(0,7)}). ` +
-                    `Choose an earlier date range.`
+                    `The selected instruments have no overlapping date range: ` +
+                    `${nameA} starts on ${globalFirst.slice(0,7)} but ${nameB} only has data until ${globalLast.slice(0,7)}. ` +
+                    `Remove one of them or choose instruments with overlapping coverage.`
+                );
+            }
+
+            // If the requested from_date is after the common window ends, error
+            if (from_date > globalLast) {
+                const instNote = limitingLast
+                    ? ` ("${limitingLast.name}" only has data until ${globalLast.slice(0,7)})`
+                    : '';
+                throw new Error(
+                    `Requested start date (${from_date.slice(0,7)}) is after the common data range ends (${globalLast.slice(0,7)})${instNote}. ` +
+                    `Remove that instrument or choose an earlier date range.`
                 );
             }
 
@@ -625,9 +802,10 @@ async function runBacktest(pool, portfolioId, config) {
                 holdings, navLookups, holdingUnits, cash
             );
             if (trigger) {
+                const effectiveCostPct = parseFloat(transaction_cost_pct) + parseFloat(slippage_pct);
                 const { newCash, costInr, logEntry } = performRebalance(
                     date, holdings, navLookups, holdingUnits, cash,
-                    parseFloat(transaction_cost_pct), trigger
+                    effectiveCostPct, trigger
                 );
                 cash      = newCash;
                 totalCost += costInr;
@@ -648,20 +826,47 @@ async function runBacktest(pool, portfolioId, config) {
 
     // 7. Benchmark
     let benchmarkValues = null;
+    let benchmarkNote   = null;
+    let benchmarkLabel  = benchmark;  // human-readable name returned in config
+
     if (benchmark === 'fd_7pct') {
         benchmarkValues = computeFdBenchmark(allDates, principal, 0.07);
+        benchmarkLabel  = 'FD 7% p.a.';
     } else if (benchmark === 'fd_8pct') {
         benchmarkValues = computeFdBenchmark(allDates, principal, 0.08);
-    } else if (benchmark === 'nifty50') {
-        const benchInst = await pool.query(
-            "SELECT id FROM instruments WHERE ticker = 'UTI-N50-IDX' LIMIT 1"
-        );
-        if (benchInst.rows.length > 0) {
-            const bid  = benchInst.rows[0].id;
+        benchmarkLabel  = 'FD 8% p.a.';
+    } else if (benchmark === 'nifty50' || benchmark === 'instrument') {
+        // Resolve instrument:
+        //   'nifty50' (legacy)  → UTI-N50-IDX by ticker
+        //   'instrument'        → use benchmark_instrument_id from config
+        let benchInstRow = null;
+        if (benchmark === 'nifty50') {
+            const r = await pool.query(
+                `SELECT id, ticker, name, instrument_type, exchange, amfi_code
+                 FROM instruments WHERE ticker = 'UTI-N50-IDX' LIMIT 1`
+            );
+            benchInstRow = r.rows[0] || null;
+        } else if (benchmark_instrument_id) {
+            const r = await pool.query(
+                `SELECT id, ticker, name, instrument_type, exchange, amfi_code
+                 FROM instruments WHERE id = $1 LIMIT 1`,
+                [benchmark_instrument_id]
+            );
+            benchInstRow = r.rows[0] || null;
+        }
+
+        if (benchInstRow) {
+            benchmarkLabel = benchInstRow.name;
+            // Auto-fetch benchmark data if missing or stale
+            try {
+                await ensureData(pool, benchInstRow, startDate, effectiveTo);
+            } catch (fetchErr) {
+                console.warn(`[backtest] Could not fetch benchmark data for "${benchInstRow.name}":`, fetchErr.message);
+            }
             const bRes = await pool.query(
                 `SELECT date::text AS date, nav FROM price_history
                  WHERE instrument_id = $1 AND date >= $2 AND date <= $3 ORDER BY date`,
-                [bid, from_date, to_date]
+                [benchInstRow.id, startDate, effectiveTo]
             );
             if (bRes.rows.length > 0) {
                 const bLookup   = buildNavLookup(bRes.rows);
@@ -674,36 +879,67 @@ async function runBacktest(pool, portfolioId, config) {
                 }
             }
         }
-        if (!benchmarkValues) benchmarkValues = computeFdBenchmark(allDates, principal, 0.07);
+
+        if (!benchmarkValues) {
+            console.warn(`[backtest] Benchmark data unavailable for "${benchmarkLabel}", falling back to FD 7%`);
+            benchmarkValues = computeFdBenchmark(allDates, principal, 0.07);
+            benchmarkNote   = `Benchmark data for "${benchmarkLabel}" was unavailable; fell back to FD 7%`;
+            benchmarkLabel  = 'FD 7% (fallback)';
+        }
     }
 
     // 8. Metrics + output
-    const metrics         = computeMetrics(dailyValues, benchmarkValues);
+    const metrics         = computeMetrics(dailyValues, benchmarkValues, riskFree);
     if (!metrics) throw new Error('Not enough data to compute metrics.');
 
     const series          = sampleMonthly(dailyValues, benchmarkValues);
     const holdingsMetrics = computeHoldingsMetrics(holdings, navLookups, allDates, principal);
+    const rollingReturns  = computeRollingReturns(dailyValues);
+    const correlation     = computeCorrelationMatrix(holdings, navLookups, allDates);
+    const groupMetrics    = computeGroupMetrics(holdingsMetrics, groupsById);
+
+    // Compute compounded no-cost value: each cost saved at date d would have grown
+    // at the same rate as the portfolio from d to the end.
+    // growth_factor(d) = finalValue / portfolioValue(d)
+    // hypothetical = finalValue + Σ(cost_i × growth_factor(d_i))
+    const portfolioValueByDate = {};
+    for (const { date, value } of dailyValues) portfolioValueByDate[date] = value;
+
+    let compoundedCostValue = 0;
+    for (const entry of rebalanceLog) {
+        const v = portfolioValueByDate[entry.date];
+        compoundedCostValue += v > 0
+            ? entry.cost_inr * (metrics.final_value / v)
+            : entry.cost_inr; // fallback: no growth data for that date
+    }
 
     const rebalancingSummary = {
-        strategy:                    rebalance_strategy,
-        count:                       rebalanceLog.length,
-        total_cost_inr:              +totalCost.toFixed(2),
-        // Approximate: adds back costs without compounding effect
-        hypothetical_value_no_cost:  +(metrics.final_value + totalCost).toFixed(2),
+        strategy:                   rebalance_strategy,
+        count:                      rebalanceLog.length,
+        total_cost_inr:             +totalCost.toFixed(2),
+        hypothetical_value_no_cost: +(metrics.final_value + compoundedCostValue).toFixed(2),
     };
 
     return {
         metrics,
         series,
         holdings_metrics:    holdingsMetrics,
+        group_metrics:       groupMetrics,
+        rolling_returns:     rollingReturns,
+        correlation:         correlation,
         rebalancing_summary: rebalancingSummary,
         rebalancing_log:     rebalanceLog,
         config: {
-            from_date:            startDate,
-            to_date:              allDates[allDates.length - 1],
+            from_date:              startDate,
+            to_date:                allDates[allDates.length - 1],
             benchmark,
+            benchmark_instrument_id: benchmark_instrument_id || null,
+            benchmark_label:        benchmarkLabel,
+            benchmark_note:         benchmarkNote,
             rebalance_strategy,
-            transaction_cost_pct: parseFloat(transaction_cost_pct),
+            transaction_cost_pct:   parseFloat(transaction_cost_pct),
+            slippage_pct:           parseFloat(slippage_pct),
+            risk_free_rate:         +(riskFree * 100).toFixed(2),
         },
     };
 }

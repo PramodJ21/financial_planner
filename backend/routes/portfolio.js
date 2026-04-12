@@ -2,6 +2,7 @@ const express = require('express');
 const pool = require('../db/pool');
 const auth = require('../middleware/auth');
 const { runBacktest } = require('../engine/backtest');
+const { ensureData } = require('../market_data/on_demand_fetcher');
 
 const router = express.Router();
 
@@ -24,13 +25,73 @@ router.get('/instruments/search', auth, async (req, res) => {
         }
 
         const result = await pool.query(
-            `SELECT id, ticker, name, instrument_type, exchange FROM instruments i ${where} ORDER BY i.name ASC LIMIT 20`,
+            `SELECT i.id, i.ticker, i.name, i.instrument_type, i.exchange,
+                    MIN(ph.date)::text AS first_date,
+                    MAX(ph.date)::text AS last_date
+             FROM instruments i
+             LEFT JOIN price_history ph ON ph.instrument_id = i.id
+             ${where}
+             GROUP BY i.id, i.ticker, i.name, i.instrument_type, i.exchange
+             HAVING (
+                 i.instrument_type = 'fixed_return'
+                 OR COUNT(ph.id) = 0
+                 OR MAX(ph.date) >= NOW() - INTERVAL '60 days'
+             )
+             ORDER BY i.name ASC LIMIT 20`,
             params
         );
         res.json(result.rows);
     } catch (err) {
         console.error('Instrument search error:', err);
         res.status(500).json({ error: 'Server error searching instruments.' });
+    }
+});
+
+// GET /instruments/:id/coverage — return first/last date for one instrument, auto-fetch if missing
+router.get('/instruments/:id/coverage', auth, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const instRes = await pool.query(
+            `SELECT id, ticker, name, instrument_type, exchange, amfi_code
+             FROM instruments WHERE id = $1`,
+            [id]
+        );
+        if (instRes.rows.length === 0) return res.status(404).json({ error: 'Instrument not found.' });
+        const inst = instRes.rows[0];
+
+        if (inst.instrument_type === 'fixed_return') {
+            return res.json({ first_date: null, last_date: null });
+        }
+
+        const covRes = await pool.query(
+            `SELECT MIN(date)::text AS first_date, MAX(date)::text AS last_date, COUNT(id)::int AS nav_count
+             FROM price_history WHERE instrument_id = $1`,
+            [id]
+        );
+        const cov = covRes.rows[0];
+
+        const today = new Date().toISOString().slice(0, 10);
+        const staleThreshold = new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+        const needsFetch = cov.nav_count === 0 || (cov.last_date && cov.last_date < staleThreshold);
+
+        if (needsFetch) {
+            try {
+                await ensureData(pool, inst, '2000-01-01', today);
+            } catch (fetchErr) {
+                console.warn(`[coverage] Fetch failed for "${inst.name}":`, fetchErr.message);
+            }
+            const refRes = await pool.query(
+                `SELECT MIN(date)::text AS first_date, MAX(date)::text AS last_date
+                 FROM price_history WHERE instrument_id = $1`,
+                [id]
+            );
+            return res.json(refRes.rows[0]);
+        }
+
+        return res.json({ first_date: cov.first_date, last_date: cov.last_date });
+    } catch (err) {
+        console.error('Coverage error:', err);
+        res.status(500).json({ error: 'Server error fetching coverage.' });
     }
 });
 
@@ -126,10 +187,16 @@ router.get('/portfolios/:id', auth, async (req, res) => {
             pool.query(
                 `SELECT h.id, h.portfolio_id, h.group_id, h.instrument_id, h.allocation_pct,
                         h.display_order, h.created_at,
-                        i.ticker, i.name AS instrument_name, i.instrument_type, i.exchange
+                        i.ticker, i.name AS instrument_name, i.instrument_type, i.exchange,
+                        MIN(ph.date)::text AS first_date,
+                        MAX(ph.date)::text AS last_date
                  FROM holdings h
                  JOIN instruments i ON h.instrument_id = i.id
+                 LEFT JOIN price_history ph ON ph.instrument_id = i.id
                  WHERE h.portfolio_id = $1 AND h.archived = false
+                 GROUP BY h.id, h.portfolio_id, h.group_id, h.instrument_id, h.allocation_pct,
+                          h.display_order, h.created_at,
+                          i.ticker, i.name, i.instrument_type, i.exchange
                  ORDER BY h.display_order ASC, h.created_at ASC`,
                 [id]
             )
@@ -464,19 +531,22 @@ router.post('/portfolios/:id/backtest', auth, async (req, res) => {
     const {
         from_date,
         to_date,
-        benchmark               = 'fd_7pct',
-        transaction_cost_pct    = 0,
-        rebalance_strategy      = 'none',
-        rebalance_threshold_pct = 5,
+        benchmark                = 'fd_7pct',
+        benchmark_instrument_id  = null,
+        transaction_cost_pct     = 0,
+        rebalance_strategy       = 'none',
+        rebalance_threshold_pct  = 5,
     } = req.body;
 
     if (!from_date || !to_date) return res.status(400).json({ error: 'from_date and to_date are required.' });
     if (new Date(to_date) <= new Date(from_date)) return res.status(400).json({ error: 'to_date must be after from_date.' });
 
-    const VALID_BENCHMARKS  = ['fd_7pct', 'fd_8pct', 'nifty50'];
-    const VALID_STRATEGIES  = ['none', 'monthly', 'quarterly', 'annually', 'threshold', 'threshold_calendar'];
+    const VALID_BENCHMARKS = ['fd_7pct', 'fd_8pct', 'nifty50', 'instrument'];
+    const VALID_STRATEGIES = ['none', 'monthly', 'quarterly', 'annually', 'threshold', 'threshold_calendar'];
     if (!VALID_BENCHMARKS.includes(benchmark))
         return res.status(400).json({ error: `Invalid benchmark. Choose: ${VALID_BENCHMARKS.join(', ')}` });
+    if (benchmark === 'instrument' && !benchmark_instrument_id)
+        return res.status(400).json({ error: 'benchmark_instrument_id is required when benchmark is "instrument".' });
     if (!VALID_STRATEGIES.includes(rebalance_strategy))
         return res.status(400).json({ error: `Invalid rebalance_strategy. Choose: ${VALID_STRATEGIES.join(', ')}` });
 
@@ -510,7 +580,7 @@ router.post('/portfolios/:id/backtest', auth, async (req, res) => {
         let result;
         try {
             result = await runBacktest(pool, id, {
-                from_date, to_date, benchmark,
+                from_date, to_date, benchmark, benchmark_instrument_id,
                 transaction_cost_pct,
                 rebalance_strategy,
                 rebalance_threshold_pct: thresholdPct,
