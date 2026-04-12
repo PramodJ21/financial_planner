@@ -52,6 +52,9 @@ export default function PortfolioEdit() {
                         exchange: h.exchange,
                         ticker: h.ticker,
                         allocation_pct: String(parseFloat(h.allocation_pct).toFixed(1)),
+                        first_date: h.first_date || null,
+                        last_date: h.last_date || null,
+                        coverageStatus: 'ready',
                         isNew: false,
                         toDelete: false,
                     }))
@@ -67,20 +70,43 @@ export default function PortfolioEdit() {
 
     function addHolding(instrument) {
         if (holdings.some((h) => !h.toDelete && h.instrument_id === instrument.id)) return;
+        const hasData = instrument.instrument_type === 'fixed_return' || !!instrument.first_date;
+        const tempId = Date.now();
         setHoldings((prev) => [
             ...prev,
             {
-                tempId: Date.now(),
+                tempId,
                 instrument_id: instrument.id,
                 instrument_name: instrument.name,
                 instrument_type: instrument.instrument_type,
                 exchange: instrument.exchange,
                 ticker: instrument.ticker,
                 allocation_pct: '',
+                first_date: instrument.first_date || null,
+                last_date: instrument.last_date || null,
+                coverageStatus: hasData ? 'ready' : 'loading',
                 isNew: true,
                 toDelete: false,
             },
         ]);
+
+        if (!hasData) {
+            fetchWithAuth(`/instruments/${instrument.id}/coverage`)
+                .then((cov) => {
+                    setHoldings((prev) =>
+                        prev.map((h) =>
+                            h.tempId === tempId
+                                ? { ...h, first_date: cov.first_date, last_date: cov.last_date, coverageStatus: 'ready' }
+                                : h
+                        )
+                    );
+                })
+                .catch(() => {
+                    setHoldings((prev) =>
+                        prev.map((h) => h.tempId === tempId ? { ...h, coverageStatus: 'error' } : h)
+                    );
+                });
+        }
     }
 
     function updateAlloc(key, val) {
@@ -275,6 +301,19 @@ export default function PortfolioEdit() {
                                                     <span className="pedit-holding-name">{h.instrument_name}</span>
                                                     {h.exchange && (
                                                         <span className="pedit-holding-exchange">{h.exchange}</span>
+                                                    )}
+                                                    {h.instrument_type !== 'fixed_return' && (
+                                                        h.coverageStatus === 'loading'
+                                                            ? <span className="pnew-holding-coverage loading">
+                                                                <span className="pnew-coverage-spinner" /> Downloading data…
+                                                              </span>
+                                                            : h.coverageStatus === 'error'
+                                                            ? <span className="pnew-holding-coverage error">Could not fetch data</span>
+                                                            : h.first_date
+                                                            ? <span className="pnew-holding-coverage">
+                                                                Active from {h.first_date.slice(0, 7)}
+                                                              </span>
+                                                            : null
                                                     )}
                                                 </div>
                                                 <div className="pedit-alloc-wrap">

@@ -123,7 +123,14 @@ export default function InstrumentSearch({
                                 <span className={`instrument-type-badge ${inst.instrument_type}`}>
                                     {TYPE_LABELS[inst.instrument_type] || inst.instrument_type}
                                 </span>
-                                <span className="instrument-dropdown-name">{inst.name}</span>
+                                <div className="instrument-dropdown-info">
+                                    <span className="instrument-dropdown-name">{inst.name}</span>
+                                    {inst.first_date && (
+                                        <span className="instrument-dropdown-since">
+                                            Active from {inst.first_date.slice(0, 7)}
+                                        </span>
+                                    )}
+                                </div>
                                 {inst.exchange && (
                                     <span className="instrument-dropdown-exchange">{inst.exchange}</span>
                                 )}

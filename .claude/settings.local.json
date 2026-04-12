@@ -57,7 +57,21 @@
       "Bash(cmd:*)",
       "Bash(powershell:*)",
       "Bash(npx --yes eslint src/pages/Portfolio.jsx src/pages/PortfolioNew.jsx --no-eslintrc -c '{\"env\":{\"browser\":true,\"es2021\":true},\"parserOptions\":{\"ecmaVersion\":2021,\"sourceType\":\"module\",\"ecmaFeatures\":{\"jsx\":true}},\"rules\":{\"no-undef\":0,\"no-unused-vars\":\"warn\"}}')",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(gh repo:*)",
+      "Bash(gh release:*)",
+      "Bash(gh api:*)",
+      "Bash(rtk --version)",
+      "Bash(rtk gain:*)",
+      "Read(//tmp/**)",
+      "Bash(unzip -o /tmp/rtk_install/rtk-x86_64-pc-windows-msvc.zip -d /tmp/rtk_install/)",
+      "Bash(cp /tmp/rtk_install/rtk.exe __TRACKED_VAR__/.local/bin/rtk.exe)",
+      "Bash(chmod +x __TRACKED_VAR__/.local/bin/rtk.exe)",
+      "Bash(export PATH=\"$HOME/.local/bin:$PATH\")",
+      "Bash(rtk init:*)",
+      "Bash(rtk --help)",
+      "Bash(rtk grep:*)",
+      "WebFetch(domain:localhost)"
     ]
   }
 }

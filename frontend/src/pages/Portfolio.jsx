@@ -1,9 +1,10 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
     LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine,
     BarChart, Bar,
+    AreaChart, Area,
 } from 'recharts';
 import { fetchWithAuth } from '../api';
 import usePortfolioStore from '../store/portfolioStore';
@@ -215,7 +216,7 @@ function HoldingsExplorer({ portfolio, portfolioId, focusedNode, onFocus, expand
     }
 
     function renderHolding(h, indented = false) {
-        const isFocused = focusedNode?.type === 'holding' && focusedNode.id === h.id;
+        const isFocused = focusedNode?.type === 'holding' && focusedNode.id === h.instrument_id;
         const pickerOpen = openPickerId === h.id;
 
         return (
@@ -223,7 +224,7 @@ function HoldingsExplorer({ portfolio, portfolioId, focusedNode, onFocus, expand
                 key={h.id}
                 className={`explorer-holding${isFocused ? ' focused' : ''}`}
                 style={indented ? { paddingLeft: 40 } : {}}
-                onClick={() => onFocus({ type: 'holding', id: h.id })}
+                onClick={() => onFocus({ type: 'holding', id: h.instrument_id })}
                 draggable
                 onDragStart={(e) => e.dataTransfer.setData('holdingId', String(h.id))}
                 onDragEnd={() => setDragOverTarget(null)}
@@ -231,7 +232,12 @@ function HoldingsExplorer({ portfolio, portfolioId, focusedNode, onFocus, expand
                 <span className="explorer-holding-type">
                     {TYPE_LABELS[h.instrument_type] || 'INV'}
                 </span>
-                <span className="explorer-holding-name">{h.instrument_name}</span>
+                <div className="explorer-holding-info">
+                    <span className="explorer-holding-name">{h.instrument_name}</span>
+                    {h.first_date && h.instrument_type !== 'fixed_return' && (
+                        <span className="explorer-holding-since">Active from {h.first_date.slice(0, 7)}</span>
+                    )}
+                </div>
                 <span className="explorer-holding-alloc">{parseFloat(h.allocation_pct).toFixed(1)}%</span>
 
                 {/* Folder / move-to-group button */}
@@ -461,13 +467,384 @@ function GrowthTooltip({ active, payload, label }) {
     );
 }
 
+// ── Contribution Bar ─────────────────────────────────────────────────────────
+function ContributionBar({ holdingsMetrics, focusedId, onFocus }) {
+    if (!holdingsMetrics?.length) return null;
+    const total = holdingsMetrics.reduce((s, h) => s + Math.abs(h.contribution_pct || 0), 0);
+    if (total === 0) return null;
+    return (
+        <div className="results-chart-section">
+            <div className="results-section-label">Who did the heavy lifting?</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-soft)', marginBottom: 8 }}>
+                Each holding's contribution to total portfolio return (percentage points)
+            </div>
+            <div className="contribution-bar">
+                {holdingsMetrics.map((h, i) => {
+                    const w = total > 0 ? (Math.abs(h.contribution_pct || 0) / total) * 100 : 0;
+                    const isPos = (h.contribution_pct || 0) >= 0;
+                    const isFocused = focusedId === h.instrument_id;
+                    return (
+                        <div
+                            key={h.instrument_id}
+                            className={`contribution-segment${isFocused ? ' focused' : ''}`}
+                            style={{
+                                width: `${w}%`,
+                                background: isPos ? PIE_COLORS[i % PIE_COLORS.length] : 'var(--red, #dc2626)',
+                                opacity: isFocused ? 1 : 0.82,
+                            }}
+                            title={`${h.name}: ${h.contribution_pct > 0 ? '+' : ''}${h.contribution_pct}ppt`}
+                            onClick={() => onFocus && onFocus(h.instrument_id)}
+                        />
+                    );
+                })}
+            </div>
+            <div className="contribution-legend">
+                {holdingsMetrics.map((h, i) => (
+                    <div
+                        key={h.instrument_id}
+                        className={`contribution-legend-item${focusedId === h.instrument_id ? ' focused' : ''}`}
+                        onClick={() => onFocus && onFocus(h.instrument_id)}
+                    >
+                        <span className="contribution-dot" style={{ background: (h.contribution_pct || 0) >= 0 ? PIE_COLORS[i % PIE_COLORS.length] : 'var(--red, #dc2626)' }} />
+                        <span className="contribution-name">{h.name}</span>
+                        <span className="contribution-val" style={{ color: (h.contribution_pct || 0) >= 0 ? 'var(--green, #059669)' : 'var(--red, #dc2626)' }}>
+                            {(h.contribution_pct || 0) > 0 ? '+' : ''}{h.contribution_pct}ppt
+                        </span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+// ── Rolling Returns Chart ────────────────────────────────────────────────────
+function RollingReturnsChart({ data }) {
+    if (!data?.length) return null;
+    return (
+        <div className="results-chart-section">
+            <div className="results-section-label">Rolling 1-Year Return</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-soft)', marginBottom: 6 }}>
+                12-month trailing return at each point in time
+            </div>
+            <ResponsiveContainer width="100%" height={160}>
+                <AreaChart data={data} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                    <defs>
+                        <linearGradient id="rollingGradPos" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="var(--green, #059669)" stopOpacity={0.25} />
+                            <stop offset="95%" stopColor="var(--green, #059669)" stopOpacity={0.02} />
+                        </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--ink-ghost)" />
+                    <XAxis dataKey="date" tick={{ fontSize: 10, fontFamily: 'var(--font-ui)', fill: 'var(--ink-soft)' }}
+                        tickLine={false} interval={Math.max(1, Math.floor(data.length / 8) - 1)} />
+                    <YAxis tickFormatter={(v) => `${v}%`}
+                        tick={{ fontSize: 10, fontFamily: 'var(--font-ui)', fill: 'var(--ink-soft)' }}
+                        tickLine={false} axisLine={false} width={44} />
+                    <Tooltip formatter={(v) => [`${v}%`, '1Y Return']}
+                        contentStyle={{ fontSize: 12, fontFamily: 'var(--font-ui)', background: 'var(--paper-raised)', border: '0.5px solid var(--ink-ghost)' }} />
+                    <ReferenceLine y={0} stroke="var(--ink-soft)" strokeDasharray="4 2" />
+                    <Area type="monotone" dataKey="return_1y"
+                        stroke="var(--green, #059669)" strokeWidth={1.5}
+                        fill="url(#rollingGradPos)" dot={false} />
+                </AreaChart>
+            </ResponsiveContainer>
+        </div>
+    );
+}
+
+// ── Correlation Matrix ───────────────────────────────────────────────────────
+function CorrelationMatrix({ correlation }) {
+    if (!correlation || correlation.labels.length < 2) return null;
+    const { labels, matrix } = correlation;
+    const ABBR_LEN = 14;
+    function abbr(s) { return s.length > ABBR_LEN ? s.slice(0, ABBR_LEN) + '…' : s; }
+    function cellColor(v) {
+        if (v === null) return 'var(--paper)';
+        if (v === 1) return 'color-mix(in srgb, var(--accent) 30%, var(--paper-raised))';
+        const t = (v + 1) / 2; // 0 → -1, 0.5 → 0, 1 → +1
+        if (t > 0.5) {
+            const intensity = ((t - 0.5) * 2 * 40).toFixed(0);
+            return `color-mix(in srgb, #059669 ${intensity}%, var(--paper-raised))`;
+        } else {
+            const intensity = ((0.5 - t) * 2 * 40).toFixed(0);
+            return `color-mix(in srgb, #dc2626 ${intensity}%, var(--paper-raised))`;
+        }
+    }
+    return (
+        <div className="results-chart-section">
+            <div className="results-section-label">Correlation Matrix</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-soft)', marginBottom: 8 }}>
+                Daily log-return correlation between holdings. Green = positive, Red = negative.
+            </div>
+            <div className="corr-matrix-wrap">
+                <table className="corr-matrix">
+                    <thead>
+                        <tr>
+                            <th />
+                            {labels.map((l, i) => <th key={i} title={l}>{abbr(l)}</th>)}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {matrix.map((row, i) => (
+                            <tr key={i}>
+                                <td className="corr-row-label" title={labels[i]}>{abbr(labels[i])}</td>
+                                {row.map((v, j) => (
+                                    <td key={j} className="corr-cell"
+                                        style={{ background: cellColor(v) }}
+                                        title={v !== null ? v.toFixed(3) : 'n/a'}
+                                    >
+                                        {v !== null ? v.toFixed(2) : '—'}
+                                    </td>
+                                ))}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
+// ── Focused Holding Panel ────────────────────────────────────────────────────
+function FocusedHoldingPanel({ holding, onClear }) {
+    const [chartType, setChartType] = useState('value'); // 'value' | 'indexed'
+    if (!holding) return null;
+
+    const series = holding.series || [];
+    const chartData = series.map((pt) => ({
+        date: pt.date.slice(0, 7),
+        value: chartType === 'indexed'
+            ? (series[0]?.value > 0 ? +(pt.value / series[0].value * 100).toFixed(2) : null)
+            : pt.value,
+    }));
+
+    return (
+        <div className="results-content">
+            <div className="focused-node-breadcrumb" style={{ marginBottom: 16 }}>
+                <button className="focused-node-back" onClick={onClear}>← All holdings</button>
+                <span className="focused-node-sep">›</span>
+                <span className="focused-node-current">{holding.name}</span>
+                {holding.ticker && (
+                    <span style={{ fontSize: 11, color: 'var(--ink-soft)', marginLeft: 4 }}>({holding.ticker})</span>
+                )}
+            </div>
+
+            <div className="metrics-cards-row metrics-cards-row--3">
+                <MetricCard label="Allocation" value={`${holding.allocation_pct?.toFixed(1)}%`} />
+                <MetricCard label="Total Return"
+                    value={holding.total_return !== null ? `${holding.total_return > 0 ? '+' : ''}${holding.total_return?.toFixed(1)}%` : '—'}
+                    accent={holding.total_return > 0} />
+                <MetricCard label="CAGR" value={holding.cagr !== null ? `${holding.cagr > 0 ? '+' : ''}${holding.cagr?.toFixed(1)}%` : '—'} />
+            </div>
+            <div className="metrics-cards-row metrics-cards-row--3" style={{ marginTop: 8 }}>
+                <MetricCard label="Final Value" value={formatInr(holding.final_value)} />
+                <MetricCard label="Max Drawdown" value={holding.max_drawdown != null ? `${holding.max_drawdown?.toFixed(1)}%` : '—'} />
+                <MetricCard label="Contribution" value={holding.contribution_pct != null ? `${holding.contribution_pct > 0 ? '+' : ''}${holding.contribution_pct?.toFixed(2)}ppt` : '—'}
+                    sub="Share of portfolio return" />
+            </div>
+
+            {chartData.length <= 1 && (
+                <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--ink-soft)', fontSize: 12 }}>
+                    Chart data not available — re-run the backtest to generate per-holding growth charts.
+                </div>
+            )}
+
+            {chartData.length > 1 && (
+                <div className="results-chart-section">
+                    <div className="results-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span>Performance Over Time</span>
+                        <div className="view-toggle" style={{ marginLeft: 'auto' }}>
+                            <button className={`view-toggle-btn${chartType === 'value' ? ' active' : ''}`} onClick={() => setChartType('value')}>₹ Value</button>
+                            <button className={`view-toggle-btn${chartType === 'indexed' ? ' active' : ''}`} onClick={() => setChartType('indexed')}>Indexed (100)</button>
+                        </div>
+                    </div>
+                    <ResponsiveContainer width="100%" height={220}>
+                        <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--ink-ghost)" />
+                            <XAxis dataKey="date"
+                                tick={{ fontSize: 10, fontFamily: 'var(--font-ui)', fill: 'var(--ink-soft)' }}
+                                tickLine={false}
+                                interval={Math.max(1, Math.floor(chartData.length / 8) - 1)}
+                            />
+                            <YAxis
+                                tickFormatter={chartType === 'value' ? (v) => formatInr(v) : (v) => v}
+                                tick={{ fontSize: 10, fontFamily: 'var(--font-ui)', fill: 'var(--ink-soft)' }}
+                                tickLine={false} axisLine={false} width={chartType === 'value' ? 72 : 44}
+                            />
+                            <Tooltip
+                                formatter={(v) => [chartType === 'value' ? formatInr(v) : `${v}`, chartType === 'value' ? 'Value' : 'Index']}
+                                contentStyle={{ background: 'var(--paper-raised)', border: '0.5px solid var(--ink-ghost)', fontSize: 12, fontFamily: 'var(--font-ui)' }}
+                            />
+                            {chartType === 'indexed' && <ReferenceLine y={100} stroke="var(--ink-ghost)" strokeDasharray="4 2" />}
+                            <Line type="monotone" dataKey="value"
+                                stroke="var(--accent)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                        </LineChart>
+                    </ResponsiveContainer>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ── Holdings Comparison Chart ─────────────────────────────────────────────────
+function HoldingsComparisonChart({ holdingsMetrics, onFocus, focusedId }) {
+    if (!holdingsMetrics?.length) return null;
+
+    // Build unified date set
+    const dateSet = new Set();
+    for (const h of holdingsMetrics) (h.series || []).forEach((pt) => dateSet.add(pt.date.slice(0, 7)));
+    const dates = [...dateSet].sort();
+
+    const noSeriesData = dates.length < 2;
+
+    if (noSeriesData) {
+        return (
+            <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--ink-soft)', fontSize: 13 }}>
+                Per-holding chart data is not available for this run.
+                <br />
+                <span style={{ fontSize: 12 }}>Re-run the backtest to generate per-holding growth charts.</span>
+            </div>
+        );
+    }
+
+    // Use string keys for Recharts dataKey
+    const key = (h) => `h_${h.instrument_id}`;
+
+    // Normalize each holding to 100 at first available date
+    const chartData = dates.map((date) => {
+        const row = { date };
+        for (const h of holdingsMetrics) {
+            const pts = h.series || [];
+            if (!pts.length) continue;
+            const pt = pts.find((p) => p.date.slice(0, 7) === date);
+            const first = pts[0];
+            if (pt && first?.value > 0) row[key(h)] = +(pt.value / first.value * 100).toFixed(2);
+        }
+        return row;
+    });
+
+    return (
+        <div className="results-chart-section">
+            <div className="results-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Holdings vs Time — Indexed (base 100)</span>
+                <span style={{ fontSize: 10, fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: 'var(--ink-soft)' }}>
+                    Click a line or legend to focus
+                </span>
+            </div>
+            <ResponsiveContainer width="100%" height={240}>
+                <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--ink-ghost)" />
+                    <XAxis dataKey="date"
+                        tick={{ fontSize: 10, fontFamily: 'var(--font-ui)', fill: 'var(--ink-soft)' }}
+                        tickLine={false}
+                        interval={Math.max(1, Math.floor(dates.length / 8) - 1)}
+                    />
+                    <YAxis
+                        tickFormatter={(v) => v}
+                        tick={{ fontSize: 10, fontFamily: 'var(--font-ui)', fill: 'var(--ink-soft)' }}
+                        tickLine={false} axisLine={false} width={40}
+                    />
+                    <Tooltip
+                        formatter={(v, name) => {
+                            const h = holdingsMetrics.find((x) => key(x) === name);
+                            return [v, h?.name || name];
+                        }}
+                        contentStyle={{ background: 'var(--paper-raised)', border: '0.5px solid var(--ink-ghost)', fontSize: 12, fontFamily: 'var(--font-ui)' }}
+                    />
+                    <ReferenceLine y={100} stroke="var(--ink-ghost)" strokeDasharray="4 2" />
+                    {holdingsMetrics.map((h, i) => (
+                        <Line
+                            key={h.instrument_id}
+                            type="monotone"
+                            dataKey={key(h)}
+                            stroke={PIE_COLORS[i % PIE_COLORS.length]}
+                            strokeWidth={focusedId === h.instrument_id ? 2.5 : 1.5}
+                            strokeOpacity={focusedId && focusedId !== h.instrument_id ? 0.3 : 1}
+                            dot={false}
+                            activeDot={{ r: 4, onClick: () => onFocus && onFocus(h.instrument_id) }}
+                            connectNulls
+                        />
+                    ))}
+                </LineChart>
+            </ResponsiveContainer>
+            <div className="contribution-legend" style={{ marginTop: 8 }}>
+                {holdingsMetrics.map((h, i) => (
+                    <div key={h.instrument_id}
+                        className={`contribution-legend-item${focusedId === h.instrument_id ? ' focused' : ''}`}
+                        onClick={() => onFocus && onFocus(focusedId === h.instrument_id ? null : h.instrument_id)}
+                    >
+                        <span className="contribution-dot" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
+                        <span className="contribution-name">{h.name}</span>
+                        <span className="contribution-val" style={{ color: (h.total_return || 0) >= 0 ? 'var(--green, #059669)' : 'var(--red, #dc2626)' }}>
+                            {h.total_return != null ? `${h.total_return > 0 ? '+' : ''}${h.total_return}%` : '—'}
+                        </span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+// ── Focused Group Panel ──────────────────────────────────────────────────────
+function FocusedGroupPanel({ group, holdingsInGroup, onClear }) {
+    if (!group) return null;
+    return (
+        <div className="results-content">
+            <div className="focused-node-breadcrumb" style={{ marginBottom: 16 }}>
+                <button className="focused-node-back" onClick={onClear}>← All holdings</button>
+                <span className="focused-node-sep">›</span>
+                <span className="focused-node-current">{group.name}</span>
+            </div>
+            <div className="metrics-cards-row metrics-cards-row--3">
+                <MetricCard label="Group Allocation" value={`${group.allocation_pct?.toFixed(1)}%`} />
+                <MetricCard label="Avg Return" value={group.avg_return !== null ? `${group.avg_return > 0 ? '+' : ''}${group.avg_return?.toFixed(1)}%` : '—'} />
+                <MetricCard label="Avg CAGR" value={group.avg_cagr !== null ? `${group.avg_cagr > 0 ? '+' : ''}${group.avg_cagr?.toFixed(1)}%` : '—'} />
+            </div>
+            <div className="metrics-cards-row metrics-cards-row--3" style={{ marginTop: 8 }}>
+                <MetricCard label="Holdings" value={group.holding_count} />
+                <MetricCard label="Contribution" value={group.contribution_pct != null ? `${group.contribution_pct > 0 ? '+' : ''}${group.contribution_pct?.toFixed(2)}ppt` : '—'}
+                    sub="Share of portfolio return" />
+                <MetricCard label="" value="" />
+            </div>
+            {holdingsInGroup?.length > 0 && (
+                <>
+                    <HoldingsComparisonChart holdingsMetrics={holdingsInGroup} />
+                    <div className="results-chart-section">
+                        <div className="results-section-label">Holdings in this group</div>
+                        <table className="holdings-metrics-table">
+                            <thead>
+                                <tr><th>Holding</th><th>Alloc %</th><th>Return</th><th>CAGR</th><th>Contribution</th></tr>
+                            </thead>
+                            <tbody>
+                                {holdingsInGroup.map((h, i) => (
+                                    <tr key={i}>
+                                        <td><div style={{ fontWeight: 500, fontSize: 13 }}>{h.name}</div></td>
+                                        <td>{h.allocation_pct?.toFixed(1)}%</td>
+                                        <td style={{ color: h.total_return >= 0 ? 'var(--green, #059669)' : 'var(--red, #dc2626)' }}>
+                                            {h.total_return !== null ? `${h.total_return > 0 ? '+' : ''}${h.total_return?.toFixed(1)}%` : '—'}
+                                        </td>
+                                        <td>{h.cagr !== null ? `${h.cagr > 0 ? '+' : ''}${h.cagr?.toFixed(1)}%` : '—'}</td>
+                                        <td>{h.contribution_pct != null ? `${h.contribution_pct > 0 ? '+' : ''}${h.contribution_pct?.toFixed(2)}ppt` : '—'}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+
 // ── Backtest Config Form ──────────────────────────────────────────────────────
 
-const BENCHMARKS = [
+const FD_BENCHMARKS = [
     { value: 'fd_7pct', label: 'FD 7% p.a.' },
     { value: 'fd_8pct', label: 'FD 8% p.a.' },
-    { value: 'nifty50', label: 'Nifty 50 Index Fund' },
 ];
+
+// Suggested default instrument benchmark
+const NIFTY50_SUGGESTION = { id: null, name: 'Nifty 50 Index Fund', ticker: 'UTI-N50-IDX', instrument_type: 'index' };
 
 const STRATEGIES = [
     { value: 'none',                label: 'No Rebalancing',    desc: 'Buy and hold through the period' },
@@ -481,18 +858,55 @@ const STRATEGIES = [
 function BacktestConfigForm({ portfolioId, onResult, onCancel }) {
     const [fromDate,    setFromDate]    = useState(dateYearsAgo(5));
     const [toDate,      setToDate]      = useState(TODAY_STR);
-    const [benchmark,   setBenchmark]   = useState('fd_7pct');
+    const [benchmark,           setBenchmark]           = useState('instrument');
+    const [benchmarkInstrument, setBenchmarkInstrument] = useState(NIFTY50_SUGGESTION);
     const [strategy,    setStrategy]    = useState('none');
     const [threshold,   setThreshold]   = useState('5');
     const [txCost,      setTxCost]      = useState('0');
+    const [slippage,    setSlippage]    = useState('0');
+    const [riskFreeRate, setRiskFreeRate] = useState('6.5');
     const [showAdv,     setShowAdv]     = useState(false);
     const [loading,       setLoading]       = useState(false);
     const [loadingPhase,  setLoadingPhase]  = useState(null); // null | 'checking' | 'downloading' | 'running'
     const [downloadNames, setDownloadNames] = useState([]);   // instrument names being fetched
     const [error,         setError]         = useState(null);
     const [dataRange,     setDataRange]     = useState(null); // { first_date, last_date, missing, stale }
+    const [benchCoverage, setBenchCoverage] = useState({ status: 'idle', first_date: null, last_date: null });
 
     const needsThreshold = strategy === 'threshold' || strategy === 'threshold_calendar';
+
+    // When benchmark instrument changes, auto-fetch its data and show the date range
+    useEffect(() => {
+        if (benchmark !== 'instrument' || !benchmarkInstrument) {
+            setBenchCoverage({ status: 'idle', first_date: null, last_date: null });
+            return;
+        }
+        setBenchCoverage({ status: 'loading', first_date: null, last_date: null });
+
+        let cancelled = false;
+        (async () => {
+            try {
+                let inst = benchmarkInstrument;
+                // NIFTY50_SUGGESTION has id=null — resolve to real DB row first
+                if (!inst.id) {
+                    const results = await fetchWithAuth(
+                        `/instruments/search?q=${encodeURIComponent(inst.ticker || inst.name)}`
+                    );
+                    if (cancelled) return;
+                    if (results.length > 0) {
+                        inst = results[0];
+                        setBenchmarkInstrument(inst); // update with real id for submission
+                    }
+                }
+                if (!inst.id) { setBenchCoverage({ status: 'error', first_date: null, last_date: null }); return; }
+                const cov = await fetchWithAuth(`/instruments/${inst.id}/coverage`);
+                if (!cancelled) setBenchCoverage({ status: 'ready', first_date: cov.first_date, last_date: cov.last_date });
+            } catch {
+                if (!cancelled) setBenchCoverage({ status: 'error', first_date: null, last_date: null });
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [benchmarkInstrument?.id ?? benchmarkInstrument?.name, benchmark]);
 
     useEffect(() => {
         fetchWithAuth(`/portfolios/${portfolioId}/data-range`)
@@ -557,7 +971,15 @@ function BacktestConfigForm({ portfolioId, onResult, onCancel }) {
                 benchmark,
                 rebalance_strategy: strategy,
                 transaction_cost_pct: parseFloat(txCost) || 0,
+                slippage_pct: parseFloat(slippage) || 0,
+                risk_free_rate: parseFloat(riskFreeRate) || 6.5,
             };
+            if (benchmark === 'instrument' && benchmarkInstrument?.id) {
+                body.benchmark_instrument_id = benchmarkInstrument.id;
+            } else if (benchmark === 'instrument' && !benchmarkInstrument?.id) {
+                // Nifty50 suggestion uses legacy key so backend resolves by ticker
+                body.benchmark = 'nifty50';
+            }
             if (needsThreshold) body.rebalance_threshold_pct = parseFloat(threshold) || 5;
             const result = await fetchWithAuth(`/portfolios/${portfolioId}/backtest`, {
                 method: 'POST',
@@ -603,6 +1025,26 @@ function BacktestConfigForm({ portfolioId, onResult, onCancel }) {
                 </div>
             )}
 
+            {/* Per-instrument data range */}
+            {dataRange?.instruments?.length > 0 && !dataRange.all_fixed_return && (
+                <div className="bt-instrument-coverage">
+                    {dataRange.instruments
+                        .filter((inst) => inst.type !== 'fixed_return')
+                        .map((inst) => (
+                            <div key={inst.id} className="bt-instrument-coverage-row">
+                                <span className="bt-inst-name">{inst.name}</span>
+                                <span className="bt-inst-range">
+                                    {inst.first_date
+                                        ? <>{inst.first_date.slice(0, 7)} → {inst.last_date?.slice(0, 7) || '—'}</>
+                                        : <span className="bt-inst-nodata">No data</span>
+                                    }
+                                </span>
+                            </div>
+                        ))
+                    }
+                </div>
+            )}
+
             <div className="bt-config-row">
                 <span className="bt-config-label">Period</span>
                 <div className="bt-config-presets">
@@ -630,13 +1072,67 @@ function BacktestConfigForm({ portfolioId, onResult, onCancel }) {
 
             <div className="bt-config-row">
                 <span className="bt-config-label">Benchmark</span>
-                <div className="bt-benchmark-pills">
-                    {BENCHMARKS.map((b) => (
-                        <button key={b.value}
-                            className={`bt-benchmark-pill${benchmark === b.value ? ' active' : ''}`}
-                            onClick={() => setBenchmark(b.value)}
-                        >{b.label}</button>
-                    ))}
+                <div className="bt-benchmark-section">
+                    {/* Fixed-return options */}
+                    <div className="bt-benchmark-pills">
+                        {FD_BENCHMARKS.map((b) => (
+                            <button key={b.value}
+                                className={`bt-benchmark-pill${benchmark === b.value ? ' active' : ''}`}
+                                onClick={() => setBenchmark(b.value)}
+                            >{b.label}</button>
+                        ))}
+                        <button
+                            className={`bt-benchmark-pill${benchmark === 'instrument' ? ' active' : ''}`}
+                            onClick={() => setBenchmark('instrument')}
+                        >Index / Fund</button>
+                    </div>
+
+                    {/* Instrument benchmark selector */}
+                    {benchmark === 'instrument' && (
+                        <div className="bt-benchmark-instrument">
+                            {benchmarkInstrument ? (
+                                <div className="bt-bench-selected">
+                                    <span className={`instrument-type-badge ${benchmarkInstrument.instrument_type}`}>
+                                        {TYPE_LABELS[benchmarkInstrument.instrument_type] || 'IDX'}
+                                    </span>
+                                    <div className="bt-bench-info">
+                                        <span className="bt-bench-name">{benchmarkInstrument.name}</span>
+                                        {benchCoverage.status === 'loading' && (
+                                            <span className="pnew-holding-coverage loading">
+                                                <span className="pnew-coverage-spinner" /> Downloading data…
+                                            </span>
+                                        )}
+                                        {benchCoverage.status === 'ready' && benchCoverage.first_date && (
+                                            <span className="pnew-holding-coverage">
+                                                Active from {benchCoverage.first_date.slice(0, 7)}
+                                            </span>
+                                        )}
+                                        {benchCoverage.status === 'error' && (
+                                            <span className="pnew-holding-coverage error">Could not fetch data</span>
+                                        )}
+                                    </div>
+                                    <button
+                                        className="bt-bench-clear"
+                                        onClick={() => { setBenchmarkInstrument(null); setBenchCoverage({ status: 'idle', first_date: null, last_date: null }); }}
+                                        title="Change benchmark"
+                                    >✕</button>
+                                </div>
+                            ) : (
+                                <div className="bt-bench-search">
+                                    <InstrumentSearch
+                                        placeholder="Search index, fund, or stock…"
+                                        onSelect={(inst) => setBenchmarkInstrument(inst)}
+                                    />
+                                    <button
+                                        className="bt-bench-suggest-btn"
+                                        onClick={() => setBenchmarkInstrument(NIFTY50_SUGGESTION)}
+                                    >
+                                        Use Nifty 50 (suggested)
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -691,6 +1187,32 @@ function BacktestConfigForm({ portfolioId, onResult, onCancel }) {
                         />
                         <span style={{ fontSize: 13, color: 'var(--ink-soft)' }}>% of traded amount (0 = no cost)</span>
                     </div>
+
+                    <label className="bt-config-label" style={{ fontSize: 11, marginTop: 10 }}>Slippage</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <input
+                            type="number"
+                            className="pnew-input"
+                            style={{ width: 72 }}
+                            value={slippage}
+                            min={0} max={5} step={0.01}
+                            onChange={(e) => setSlippage(e.target.value)}
+                        />
+                        <span style={{ fontSize: 13, color: 'var(--ink-soft)' }}>% price impact per rebalance trade (0 = no slippage)</span>
+                    </div>
+
+                    <label className="bt-config-label" style={{ fontSize: 11, marginTop: 10 }}>Risk-free rate</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <input
+                            type="number"
+                            className="pnew-input"
+                            style={{ width: 72 }}
+                            value={riskFreeRate}
+                            min={0} max={20} step={0.1}
+                            onChange={(e) => setRiskFreeRate(e.target.value)}
+                        />
+                        <span style={{ fontSize: 13, color: 'var(--ink-soft)' }}>% p.a. used for Sharpe / Sortino / Alpha (default 6.5%)</span>
+                    </div>
                 </div>
             )}
 
@@ -731,8 +1253,8 @@ const STRATEGY_LABELS = {
 
 // ── Simple Results View ────────────────────────────────────────────────────────
 
-function SimpleResults({ run, compareRun }) {
-    const { metrics, series = [], config = {}, rebalancing_summary: rs } = run;
+function SimpleResults({ run, compareRun, focusedId, onFocus }) {
+    const { metrics, series = [], config = {}, rebalancing_summary: rs, holdings_metrics = [] } = run;
     const benchLabel = BENCHMARK_LABELS[config.benchmark] || 'Benchmark';
 
     const chartData = series.map((pt) => ({
@@ -756,7 +1278,7 @@ function SimpleResults({ run, compareRun }) {
                         {rs.total_cost_inr > 0 && (
                             <> · Transaction costs: <strong>{formatInr(rs.total_cost_inr)}</strong>
                             {' '}<span style={{ color: 'var(--ink-soft)', fontSize: 11 }}>
-                                (without costs: ~{formatInr(rs.hypothetical_value_no_cost)} vs {formatInr(metrics.final_value)})
+                                (without costs: {formatInr(rs.hypothetical_value_no_cost)} vs {formatInr(metrics.final_value)})
                             </span></>
                         )}
                     </span>
@@ -768,6 +1290,9 @@ function SimpleResults({ run, compareRun }) {
                     <span>{STRATEGY_LABELS[rs.strategy] || rs.strategy} — no rebalance events triggered in this period.</span>
                 </div>
             )}
+
+            {/* Contribution bar */}
+            <ContributionBar holdingsMetrics={holdings_metrics} focusedId={focusedId} onFocus={onFocus} />
 
             {/* 4 summary cards */}
             <div className="metrics-cards-row">
@@ -820,7 +1345,12 @@ function SimpleResults({ run, compareRun }) {
             {/* Growth chart */}
             {chartData.length > 1 && (
                 <div className="results-chart-section">
-                    <div className="results-section-label">Portfolio Growth</div>
+                    <div className="results-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span>Portfolio Growth</span>
+                        <span style={{ fontSize: 10, fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: 'var(--ink-soft)' }}>
+                            NAV = total return (dividends reinvested, growth plan)
+                        </span>
+                    </div>
                     <ResponsiveContainer width="100%" height={220}>
                         <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="var(--ink-ghost)" />
@@ -911,11 +1441,20 @@ function RebalancingLog({ log }) {
 
     return (
         <div className="results-chart-section">
-            <div className="results-section-label">
-                Rebalancing Log
-                <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: 8 }}>
-                    ({log.length} event{log.length !== 1 ? 's' : ''})
+            <div className="results-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>
+                    Rebalancing Log
+                    <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: 8 }}>
+                        ({log.length} event{log.length !== 1 ? 's' : ''})
+                    </span>
                 </span>
+                <button
+                    className="btn-ghost btn-sm"
+                    style={{ fontSize: 11, padding: '2px 8px' }}
+                    onClick={() => exportRebalancingLogCSV(log)}
+                >
+                    Export CSV
+                </button>
             </div>
             <table className="holdings-metrics-table rebalancing-log-table">
                 <thead>
@@ -970,15 +1509,36 @@ function RebalancingLog({ log }) {
     );
 }
 
-function AdvancedResults({ run }) {
-    const { metrics, holdings_metrics = [], rebalancing_log = [] } = run;
+function exportRebalancingLogCSV(log) {
+    const headers = ['Date', 'Trigger', 'Portfolio Value (INR)', 'Cost (INR)', 'Trades'];
+    const rows = log.map((evt) => [
+        evt.date,
+        evt.trigger,
+        evt.portfolio_value,
+        evt.cost_inr,
+        evt.trades.map((t) => `${t.name}: ${t.old_value}→${t.new_value}`).join(' | '),
+    ]);
+    const csv = [headers, ...rows].map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'rebalancing_log.csv'; a.click();
+    URL.revokeObjectURL(url);
+}
+
+function AdvancedResults({ run, focusedId, onFocus }) {
+    const { metrics, holdings_metrics = [], rebalancing_log = [], drawdown_series = [], rolling_returns, correlation } = run;
+    const rfLabel = metrics.risk_free_rate != null ? `rf ${metrics.risk_free_rate}%` : 'rf 6.5%';
 
     return (
         <div className="results-content">
             <div className="metrics-cards-row metrics-cards-row--3">
                 <MetricCard label="CAGR" value={`${sign(metrics.cagr)}${metrics.cagr}%`} />
-                <MetricCard label="Sharpe Ratio" value={metrics.sharpe} sub="Risk-adj. return (rf 6.5%)" />
+                <MetricCard label="Sharpe Ratio" value={metrics.sharpe} sub={`Risk-adj. return (${rfLabel})`} />
                 <MetricCard label="Max Drawdown" value={`${metrics.max_drawdown}%`} sub="Worst peak-to-trough" />
+            </div>
+
+            <div className="metrics-cards-row metrics-cards-row--3" style={{ marginTop: 8 }}>
                 <MetricCard label="Volatility" value={`${metrics.volatility}%`} sub="Annualised std dev" />
                 <MetricCard label="Sortino Ratio" value={metrics.sortino} sub="Downside-adj. return" />
                 <MetricCard label="Calmar Ratio" value={metrics.calmar} sub="CAGR / Max DD" />
@@ -989,6 +1549,45 @@ function AdvancedResults({ run }) {
                 <MetricCard label="Beta" value={metrics.beta ?? '—'} sub="Market sensitivity" />
                 <MetricCard label="VaR (95%)" value={metrics.var_95 !== null ? `${metrics.var_95}%` : '—'} sub="Worst daily return (5%ile)" />
             </div>
+
+            {/* Underwater / Drawdown chart */}
+            {drawdown_series.length > 1 && (
+                <div className="results-chart-section">
+                    <div className="results-section-label">Underwater Chart</div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-soft)', marginBottom: 6 }}>
+                        How far below peak the portfolio was at each point in time
+                    </div>
+                    <ResponsiveContainer width="100%" height={160}>
+                        <AreaChart data={drawdown_series} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                            <defs>
+                                <linearGradient id="ddGrad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="var(--red, #DC2626)" stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor="var(--red, #DC2626)" stopOpacity={0.02} />
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--ink-ghost)" />
+                            <XAxis dataKey="date"
+                                tick={{ fontSize: 10, fontFamily: 'var(--font-ui)', fill: 'var(--ink-soft)' }}
+                                tickLine={false}
+                                interval={Math.max(1, Math.floor(drawdown_series.length / 8) - 1)}
+                            />
+                            <YAxis
+                                tickFormatter={(v) => `${v}%`}
+                                tick={{ fontSize: 10, fontFamily: 'var(--font-ui)', fill: 'var(--ink-soft)' }}
+                                tickLine={false} axisLine={false} width={44}
+                            />
+                            <Tooltip
+                                formatter={(val) => [`${val}%`, 'Drawdown']}
+                                contentStyle={{ fontSize: 12, fontFamily: 'var(--font-ui)', background: 'var(--paper-raised)', border: '0.5px solid var(--ink-ghost)' }}
+                            />
+                            <ReferenceLine y={0} stroke="var(--ink-ghost)" />
+                            <Area type="monotone" dataKey="drawdown"
+                                stroke="var(--red, #DC2626)" strokeWidth={1.5}
+                                fill="url(#ddGrad)" dot={false} />
+                        </AreaChart>
+                    </ResponsiveContainer>
+                </div>
+            )}
 
             {holdings_metrics.length > 0 && (
                 <div className="results-chart-section">
@@ -1001,11 +1600,17 @@ function AdvancedResults({ run }) {
                                 <th>Total Return</th>
                                 <th>CAGR</th>
                                 <th>Max DD</th>
+                                <th>Contribution</th>
                             </tr>
                         </thead>
                         <tbody>
                             {holdings_metrics.map((h, i) => (
-                                <tr key={i}>
+                                <tr
+                                    key={i}
+                                    className={focusedId === h.instrument_id ? 'holdings-row-focused' : ''}
+                                    onClick={() => onFocus && onFocus(h.instrument_id === focusedId ? null : h.instrument_id)}
+                                    style={{ cursor: 'pointer' }}
+                                >
                                     <td>
                                         <div style={{ fontWeight: 500, fontSize: 13 }}>{h.name}</div>
                                         <div style={{ fontSize: 11, color: 'var(--ink-soft)' }}>{h.ticker}</div>
@@ -1018,12 +1623,18 @@ function AdvancedResults({ run }) {
                                     <td style={{ color: 'var(--red, #DC2626)' }}>
                                         {h.max_drawdown !== undefined ? `${h.max_drawdown?.toFixed(1)}%` : '—'}
                                     </td>
+                                    <td style={{ color: (h.contribution_pct || 0) >= 0 ? 'var(--green, #059669)' : 'var(--red, #DC2626)' }}>
+                                        {h.contribution_pct != null ? `${h.contribution_pct > 0 ? '+' : ''}${h.contribution_pct?.toFixed(2)}ppt` : '—'}
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
             )}
+
+            <RollingReturnsChart data={rolling_returns} />
+            <CorrelationMatrix correlation={correlation} />
 
             <RebalancingLog log={rebalancing_log} />
         </div>
@@ -1033,6 +1644,7 @@ function AdvancedResults({ run }) {
 // ── Results Panel ─────────────────────────────────────────────────────────────
 function ResultsPanel({ portfolio, portfolioId, navigate, onPortfolioDeleted }) {
     const { holdings = [], name, principal, notes } = portfolio;
+    const { focusedNode, setFocusedNode } = usePortfolioStore();
 
     const [viewMode,     setViewMode]     = useState('simple');
     const [showConfig,   setShowConfig]   = useState(false);
@@ -1111,15 +1723,22 @@ function ResultsPanel({ portfolio, portfolioId, navigate, onPortfolioDeleted }) 
                                 {activeRun.config.rebalance_strategy && activeRun.config.rebalance_strategy !== 'none' && (
                                     <> · {STRATEGY_LABELS[activeRun.config.rebalance_strategy]}</>
                                 )}
+                                {activeRun.config.slippage_pct > 0 && (
+                                    <> · {activeRun.config.slippage_pct}% slip</>
+                                )}
+                                {activeRun.config.risk_free_rate != null && activeRun.config.risk_free_rate !== 6.5 && (
+                                    <> · rf {activeRun.config.risk_free_rate}%</>
+                                )}
                             </span>
                         )}
                     </div>
                 </div>
                 <div className="results-topbar-right">
-                    {hasResults && !confirmDelete && (
+                    {hasResults && !confirmDelete && !focusedNode && (
                         <div className="view-toggle">
                             <button className={`view-toggle-btn${viewMode === 'simple' ? ' active' : ''}`} onClick={() => setViewMode('simple')}>Simple</button>
                             <button className={`view-toggle-btn${viewMode === 'advanced' ? ' active' : ''}`} onClick={() => setViewMode('advanced')}>Advanced</button>
+                            <button className={`view-toggle-btn${viewMode === 'holdings' ? ' active' : ''}`} onClick={() => setViewMode('holdings')}>Holdings</button>
                         </div>
                     )}
                     {hasResults && !confirmDelete && runsList.length > 1 && (
@@ -1172,6 +1791,7 @@ function ResultsPanel({ portfolio, portfolioId, navigate, onPortfolioDeleted }) 
                             setActiveRun(run);
                             setShowConfig(false);
                             setViewMode('simple');
+                            setFocusedNode(null);
                             // Refresh runs list
                             fetchWithAuth(`/portfolios/${portfolioId}/backtests`)
                                 .then(setRunsList).catch(() => {});
@@ -1187,13 +1807,111 @@ function ResultsPanel({ portfolio, portfolioId, navigate, onPortfolioDeleted }) 
                     </div>
                 )}
 
-                {!showConfig && !loadingRun && hasResults && viewMode === 'simple' && (
-                    <SimpleResults run={activeRun} compareRun={loadingCmp ? null : compareRun} />
-                )}
+                {!showConfig && !loadingRun && hasResults && (() => {
+                    const hm = activeRun.holdings_metrics || [];
+                    const gm = activeRun.group_metrics || [];
+                    const focusedHoldingId = focusedNode?.type === 'holding' ? focusedNode.id : null;
+                    const focusedGroupId   = focusedNode?.type === 'group'   ? focusedNode.id : null;
+                    const focusedHolding   = focusedHoldingId ? hm.find((h) => h.instrument_id === focusedHoldingId) : null;
+                    const focusedGroup     = focusedGroupId   ? gm.find((g) => g.group_id === focusedGroupId) : null;
+                    const holdingsInGroup  = focusedGroupId   ? hm.filter((h) => h.group_id === focusedGroupId) : [];
 
-                {!showConfig && !loadingRun && hasResults && viewMode === 'advanced' && (
-                    <AdvancedResults run={activeRun} />
-                )}
+                    function handleFocus(instrumentId) {
+                        if (!instrumentId) { setFocusedNode(null); return; }
+                        setFocusedNode(focusedHoldingId === instrumentId ? null : { type: 'holding', id: instrumentId });
+                    }
+
+                    // Focused holding — full replacement view
+                    if (focusedHolding) {
+                        return <FocusedHoldingPanel holding={focusedHolding} onClear={() => setFocusedNode(null)} />;
+                    }
+
+                    // Focused group — full replacement view
+                    if (focusedGroup) {
+                        return <FocusedGroupPanel group={focusedGroup} holdingsInGroup={holdingsInGroup} onClear={() => setFocusedNode(null)} />;
+                    }
+
+                    // Normal portfolio-level views
+                    if (viewMode === 'holdings') {
+                        return (
+                            <div className="results-content">
+                                <HoldingsComparisonChart
+                                    holdingsMetrics={hm}
+                                    focusedId={focusedHoldingId}
+                                    onFocus={handleFocus}
+                                />
+                                {/* Holdings table — always visible */}
+                                {hm.length > 0 && (
+                                    <div className="results-chart-section">
+                                        <div className="results-section-label">All Holdings</div>
+                                        <table className="holdings-metrics-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Holding</th>
+                                                    <th>Alloc %</th>
+                                                    <th>Total Return</th>
+                                                    <th>CAGR</th>
+                                                    <th>Max DD</th>
+                                                    <th>Contribution</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {hm.map((h, i) => (
+                                                    <tr key={h.instrument_id}
+                                                        className={focusedHoldingId === h.instrument_id ? 'holdings-row-focused' : ''}
+                                                        onClick={() => handleFocus(h.instrument_id === focusedHoldingId ? null : h.instrument_id)}
+                                                        style={{ cursor: 'pointer' }}
+                                                    >
+                                                        <td>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                                <span style={{ width: 8, height: 8, borderRadius: '50%', background: PIE_COLORS[i % PIE_COLORS.length], flexShrink: 0 }} />
+                                                                <div>
+                                                                    <div style={{ fontWeight: 500, fontSize: 13 }}>{h.name}</div>
+                                                                    <div style={{ fontSize: 11, color: 'var(--ink-soft)' }}>{h.ticker}</div>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td>{h.allocation_pct?.toFixed(1)}%</td>
+                                                        <td style={{ color: h.total_return >= 0 ? 'var(--green, #059669)' : 'var(--red, #DC2626)' }}>
+                                                            {h.total_return !== null ? `${sign(h.total_return)}${h.total_return?.toFixed(1)}%` : '—'}
+                                                        </td>
+                                                        <td>{h.cagr !== null ? `${sign(h.cagr)}${h.cagr?.toFixed(1)}%` : '—'}</td>
+                                                        <td style={{ color: 'var(--red, #DC2626)' }}>
+                                                            {h.max_drawdown != null ? `${h.max_drawdown?.toFixed(1)}%` : '—'}
+                                                        </td>
+                                                        <td style={{ color: (h.contribution_pct || 0) >= 0 ? 'var(--green, #059669)' : 'var(--red, #DC2626)' }}>
+                                                            {h.contribution_pct != null ? `${h.contribution_pct > 0 ? '+' : ''}${h.contribution_pct?.toFixed(2)}ppt` : '—'}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    }
+
+                    return (
+                        <>
+                            {viewMode === 'simple' && (
+                                <SimpleResults
+                                    run={activeRun}
+                                    compareRun={loadingCmp ? null : compareRun}
+                                    focusedId={focusedHoldingId}
+                                    onFocus={handleFocus}
+                                />
+                            )}
+                            {viewMode === 'advanced' && (
+                                <AdvancedResults
+                                    run={activeRun}
+                                    focusedId={focusedHoldingId}
+                                    onFocus={handleFocus}
+                                />
+                            )}
+                        </>
+                    );
+                })()}
 
                 {!showConfig && !loadingRun && !hasResults && (
                     <div className="results-empty">

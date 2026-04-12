@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchWithAuth } from '../api';
 import InstrumentSearch from '../components/InstrumentSearch';
@@ -86,17 +86,41 @@ function Step2({ holdings, setHoldings }) {
 
     function addHolding(instrument) {
         if (holdings.some((h) => h.instrument_id === instrument.id)) return;
-        setHoldings([
-            ...holdings,
+        const hasData = instrument.instrument_type === 'fixed_return' || !!instrument.first_date;
+        const tempId = Date.now();
+        setHoldings((prev) => [
+            ...prev,
             {
-                tempId: Date.now(),
+                tempId,
                 instrument_id: instrument.id,
                 instrument_name: instrument.name,
                 instrument_type: instrument.instrument_type,
                 exchange: instrument.exchange,
                 allocation_pct: '',
+                first_date: instrument.first_date || null,
+                last_date: instrument.last_date || null,
+                coverageStatus: hasData ? 'ready' : 'loading',
             },
         ]);
+
+        // If no data yet, fetch coverage in the background and update the row
+        if (!hasData) {
+            fetchWithAuth(`/instruments/${instrument.id}/coverage`)
+                .then((cov) => {
+                    setHoldings((prev) =>
+                        prev.map((h) =>
+                            h.tempId === tempId
+                                ? { ...h, first_date: cov.first_date, last_date: cov.last_date, coverageStatus: 'ready' }
+                                : h
+                        )
+                    );
+                })
+                .catch(() => {
+                    setHoldings((prev) =>
+                        prev.map((h) => h.tempId === tempId ? { ...h, coverageStatus: 'error' } : h)
+                    );
+                });
+        }
     }
 
     function updateAlloc(tempId, value) {
@@ -124,6 +148,19 @@ function Step2({ holdings, setHoldings }) {
                                     {TYPE_LABELS[h.instrument_type] || h.instrument_type}
                                     {h.exchange ? ` · ${h.exchange}` : ''}
                                 </span>
+                                {h.instrument_type !== 'fixed_return' && (
+                                    h.coverageStatus === 'loading'
+                                        ? <span className="pnew-holding-coverage loading">
+                                            <span className="pnew-coverage-spinner" /> Downloading data…
+                                          </span>
+                                        : h.coverageStatus === 'error'
+                                        ? <span className="pnew-holding-coverage error">Could not fetch data</span>
+                                        : h.first_date
+                                        ? <span className="pnew-holding-coverage">
+                                            Active from {h.first_date.slice(0, 7)}
+                                          </span>
+                                        : null
+                                )}
                             </div>
 
                             <div className="pnew-alloc-input-wrap">
@@ -180,11 +217,17 @@ function Step2({ holdings, setHoldings }) {
     );
 }
 
-const BENCHMARKS = [
-    { value: 'fd_7pct', label: 'FD at 7% p.a.', desc: 'Fixed deposit benchmark' },
-    { value: 'fd_8pct', label: 'FD at 8% p.a.', desc: 'Higher FD / debt fund proxy' },
-    { value: 'nifty50', label: 'Nifty 50 Index Fund', desc: 'UTI Nifty 50 Index Fund (Direct Growth)' },
+const FD_BENCHMARKS = [
+    { value: 'fd_7pct', label: 'FD 7% p.a.', desc: 'Fixed deposit benchmark' },
+    { value: 'fd_8pct', label: 'FD 8% p.a.', desc: 'Higher FD / debt fund proxy' },
 ];
+
+const NIFTY50_SUGGESTION = { id: null, name: 'Nifty 50 Index Fund', ticker: 'UTI-N50-IDX', instrument_type: 'index' };
+
+const TYPE_LABELS_NEW = {
+    mutual_fund: 'MF', equity: 'EQ', etf: 'ETF',
+    index: 'IDX', gold: 'GOLD', bond: 'BOND', fixed_return: 'FD',
+};
 
 const STRATEGIES = [
     { value: 'none',               label: 'No Rebalancing',   desc: 'Buy and hold' },
@@ -206,7 +249,40 @@ const TODAY = new Date().toISOString().slice(0, 10);
 // ── Step 3 — Review & Backtest Config ─────────────────────────────────────────
 function Step3({ name, principal, notes, holdings, saving, saveError, backtestConfig, setBacchtestConfig }) {
     const totalAllocated = holdings.reduce((s, h) => s + (parseFloat(h.allocation_pct) || 0), 0);
-    const { fromDate, toDate, benchmark, strategy, threshold, txCost, runBacktest } = backtestConfig;
+    const { fromDate, toDate, benchmark, benchmarkInstrument, strategy, threshold, txCost, runBacktest } = backtestConfig;
+
+    const [benchCoverage, setBenchCoverage] = useState({ status: 'idle', first_date: null, last_date: null });
+
+    useEffect(() => {
+        if (benchmark !== 'instrument' || !benchmarkInstrument) {
+            setBenchCoverage({ status: 'idle', first_date: null, last_date: null });
+            return;
+        }
+        setBenchCoverage({ status: 'loading', first_date: null, last_date: null });
+
+        let cancelled = false;
+        (async () => {
+            try {
+                let inst = benchmarkInstrument;
+                if (!inst.id) {
+                    const results = await fetchWithAuth(
+                        `/instruments/search?q=${encodeURIComponent(inst.ticker || inst.name)}`
+                    );
+                    if (cancelled) return;
+                    if (results.length > 0) {
+                        inst = results[0];
+                        setBacchtestConfig((c) => ({ ...c, benchmarkInstrument: inst }));
+                    }
+                }
+                if (!inst.id) { setBenchCoverage({ status: 'error', first_date: null, last_date: null }); return; }
+                const cov = await fetchWithAuth(`/instruments/${inst.id}/coverage`);
+                if (!cancelled) setBenchCoverage({ status: 'ready', first_date: cov.first_date, last_date: cov.last_date });
+            } catch {
+                if (!cancelled) setBenchCoverage({ status: 'error', first_date: null, last_date: null });
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [benchmarkInstrument?.id ?? benchmarkInstrument?.name, benchmark]);
 
     const needsThreshold = strategy === 'threshold' || strategy === 'threshold_calendar';
 
@@ -336,22 +412,62 @@ function Step3({ name, principal, notes, holdings, saving, saveError, backtestCo
 
                     <div className="pnew-field">
                         <label className="pnew-label">Benchmark</label>
-                        <div className="pnew-benchmark-options">
-                            {BENCHMARKS.map((b) => (
-                                <label key={b.value} className={`pnew-benchmark-option${benchmark === b.value ? ' selected' : ''}`}>
-                                    <input
-                                        type="radio"
-                                        name="benchmark"
-                                        value={b.value}
-                                        checked={benchmark === b.value}
-                                        onChange={() => setBacchtestConfig((c) => ({ ...c, benchmark: b.value }))}
-                                    />
-                                    <div>
-                                        <div style={{ fontWeight: 600, fontSize: 13 }}>{b.label}</div>
-                                        <div style={{ fontSize: 11, color: 'var(--ink-soft)' }}>{b.desc}</div>
-                                    </div>
-                                </label>
-                            ))}
+                        <div className="bt-benchmark-section">
+                            <div className="bt-benchmark-pills">
+                                {FD_BENCHMARKS.map((b) => (
+                                    <button key={b.value} type="button"
+                                        className={`bt-benchmark-pill${benchmark === b.value ? ' active' : ''}`}
+                                        onClick={() => setBacchtestConfig((c) => ({ ...c, benchmark: b.value }))}
+                                    >{b.label}</button>
+                                ))}
+                                <button type="button"
+                                    className={`bt-benchmark-pill${benchmark === 'instrument' ? ' active' : ''}`}
+                                    onClick={() => setBacchtestConfig((c) => ({ ...c, benchmark: 'instrument' }))}
+                                >Index / Fund</button>
+                            </div>
+                            {benchmark === 'instrument' && (
+                                <div className="bt-benchmark-instrument">
+                                    {benchmarkInstrument ? (
+                                        <div className="bt-bench-selected">
+                                            <span className={`instrument-type-badge ${benchmarkInstrument.instrument_type}`}>
+                                                {TYPE_LABELS_NEW[benchmarkInstrument.instrument_type] || 'IDX'}
+                                            </span>
+                                            <div className="bt-bench-info">
+                                                <span className="bt-bench-name">{benchmarkInstrument.name}</span>
+                                                {benchCoverage.status === 'loading' && (
+                                                    <span className="pnew-holding-coverage loading">
+                                                        <span className="pnew-coverage-spinner" /> Downloading data…
+                                                    </span>
+                                                )}
+                                                {benchCoverage.status === 'ready' && benchCoverage.first_date && (
+                                                    <span className="pnew-holding-coverage">
+                                                        Active from {benchCoverage.first_date.slice(0, 7)}
+                                                    </span>
+                                                )}
+                                                {benchCoverage.status === 'error' && (
+                                                    <span className="pnew-holding-coverage error">Could not fetch data</span>
+                                                )}
+                                            </div>
+                                            <button type="button" className="bt-bench-clear"
+                                                onClick={() => { setBacchtestConfig((c) => ({ ...c, benchmarkInstrument: null })); setBenchCoverage({ status: 'idle', first_date: null, last_date: null }); }}
+                                                title="Change benchmark"
+                                            >✕</button>
+                                        </div>
+                                    ) : (
+                                        <div className="bt-bench-search">
+                                            <InstrumentSearch
+                                                placeholder="Search index, fund, or stock…"
+                                                onSelect={(inst) => setBacchtestConfig((c) => ({ ...c, benchmarkInstrument: inst }))}
+                                            />
+                                            <button type="button" className="bt-bench-suggest-btn"
+                                                onClick={() => setBacchtestConfig((c) => ({ ...c, benchmarkInstrument: NIFTY50_SUGGESTION }))}
+                                            >
+                                                Use Nifty 50 (suggested)
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -424,13 +540,14 @@ function PortfolioNew() {
     const [downloadNames, setDownloadNames] = useState([]);
 
     const [backtestConfig, setBacchtestConfig] = useState({
-        runBacktest: true,
-        fromDate:   dateYearsAgo(5),
-        toDate:     TODAY,
-        benchmark:  'fd_7pct',
-        strategy:   'none',
-        threshold:  '5',
-        txCost:     '0',
+        runBacktest:         true,
+        fromDate:            dateYearsAgo(5),
+        toDate:              TODAY,
+        benchmark:           'instrument',
+        benchmarkInstrument: NIFTY50_SUGGESTION,
+        strategy:            'none',
+        threshold:           '5',
+        txCost:              '0',
     });
 
     function validateStep1() {
@@ -497,10 +614,20 @@ function PortfolioNew() {
                 const btBody = {
                     from_date:            backtestConfig.fromDate,
                     to_date:              backtestConfig.toDate,
-                    benchmark:            backtestConfig.benchmark,
                     rebalance_strategy:   backtestConfig.strategy,
                     transaction_cost_pct: parseFloat(backtestConfig.txCost) || 0,
                 };
+                if (backtestConfig.benchmark === 'instrument') {
+                    const bi = backtestConfig.benchmarkInstrument;
+                    if (bi?.id) {
+                        btBody.benchmark = 'instrument';
+                        btBody.benchmark_instrument_id = bi.id;
+                    } else {
+                        btBody.benchmark = 'nifty50'; // suggested default
+                    }
+                } else {
+                    btBody.benchmark = backtestConfig.benchmark;
+                }
                 if (needsThreshold) btBody.rebalance_threshold_pct = parseFloat(backtestConfig.threshold) || 5;
                 try {
                     await fetchWithAuth(`/portfolios/${portfolio.id}/backtest`, {

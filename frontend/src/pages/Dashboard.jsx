@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
-import { driver } from 'driver.js';
-import 'driver.js/dist/driver.css';
 import { fetchWithAuth } from '../api';
+import DashboardTour from '../components/DashboardTour';
 import { Link } from 'react-router-dom';
 import {
     getFBSContext,
@@ -181,67 +180,41 @@ const JOURNEY_ICONS = {
     'Net Worth':       (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-4"/></svg>),
 };
 
+// ── Custom Tour ───────────────────────────────────────────────────────────────
+
+
 function Dashboard() {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [confirmingAction, setConfirmingAction] = useState(null);
     const [showAllGaps, setShowAllGaps] = useState(false);
     const [showFBSExplainer, setShowFBSExplainer] = useState(false);
+    const [tourActive, setTourActive] = useState(false);
 
-    const startTour = () => {
-        const d = driver({
-            showProgress: true,
-            animate: true,
-            steps: [
-                {
-                    element: '#chapter-01',
-                    popover: { title: 'Your Money Personality', description: 'This shows your money personality based on how you handle risks. It spots your strengths and areas where you might get tripped up.', side: 'left', align: 'start' }
-                },
-                {
-                    element: '#chapter-01 .journey-grid',
-                    popover: { title: 'Financial Snapshot', description: 'A quick summary of everything you own vs. what you owe, plus your monthly expenses.', side: 'left', align: 'start' }
-                },
-                {
-                    element: '#chapter-02',
-                    popover: { title: 'Financial Health Score', description: 'Your total Score out of 100! It doesn\'t judge how rich you are, but rather how healthy your financial habits and safety nets are.', side: 'left', align: 'start' }
-                },
-                {
-                    element: '#chapter-02 .health-grid',
-                    popover: { title: 'Score Breakdown', description: 'Here\'s how your score breaks down. The higher the bars, the better your habits and knowledge.', side: 'left', align: 'start' }
-                },
-                {
-                    element: '#chapter-03',
-                    popover: { title: 'What\'s Working', description: 'This highlights the good things you\'re already doing right, so you can keep them going.', side: 'left', align: 'start' }
-                },
-                {
-                    element: '#chapter-04',
-                    popover: { title: 'Needs Attention', description: 'These are the vulnerable spots that need your focus to prevent future money stress.', side: 'left', align: 'start' }
-                },
-                {
-                    element: '#chapter-05',
-                    popover: { title: 'Cashflow', description: 'Your money-in vs money-out prediction. It shows how much extra cash you have leftover or if things are too tight.', side: 'left', align: 'start' }
-                },
-                {
-                    element: '#chapter-06',
-                    popover: { title: 'Action Plan', description: 'Your personal checklist! Completing these simple tasks will immediately boost your score and fix any weak spots.', side: 'left', align: 'start' }
-                }
-            ]
-        });
-        d.drive();
-    };
+    const startTour = () => setTourActive(true);
 
+    // Scroll to hash section on initial load (e.g. /dashboard#chapter-03)
+    useEffect(() => {
+        if (!data) return;
+        const hash = window.location.hash.slice(1); // e.g. 'chapter-03'
+        if (!hash) return;
+        const el = document.getElementById(hash);
+        if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+    }, [data]);
+
+    // Auto-start once on first visit
     useEffect(() => {
         if (!data) return;
         if (!localStorage.getItem('dashboard_tour_seen')) {
             localStorage.setItem('dashboard_tour_seen', '1');
-            setTimeout(() => startTour(), 800);
+            setTimeout(() => setTourActive(true), 800);
         }
     }, [data]);
 
     useEffect(() => {
-        const handleStartTour = () => startTour();
-        window.addEventListener('start-dashboard-tour', handleStartTour);
-        return () => window.removeEventListener('start-dashboard-tour', handleStartTour);
+        const handler = () => setTourActive(true);
+        window.addEventListener('start-dashboard-tour', handler);
+        return () => window.removeEventListener('start-dashboard-tour', handler);
     }, []);
 
     useEffect(() => {
@@ -462,6 +435,9 @@ function Dashboard() {
 
     return (
         <div className="dashboard-book">
+
+            {/* ── Dashboard Tour ── */}
+            {tourActive && <DashboardTour onClose={() => setTourActive(false)} />}
 
             {/* ═══════════════════════════════════════════════════
                 SECTION 01 — YOUR PROFILE

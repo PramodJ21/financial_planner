@@ -71,9 +71,8 @@ function Sidebar({ mobileOpen, onCloseMobile, collapsed, onToggleCollapse, secti
     const scrollToChapter = useCallback((chapterId) => {
         if (isDashboard) {
             const el = document.getElementById(chapterId);
-            if (el) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            navigate(`/dashboard#${chapterId}`, { replace: true });
         } else {
             navigate(`/dashboard#${chapterId}`);
         }
