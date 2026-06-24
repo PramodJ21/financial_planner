@@ -10,8 +10,9 @@ const portfolioRoutes = require('./routes/portfolio');
 
 const app = express();
 
+const allowedOrigins = ["https://financial-planner-1-uhyd.onrender.com"];
 app.use(cors({
-    origin: true,
+    origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
